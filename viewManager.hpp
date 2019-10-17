@@ -38,6 +38,7 @@
 #include <typeindex>
 #include <typeinfo>
 #include <utility>
+#include <stdexcept>
 
 #define CONSOLE
 
@@ -213,6 +214,7 @@ developed.
   public:                                                                      \
     double value;                                                              \
     NAME(const double &_val) : value(_val) {}                                  \
+    NAME(const NAME &_val) : value(_val.value) {}                                  \
   }
 #define _STRING_ATTRIBUTE(NAME)                                                \
   using NAME = class NAME {                                                    \
@@ -227,6 +229,7 @@ developed.
     NAME(const double &_val, const numericFormat &_nf)                         \
         : doubleNF(_val, _nf) {}                                               \
     NAME(const doubleNF &_val) : doubleNF(_val) {}                             \
+    NAME(const NAME &_val) : doubleNF(_val) {}                             \
   }
 #define _ENUMERATED_ATTRIBUTE(NAME, ...)                                       \
   using NAME = class NAME {                                                    \
@@ -236,6 +239,7 @@ developed.
                                                                                \
   public:                                                                      \
     NAME(const optionEnum &val) : value(val) {}                                \
+    NAME(const NAME &val) : value(val.value) {}                                \
   }
 #define _NUMERIC_WITH_ENUMERATED_ATTRIBUTE(NAME, ...)                          \
   using NAME = class NAME {                                                    \
@@ -245,7 +249,7 @@ developed.
     optionEnum option;                                                         \
     NAME(const double &_val, const optionEnum &_opt)                           \
         : value(_val), option(_opt) {}                                         \
-    NAME(NAME &&) = default;                                                   \
+    NAME(const NAME &_val) : value(_val.value), option(_val.option) {} \
   }
 #define _COLOR_ATTRIBUTE(NAME)                                                 \
   using NAME = class NAME : public colorNF {                                   \
@@ -267,7 +271,6 @@ developed.
   public:                                                                      \
     std::vector<std::string_view> value;                                       \
     NAME(std::vector<std::string_view> _val) : value(std::move(_val)) {}       \
-    NAME(NAME &&) = default;                                                   \
   }
 // namespace ViewManager
 /*
@@ -389,9 +392,11 @@ Element
 ********************************************************/
 class Element {
 public:
+  std::string_view softName;
+
 public:
-  Element(const std::vector<std::any> &attribs = {})
-      : m_self(this), m_parent(nullptr), m_firstChild(nullptr),
+  Element(std::string_view _softName, const std::vector<std::any> &attribs = {})
+      : softName(_softName), m_self(this), m_parent(nullptr), m_firstChild(nullptr),
         m_lastChild(nullptr), m_nextChild(nullptr), m_previousChild(nullptr),
         m_nextSibling(nullptr), m_previousSibling(nullptr), m_childCount(0) {
     setAttribute(attribs);
@@ -462,8 +467,13 @@ public:
   /// noted that flush should be called.
   /// </summary>
   template <typename T> Element &operator<<(const T &data) {
-    std::stringstream s;
-    // s << data;
+    std::ostringstream s;
+    s << data;
+
+    // append the information to the end of the data vector.
+    auto &vdata=this->data<std::string>();
+    vdata.push_back(s.str());
+
     return *this;
   }
   /*
@@ -651,14 +661,15 @@ public:
     return newChild;
   }
 
-  auto appendChild(ElementList &elementCollection) -> Element & {
-    for (auto &e : elementCollection)
-      appendChild(e);
+  auto appendChild(const ElementList &elementCollection) -> Element & {
+    for (auto e : elementCollection) {
+      appendChild(e.get());
+    }
     return *this;
   }
   template <typename TYPE, typename... ATTRS>
   auto appendChild(const ATTRS &... attrs) -> Element & {
-    std::vector<std::any> attrvector{&attrs...};
+    std::vector<std::any> attrvector{attrs...};
     TYPE &e = _createElement<TYPE>(attrvector);
     appendChild(e);
     return e;
@@ -680,7 +691,7 @@ public:
   }
   template <typename TYPE, typename... ATTRS>
   auto append(const ATTRS &... attrs) -> Element & {
-    std::vector<std::any> attrvector{&attrs...};
+    std::vector<std::any> attrvector{attrs...};
     TYPE &e = _createElement<TYPE>(attrvector);
     append(e);
     return e;
@@ -834,8 +845,14 @@ public:
     ATTR_TYPE *ret = nullptr;
     std::unordered_map<std::type_index, std::any>::iterator it =
         attributes.find(std::type_index(typeid(ATTR_TYPE)));
-    if (it != attributes.end())
+    if (it != attributes.end()) {
       ret = &std::any_cast<ATTR_TYPE &>(it->second);
+    } else {
+        std::string info = typeid(ret).name();
+        info+=" attribute not found";
+
+        throw std::invalid_argument( info );
+    }
     return *ret;
   }
 
@@ -903,14 +920,14 @@ auto operator""_numeric(long double value) -> lineHeight;
 
 using BR = class BR : public Element {
 public:
-  BR(const std::vector<std::any> &attribs) : Element() {
+  BR(const std::vector<std::any> &attribs) : Element("br") {
     setAttribute(attribs);
   }
 };
 using H1 = class H1 : public Element {
 public:
   H1(const std::vector<std::any> &attribs)
-      : Element({display::block, marginTop{.67_em}, marginLeft{.67_em},
+      : Element("h1",{display::block, marginTop{.67_em}, marginLeft{.67_em},
                  marginBottom{0_em}, marginRight{0_em}, textSize{2_em},
                  textWeight{800}}) {
     setAttribute(attribs);
@@ -919,7 +936,7 @@ public:
 using H2 = class H2 : public Element {
 public:
   H2(const std::vector<std::any> &attribs)
-      : Element({display::block, marginTop{.83_em}, marginLeft{.83_em},
+      : Element("h2",{display::block, marginTop{.83_em}, marginLeft{.83_em},
                  marginBottom{0_em}, marginRight{0_em}, textSize{1.5_em},
                  textWeight{800}}) {
     setAttribute(attribs);
@@ -928,7 +945,7 @@ public:
 using H3 = class H3 : public Element {
 public:
   H3(const std::vector<std::any> &attribs)
-      : Element({display::block, marginTop{1_em}, marginLeft{1_em},
+      : Element("h3",{display::block, marginTop{1_em}, marginLeft{1_em},
                  marginBottom{0_em}, marginRight{0_em}, textSize{1.17_em},
                  textWeight{800}}) {
     setAttribute(attribs);
@@ -937,27 +954,27 @@ public:
 using PARAGRAPH = class PARAGRAPH : public Element {
 public:
   PARAGRAPH(const std::vector<std::any> &attribs)
-      : Element({listStyleType::disc, marginTop{1_em}, marginLeft{1_em},
+      : Element("paragraph",{listStyleType::disc, marginTop{1_em}, marginLeft{1_em},
                  marginBottom{0_em}, marginRight{0_em}}) {
     setAttribute(attribs);
   }
 };
 using DIV = class DIV : public Element {
 public:
-  DIV(const std::vector<std::any> &attribs) : Element({display::block}) {
+  DIV(const std::vector<std::any> &attribs) : Element("div",{display::block}) {
     setAttribute(attribs);
   }
 };
 using SPAN = class SPAN : public Element {
 public:
-  SPAN(const std::vector<std::any> &attribs) : Element() {
+  SPAN(const std::vector<std::any> &attribs) : Element("span") {
     setAttribute(attribs);
   }
 };
 using UL = class UL : public Element {
 public:
   UL(const std::vector<std::any> &attribs)
-      : Element({listStyleType::disc, display::block, marginTop{1_em},
+      : Element("ul",{listStyleType::disc, display::block, marginTop{1_em},
                  marginLeft{1_em}, marginBottom{0_em}, marginRight{0_em},
                  paddingLeft{40_px}}) {
     setAttribute(attribs);
@@ -966,7 +983,7 @@ public:
 using OL = class OL : public Element {
 public:
   OL(const std::vector<std::any> &attribs)
-      : Element({listStyleType::decimal, display::block, marginTop{1_em},
+      : Element("ol",{listStyleType::decimal, display::block, marginTop{1_em},
                  marginLeft{1_em}, marginBottom{0_em}, marginRight{0_em},
                  paddingLeft{40_px}}) {
     setAttribute(attribs);
@@ -974,7 +991,7 @@ public:
 };
 using LI = class LI : public Element {
 public:
-  LI(const std::vector<std::any> &attribs) : Element() {
+  LI(const std::vector<std::any> &attribs) : Element("li") {
     setAttribute(attribs);
   }
 };
@@ -982,32 +999,32 @@ public:
 _VECTOR_ATTRIBUTE(tableColumns);
 using TABLE = class TABLE : public Element {
 public:
-  TABLE(const std::vector<std::any> &attribs) : Element() {
+  TABLE(const std::vector<std::any> &attribs) : Element("table") {
     setAttribute(attribs);
   }
 };
 using MENU = class MENU : public Element {
 public:
-  MENU(const std::vector<std::any> &attribs) : Element() {
+  MENU(const std::vector<std::any> &attribs) : Element("menu") {
     setAttribute(attribs);
   }
 };
-using GUI_OBJECT = class GUI_OBJECT : public Element {
+using UX = class UX : public Element {
 public:
-  GUI_OBJECT(const std::vector<std::any> &attribs) : Element() {
+  UX(const std::vector<std::any> &attribs) : Element("ux") {
     setAttribute(attribs);
   }
 };
 using IMAGE = class IMAGE : public Element {
 public:
-  IMAGE(const std::vector<std::any> &attribs) : Element() {
+  IMAGE(const std::vector<std::any> &attribs) : Element("image") {
     setAttribute(attribs);
   }
 };
 class textNode : public Element {
 public:
   std::string_view &value;
-  textNode(std::string_view &s) : value(s), Element() {}
+  textNode(std::string_view &s) : value(s), Element("textNode") {}
 };
 /// USE_LOWER_CASE_ENTITY_NAMES
 /// <summary>Options for compiling that provide recognition of
@@ -1027,7 +1044,7 @@ using ul = UL;
 using ol = OL;
 using li = LI;
 using menu = MENU;
-using gui_object = GUI_OBJECT;
+using ux = UX;
 using image = IMAGE;
 using textnode = textNode;
 #endif
@@ -1036,6 +1053,9 @@ Templated factory implementation for reference based callee and
 viewManager ownership of the object. The vector deconstructor will cause
 proper deallocation.
 *********************************************************************************/
+
+void consoleRender(Element &e, int iLevel);
+
 template <class TYPE>
 auto _createElement(const std::vector<std::any> &attrs) -> TYPE & {
   std::unique_ptr<TYPE> e = std::make_unique<TYPE>(attrs);
@@ -1044,7 +1064,7 @@ auto _createElement(const std::vector<std::any> &attrs) -> TYPE & {
 }
 template <class TYPE, typename... ATTRS>
 auto createElement(const ATTRS &... attribs) -> TYPE & {
-  std::vector<std::any> attrvector{&attribs...};
+  std::vector<std::any> attrvector{attribs...};
   return _createElement<TYPE>(attrvector);
 }
 template <typename... Types> auto createStyle(Types... args) -> StyleClass & {
@@ -1054,14 +1074,14 @@ template <typename... Types> auto createStyle(Types... args) -> StyleClass & {
 }
 auto query(const std::string_view &queryString) -> ElementList;
 auto query(const ElementQuery &queryFunction) -> ElementList;
+
 template <class T = Element &>
 auto getElement(const std::string_view &key) -> T & {
-#if 0
-auto &it = indexedElements.find(key);
+auto it = indexedElements.find(key);
 T ret = it->second.get();
 return ret;
-#endif
 }
+
 bool hasElement(const std::string_view &key);
 #define CREATE_OBJECT_ALIAS(OBJECT_TEXT, OBJECT_TYPE)                          \
   {                                                                            \
@@ -1078,7 +1098,7 @@ static std::unordered_map<
                         CREATE_OBJECT(PARAGRAPH), CREATE_OBJECT(DIV),
                         CREATE_OBJECT(SPAN),      CREATE_OBJECT(UL),
                         CREATE_OBJECT(OL),        CREATE_OBJECT(LI),
-                        CREATE_OBJECT(MENU),      CREATE_OBJECT(GUI_OBJECT),
+                        CREATE_OBJECT(MENU),      CREATE_OBJECT(UX),
                         CREATE_OBJECT(IMAGE)};
 /****************************************************************
 Viewer
@@ -1087,8 +1107,7 @@ class Viewer : public Element {
 public:
   Viewer(const std::vector<std::any> &attribs);
   ~Viewer();
-  Viewer(const Viewer &) {}
-  Viewer(Viewer &&other) noexcept {}
+  Viewer(const Viewer &) : Element("viewer") {}
   Viewer &operator=(const Viewer &) {}
   Viewer &operator=(Viewer &&other) noexcept {} // move assignment
   void render(void);
