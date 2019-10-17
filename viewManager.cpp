@@ -16,7 +16,7 @@ std::vector<std::unique_ptr<Element>> ViewManager::elements;
 std::unordered_map<std::string_view, std::reference_wrapper<Element>>
     ViewManager::indexedElements;
 std::vector<std::unique_ptr<StyleClass>> ViewManager::styles;
-ViewManager::Viewer::Viewer(const vector<any> &attrs) : Element(attrs) {
+ViewManager::Viewer::Viewer(const vector<any> &attrs) : Element("viewer", attrs) {
   // setAttribute(indexBy{"_root"};
   Visualizer::openWindow(*this);
 }
@@ -29,7 +29,33 @@ ViewManager::Viewer::~Viewer() { Visualizer::closeWindow(*this); }
 ///
 ///
 /// </summary>
-void ViewManager::Viewer::render(void) {}
+
+void ViewManager::consoleRender(Element &e, int iLevel) {
+    int iWidth = iLevel *4;
+
+    cout.width(iWidth);
+    cout.fill(' ');
+
+    cout << e.softName << endl;
+
+    auto n = e.firstChild();
+    e.render();
+    while (n) {
+        consoleRender(n->get(),iLevel+1);
+        n = n->get().nextChild();
+    }
+
+
+}
+
+void ViewManager::Viewer::render(void) {
+
+#if defined(CONSOLE)
+consoleRender(*this, 0);
+
+#endif
+
+}
 /// <summary>
 /// This is the only entry point from the platform for the event
 /// dispatching system. The routine expects only certain types
@@ -141,7 +167,7 @@ auto ViewManager::query(const std::string_view &queryString) -> ElementList {
   ElementList results;
   if (queryString == "*") {
     for (const auto &n : elements) {
-      results.push_back(*n);
+      results.push_back(std::ref(*(n.get())));
     }
   } else {
     std::regex matchExpression(queryString.data(),
@@ -150,7 +176,7 @@ auto ViewManager::query(const std::string_view &queryString) -> ElementList {
     for (const auto &n : elements) {
       if (std::regex_match(n->getAttribute<indexBy>().value.data(),
                            matchExpression))
-        results.push_back(*n);
+      results.push_back(std::ref(*(n.get())));
     }
   }
   return results;
@@ -158,8 +184,8 @@ auto ViewManager::query(const std::string_view &queryString) -> ElementList {
 auto ViewManager::query(const ElementQuery &queryFunction) -> ElementList {
   ElementList results;
   for (const auto &n : elements) {
-    if (queryFunction(*n))
-      results.push_back(*n);
+    if (queryFunction(std::ref(*(n.get()))))
+      results.push_back(std::ref(*(n.get())));
   }
   return results;
 }
@@ -324,7 +350,15 @@ auto ViewManager::Element::removeListener(eventType evtType,
 /// work performed by this routine is accomplished using the surface image.
 /// </ summary>
 ///
-void ViewManager::Element::render(void) {}
+void ViewManager::Element::render(void) {
+     std::cout<<m_childCount<<std::endl;
+
+     // print information in the default string vector buffer
+     auto vdata=this->data<std::string>();
+     for(auto s:vdata)
+        std::cout << s << endl;
+
+}
 /// <summary>Uses the vasprint standard function to format the given
 /// parameters with the format string. Inserts the named
 /// elements within the markup into the document.</summary>
