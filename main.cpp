@@ -26,10 +26,10 @@ void test8(Viewer &vm);
 void test10(Viewer &vm);
 
 void testStart(string_view sFunc) {
-#if defined(CONSOLE)	
+#if defined(CONSOLE)
 	cout << sFunc << endl;
 #endif
-	
+
 }
 
 /****************************************************************************************************
@@ -46,14 +46,14 @@ int WINAPI WinMain(HINSTANCE /* hInstance */, HINSTANCE /* hPrevInstance */,
 
   // create the main window area. This may this is called a Viewer object.
   // The main browsing window. It is an element as well.
-  auto &vm = createElement<Viewer>(
+  auto vm = createElement<Viewer>(
       objectTop{10_pct}, objectLeft{10_pct}, objectHeight{80_pct},
       objectWidth{80_pct}, textFace{"arial"}, textSize{16_pt}, textWeight{400},
       textIndent{2_em}, lineHeight::normal, textAlignment::left,
       position::relative, paddingTop{5_pt}, paddingLeft{5_pt},
       paddingBottom{5_pt}, paddingRight{5_pt}, marginTop{5_pt},
       marginLeft{5_pt}, marginBottom{5_pt}, marginRight{5_pt});
-      
+
   vm << "Hello World\n";
   vm.render();
   vm << "<h1>Hello World</h1>";
@@ -104,14 +104,14 @@ void test0b(Viewer &vm) {
 //! [test1]
 void test1(Viewer &vm) {
   //testStart(__func__);
-  auto &mainArea = createElement<DIV>(
+  auto mainArea = createElement<DIV>(
       indexBy{"mainArea"}, objectTop{10_pct}, objectLeft{10_pct},
       objectWidth{90_pct}, objectHeight{90_pct}, textColor{50, 50, 50},
       background{100, 200, 200}, textFace{"FiraMono-Regular"}, textSize{20_pt},
       textWeight{400});
-  auto &appTitle = createElement<H1>(indexBy{"title"}, objectTop{10_px},
+  auto appTitle = createElement<H1>(indexBy{"title"}, objectTop{10_px},
                                      textAlignment::center, "Type XCB");
-  auto &appSubTitle =
+  auto appSubTitle =
       createElement<H2>(indexBy{"subtitle"}, objectTop{10_px},
                         textAlignment::center, "A starter testing Application");
   appTitle.setAttribute(objectTop{20_percent});
@@ -121,12 +121,12 @@ void test1(Viewer &vm) {
   mainArea.appendChild(appTitle);
   mainArea.appendChild(appSubTitle);
   vm.appendChild(mainArea);
-  for (Element &n : query("*")) {
+  for (Element n : query("*")) {
   }
   getElement("title").clear().data() = {
       "A new copy is never created when appending happens., just std::move"};
   vm.render();
-  for (auto &n : query("*")) {
+  for (auto n : query("*")) {
   }
   getElement("title").data() = {
       "It uses the reference to the created object createElement."};
@@ -262,15 +262,17 @@ void test1a(Viewer &vm) {
 void test2(Viewer &vm) {
   testStart(__func__);
   for (int i = 0; i < randomInt(100); i++) {
-    auto &information = createElement<DIV>(indexBy{"rndDIV_" + to_string(i)});
+    auto information = createElement<DIV>(indexBy{"rndDIV_" + to_string(i)});
     for (int j = 0; j < randomInt(100); j++) {
       information.appendChild<PARAGRAPH>(
           indexBy{"rndParagraph_" + to_string(j)}, randomString(200));
     }
     vm.appendChild(information);
   }
-  // randomize attributes
-  for (int i = 0; i < 1000; i++) {
+
+  // randomize attributes, usually the test would contain a larger number that 1 for testing the performance.
+  // hwoever with exceptions being caught, within the terminal, one iteration is fine for the debug.
+  for (int i = 0; i < 1; i++) {
     for (auto n : query("*"))
       randomAttributeSettings(n);
   }
@@ -289,7 +291,7 @@ void test3(Viewer &vm) {
         indexBy{"rndTEST3BookletParagraph_" + to_string(i)},
         randomString(200)));
   }
-  auto &booklet = createElement<DIV>(indexBy{"booklet3"});
+  auto booklet = createElement<DIV>(indexBy{"booklet3"});
   vm.appendChild(booklet);
   booklet.appendChild(chapter);
   vm.render();
@@ -299,7 +301,7 @@ void test3(Viewer &vm) {
 void test4(Viewer &vm) {
   testStart(__func__);
   int m = randomInt(100);
-  Element &eBooklet = vm.appendChild<DIV>(indexBy{"booklet4"});
+  Element eBooklet = vm.appendChild<DIV>(indexBy{"booklet4"});
   for (int i = 0; i < m; i++)
     eBooklet.appendChild<PARAGRAPH>(
         indexBy{"rndTEST4BookletParagraph_" + to_string(i)}, randomString(200));
@@ -322,6 +324,7 @@ void test5(Viewer &vm) {
                            randomString(200));
     chapter.push_back(e);
   }
+  cout << "document building finished" << endl;
   vm.appendChild<DIV>(indexBy{"booklet5"}).appendChild(chapter);
   vm.render();
 }
@@ -334,13 +337,13 @@ void test6(Viewer &vm) {
   ElementList chapter;
   int m = randomInt(5);
   for (int i = 0; i < m; i++) {
-    auto e = createElement<PARAGRAPH>(
+    auto &e = createElement<PARAGRAPH>(
         indexBy{"rndTEST5BookletParagraph_" + to_string(i)});
-    stringstream ss;
-    ss << "Hello "
-       << "anthony"
-       << "can you do the []";
-    e << ss;
+
+    e  <<  "Hello "
+        << "anthony"
+        << "can you do the []";
+
     e.appendChild<UL>(indexBy{"bookletNotes_" + to_string(i)},
                       vector<string_view>{"Endurance training", "Biking",
                                           "Meals", "Schedule"})
@@ -360,7 +363,9 @@ void test6(Viewer &vm) {
                                         "Rim's n Chains"});
     chapter.push_back(e);
   }
+
   vm.appendChild<DIV>(indexBy{"booklet5"}).appendChild(chapter);
+
   vm.render();
 }
 //! [test6]
@@ -405,7 +410,7 @@ void test7a(Viewer &vm) {
   vParagraphs.push_back(createElement<PARAGRAPH>(indexBy{"testpara3"}));
   vParagraphs.push_back(createElement<PARAGRAPH>(indexBy{"testpara4"}));
   vParagraphs.push_back(createElement<PARAGRAPH>(indexBy{"testpara5"}));
-  auto &divTest = vm.appendChild<DIV>(indexBy{"test"});
+  auto divTest = vm.appendChild<DIV>(indexBy{"test"});
   divTest.appendChild(vParagraphs);
   divTest.append("<ul><li>Hello added to the end</li></ul>");
   divTest.appendChild("<p>Just adhoc dom building.</p>");
@@ -428,7 +433,7 @@ void test7b(Viewer &vm) {
   vParagraphs.push_back(createElement<PARAGRAPH>(indexBy{"testpara3"}));
   vParagraphs.push_back(createElement<PARAGRAPH>(indexBy{"testpara4"}));
   vParagraphs.push_back(createElement<PARAGRAPH>(indexBy{"testpara5"}));
-  auto &divTest = vm.appendChild<DIV>(indexBy{"test"});
+  auto divTest = vm.appendChild<DIV>(indexBy{"test"});
   divTest.appendChild(vParagraphs);
   divTest.append("<p>Appended after divtest as a sibling.</p>");
   divTest.appendChild("<p>Just adhoc dom building.</p>");
@@ -446,7 +451,7 @@ void test7b(Viewer &vm) {
 //! [test7c]
 void test7c(Viewer &vm) {
   testStart(__func__);
-  auto &divTest = vm.appendChild<DIV>(indexBy{"testAnother"});
+  auto divTest = vm.appendChild<DIV>(indexBy{"testAnother"});
   // the append and appendChild with texts.
   divTest.appendChild("<ul></ul>")
       .appendChild("<li>test1</li>")
@@ -460,7 +465,7 @@ void test7c(Viewer &vm) {
 //! [test7d]
 void test7d(Viewer &vm) {
   testStart(__func__);
-  auto &divTest = vm.appendChild<DIV>(indexBy{"testAnother"});
+  auto divTest = vm.appendChild<DIV>(indexBy{"testAnother"});
   // the append and appendChild with texts.
   divTest.appendChild("<ul></ul>").data() = {"2222", "3333", "444", "6.66",
                                              "7"};
@@ -480,7 +485,7 @@ void test7d(Viewer &vm) {
                                              "ghhhht"};
 }
 void test7e(Viewer &view) {
-  auto &tblCost = createElement<TABLE>(
+  auto tblCost = createElement<TABLE>(
       objectLeft{10_pct}, objectTop{10_pct}, objectWidth{80_pct},
       objectHeight{80_pct},
       tableColumns{
@@ -555,8 +560,8 @@ void test7f(Viewer &view) {
       {1, "Squeeler", 9.1},
       {0, "Books", 10},
       {1, "The Button Bubble - Digital Economics By Anthony Matarazzo", 5.5}};
-  auto &urecords = getElement<ul>(idRecords);
-  auto &recordPlex = urecords.data<tagInfo>();
+  auto urecords = getElement(idRecords);
+  auto recordPlex = urecords.data<tagInfo>();
   recordPlex.push_back({0, "Variodic Blackhearts", .2});
   recordPlex.push_back({1, "Sympathetic Voting Machines", .001});
   recordPlex.push_back(
@@ -582,7 +587,7 @@ void test7f(Viewer &view) {
         std::get<2>(tag) < 5.0 ? textColor{"blue"} : textColor{"purple"};
     auto &o = createElement<li>(textColor{"blue"});
     // set icon of the li element
-    auto &n = std::get<0>(tag);
+    auto n = std::get<0>(tag);
     o.appendChild<image>(sIconNames[n]);
     // set text
     o.appendChild<span>(std::get<1>(tag));
@@ -592,7 +597,7 @@ void test7f(Viewer &view) {
   // Data insertion using the stdandard libary
   //
   // get reference to actual memory. std interface.
-  auto &ulRecords = getElement<ul>(idRecords);
+  auto ulRecords = getElement(idRecords);
   // tagFormatter is needed for hash map to get the structure.
   // templated for user defined storage and reflexion.
   // state information is saved when getAdaptor is invoked,
@@ -600,7 +605,7 @@ void test7f(Viewer &view) {
   // the problem to solve for the system that will create
   // high performance "implementation error free" solution
   // exception raised from non created item from absorb.
-  auto &recordPlex2 = ulRecords.data<tagInfo>();
+  auto recordPlex2 = ulRecords.data<tagInfo>();
   for (int i = 1; i < 10; i++)
     recordPlex2.push_back({i, "STD::MOVE", randomDouble(0, 10)});
   // senses that 10 added to the end of a list of 1000 already/ - no display
@@ -730,7 +735,7 @@ void test7g(Viewer &view) {
       {"apple.jpg", 2344, 0x676778534},
       {"orange.jpg", 5545, 0x99887},
       {"pineapple.jpg", 1346, 0x454567}};
-  auto &ulItems = getElement<ul>("uniRec");
+  auto ulItems = getElement("uniRec");
   // transform lambda
   ulItems.dataTransform<li, uniRecord>(
       [](auto &o) -> auto & { return o.build(); });
@@ -738,7 +743,7 @@ void test7g(Viewer &view) {
                                   {"Brussel Sprouts"}, {"Cabbage, Green"},
                                   {"Cabbage, Red"},    {"Carrot"},
                                   {"Cassava"},         {"Cauliflower"}};
-  auto &vecItems = ulItems.data<uniRecord>();
+  auto vecItems = ulItems.data<uniRecord>();
   vecItems.insert(vecItems.end(), vegetables.begin(), vegetables.end());
   // takes info and induces the change.
   ulItems.dataHint<uniRecord>(vegetables.size());
@@ -880,7 +885,7 @@ void test7i(Viewer &view) {
       {0, "color", 2.9, "unknown not found error"},
       {2, "magnetism", 8.3, "perhaps but much after quantium decays"},
       {1, "alertness", 3.7, "can monitor laughter pinches"}};
-  auto &o = getElement<ul>("corp");
+  auto o = getElement("corp");
 #if 0
  o.dataTransform<0, processList>(
  {{0,
@@ -952,7 +957,7 @@ library for specific types of uses.
 //! [test8a]
 void test8a(Viewer &vm) {
   testStart(__func__);
-  auto &dBook = vm.appendChild<DIV>(indexBy{"booklet5"});
+  auto dBook = vm.appendChild<DIV>(indexBy{"booklet5"});
   PARAGRAPH *pBooklet = nullptr;
   // a warning is issued which is what is required.
   // main.cpp:XXXXX: warning: format string is not a string
@@ -977,7 +982,7 @@ void test8a(Viewer &vm) {
 void test8(Viewer &vm) {
   testStart(__func__);
   int m = randomInt(5);
-  auto &dBook = vm.appendChild<DIV>(indexBy{"booklet5"});
+  auto dBook = vm.appendChild<DIV>(indexBy{"booklet5"});
   vm.render();
   // std::reference_wrapper<PARAGRAPH> Booklet;
   for (int i = 0; i < m; i++) {
@@ -1005,12 +1010,10 @@ void test10(Viewer &vm) {
   int m = randomInt(5);
   auto dBook = vm.appendChild<DIV>(indexBy{"booklet5"});
   vm.render();
-  PARAGRAPH *pBooklet = nullptr;
+
   for (int i = 0; i < m; i++) {
-    // this line is like putting :
-    // pBooklet=
-    // in textual tag
-    dBook << stringPointerTag(pBooklet) << "<p id=BookletParagraph_" << i << ">"
+
+    dBook << "<p id=BookletParagraph_" << i << ">"
           << "The paragraph content is here."
           << " <ul id=notes_" << i << ">text content ul"
           << "<ul id=guestSpeaker_" << i << ">"
@@ -1021,7 +1024,15 @@ void test10(Viewer &vm) {
           << "</ul>"
           << "</ul>"
           << "</p>";
-    pBooklet->setAttribute(textColor{"red"});
+    #if 0
+       /* rather than mixing the use of pointer withi nthe syntax, the stringPointTag syntax might offer complexity.
+         document for the user of the library a query facility that implements the functionality.
+         */
+    auto Booklet = query("id=
+
+    ->setAttribute(textColor{"red"});
+    #endif
+
   }
   vm.render();
 }
@@ -1063,28 +1074,33 @@ int randomInt(int a) {
 /************************************************************************
 ************************************************************************/
 void randomAttributeSettings(Element &e) {
-  e.getAttribute<textIndent>().value = randomDouble(0.0, 10.5);
-  e.getAttribute<objectTop>().value = randomDouble(0.0, 300);
-  e.setAttribute(objectTop{randomDouble(0.0, 300), numericFormat::percent});
-  e.getAttribute<objectLeft>().value = randomDouble(0.0, 300);
-  e.setAttribute(objectLeft{randomDouble(0.0, 300), numericFormat::percent});
-  e.getAttribute<objectWidth>().value = randomDouble(0.0, 300);
-  e.setAttribute(objectWidth{randomDouble(0.0, 300), numericFormat::percent});
-  e.getAttribute<objectHeight>().value = randomDouble(0.0, 300);
-  e.setAttribute(objectHeight{randomDouble(0.0, 300), numericFormat::percent});
-  e.getAttribute<textFace>().value = randomString(10);
-  e.getAttribute<textWeight>().value = randomDouble(0.0, 1000.0);
-  e.getAttribute<tabSize>().value = randomDouble(0.0, 10.0);
-  e.getAttribute<focusIndex>().value = randomDouble(0.0, 1000.0);
-  e.getAttribute<lineHeight>().value = randomDouble(0.0, 20.0);
-  e.getAttribute<paddingTop>().value = randomDouble(0.0, 20.0);
-  e.getAttribute<paddingBottom>().value = randomDouble(0.0, 20.0);
-  e.getAttribute<paddingLeft>().value = randomDouble(0.0, 20.0);
-  e.getAttribute<paddingRight>().value = randomDouble(0.0, 20.0);
-  e.getAttribute<marginTop>().value = randomDouble(0.0, 50.0);
-  e.getAttribute<marginBottom>().value = randomDouble(0.0, 50.0);
-  e.getAttribute<marginLeft>().value = randomDouble(0.0, 50.0);
-  e.getAttribute<marginRight>().value = randomDouble(0.0, 50.0);
-  e.getAttribute<borderWidth>().value = randomDouble(0.0, 50.0);
-  e.getAttribute<borderRadius>().value = randomDouble(0.0, 10.5);
+    try {
+    e.getAttribute<textIndent>().value = randomDouble(0.0, 10.5);
+    e.getAttribute<objectTop>().value = randomDouble(0.0, 300);
+    e.setAttribute(objectTop{randomDouble(0.0, 300), numericFormat::percent});
+    e.getAttribute<objectLeft>().value = randomDouble(0.0, 300);
+    e.setAttribute(objectLeft{randomDouble(0.0, 300), numericFormat::percent});
+    e.getAttribute<objectWidth>().value = randomDouble(0.0, 300);
+    e.setAttribute(objectWidth{randomDouble(0.0, 300), numericFormat::percent});
+    e.getAttribute<objectHeight>().value = randomDouble(0.0, 300);
+    e.setAttribute(objectHeight{randomDouble(0.0, 300), numericFormat::percent});
+    e.getAttribute<textFace>().value = randomString(10);
+    e.getAttribute<textWeight>().value = randomDouble(0.0, 1000.0);
+    e.getAttribute<tabSize>().value = randomDouble(0.0, 10.0);
+    e.getAttribute<focusIndex>().value = randomDouble(0.0, 1000.0);
+    e.getAttribute<lineHeight>().value = randomDouble(0.0, 20.0);
+    e.getAttribute<paddingTop>().value = randomDouble(0.0, 20.0);
+    e.getAttribute<paddingBottom>().value = randomDouble(0.0, 20.0);
+    e.getAttribute<paddingLeft>().value = randomDouble(0.0, 20.0);
+    e.getAttribute<paddingRight>().value = randomDouble(0.0, 20.0);
+    e.getAttribute<marginTop>().value = randomDouble(0.0, 50.0);
+    e.getAttribute<marginBottom>().value = randomDouble(0.0, 50.0);
+    e.getAttribute<marginLeft>().value = randomDouble(0.0, 50.0);
+    e.getAttribute<marginRight>().value = randomDouble(0.0, 50.0);
+    e.getAttribute<borderWidth>().value = randomDouble(0.0, 50.0);
+    e.getAttribute<borderRadius>().value = randomDouble(0.0, 10.5);
+    } catch (const std::exception& e) {
+        std::cout << " Exception: "
+                    << e.what() << "\n";
+    }
 }
