@@ -1,9 +1,10 @@
 #include "viewManager.hpp"
 
 using namespace std;
-using namespace ViewManager;
+using namespace viewManager;
 
 void test0(Viewer &vm);
+void test0b(Viewer &vm);
 void test1(Viewer &vm);
 void test1a(Viewer &vm);
 void test2(Viewer &vm);
@@ -27,9 +28,8 @@ void test10(Viewer &vm);
 
 void testStart(string_view sFunc) {
 #if defined(CONSOLE)
-	cout << sFunc << endl;
+  cout << sFunc << endl;
 #endif
-
 }
 
 /****************************************************************************************************
@@ -46,6 +46,7 @@ int WINAPI WinMain(HINSTANCE /* hInstance */, HINSTANCE /* hPrevInstance */,
 
   // create the main window area. This may this is called a Viewer object.
   // The main browsing window. It is an element as well.
+  cout << "start viewer create" << endl;
   auto vm = createElement<Viewer>(
       objectTop{10_pct}, objectLeft{10_pct}, objectHeight{80_pct},
       objectWidth{80_pct}, textFace{"arial"}, textSize{16_pt}, textWeight{400},
@@ -53,12 +54,9 @@ int WINAPI WinMain(HINSTANCE /* hInstance */, HINSTANCE /* hPrevInstance */,
       position::relative, paddingTop{5_pt}, paddingLeft{5_pt},
       paddingBottom{5_pt}, paddingRight{5_pt}, marginTop{5_pt},
       marginLeft{5_pt}, marginBottom{5_pt}, marginRight{5_pt});
-
-  vm << "Hello World\n";
-  vm.render();
-  vm << "<h1>Hello World</h1>";
-  vm << "<blue>Got to be a pretty day.</blue>";
-  vm.render();
+  cout << "viewer created." << endl;
+  test0b(vm);
+#if 0
   test0(vm);
   test1(vm);
   test1a(vm);
@@ -74,6 +72,7 @@ int WINAPI WinMain(HINSTANCE /* hInstance */, HINSTANCE /* hPrevInstance */,
   test8(vm);
   test8a(vm);
   test10(vm);
+#endif
 }
 string_view randomString(int nChars);
 double randomDouble(double a, double b);
@@ -92,8 +91,37 @@ void test0(Viewer &vm) {
 ************************************************************************/
 //! [test0]
 void test0b(Viewer &vm) {
-  auto e = createElement<DIV>(indexBy{"divTTT"}, "test");
+  testStart(__FUNCTION__);
+
+  cout << "createElement DIV" << endl;
+  auto e = createElement<DIV>(indexBy{"divTTT"}, "test",
+                              vector<float>{.3, .6, .3, .777, 10.33});
+  if (std::is_lvalue_reference<decltype(e)>::value)
+    cout << "&";
+  else if (std::is_rvalue_reference<decltype(e)>::value)
+    cout << "&&";
+  cout << typeid(e).name() << endl;
+
+  cout << "createElement DIV END" << endl;
+
+  cout << "createElement H1 BEGIN" << endl;
+  auto &appTitle = createElement<H1>(indexBy{"title"}, objectTop{10_px},
+                                     textAlignment::center, "Type XCB");
+  if (std::is_lvalue_reference<decltype(appTitle)>::value)
+    cout << "&";
+  else if (std::is_rvalue_reference<decltype(appTitle)>::value)
+    cout << "&&";
+  cout << typeid(e).name() << endl;
+
+  cout << "createElement H1 END" << endl;
+
+  e.appendChild(appTitle);
+  e.appendChild<H2>(indexBy{"subTitle"}, textAlignment::center,
+                    "An application for entering text");
+
   vm.appendChild(e);
+  vm.appendChild<PARAGRAPH>(indexBy{"content"},
+                            "The information must add two children");
   e.data() = {"This is replace as a data node"};
   vm.appendChild("<div id=testAdd/>");
   vm.render();
@@ -103,14 +131,14 @@ void test0b(Viewer &vm) {
 ************************************************************************/
 //! [test1]
 void test1(Viewer &vm) {
-  //testStart(__func__);
+  // testStart(__func__);
   auto mainArea = createElement<DIV>(
       indexBy{"mainArea"}, objectTop{10_pct}, objectLeft{10_pct},
       objectWidth{90_pct}, objectHeight{90_pct}, textColor{50, 50, 50},
       background{100, 200, 200}, textFace{"FiraMono-Regular"}, textSize{20_pt},
       textWeight{400});
   auto appTitle = createElement<H1>(indexBy{"title"}, objectTop{10_px},
-                                     textAlignment::center, "Type XCB");
+                                    textAlignment::center, "Type XCB");
   auto appSubTitle =
       createElement<H2>(indexBy{"subtitle"}, objectTop{10_px},
                         textAlignment::center, "A starter testing Application");
@@ -176,19 +204,19 @@ void test1(Viewer &vm) {
   vm.render();
   // attributes and references
   /* to quickly change attribute values wihin the dom
-  you can
-  get a reference to the actual value stored within the tree. this is
-  accomplished using the getAttribute function. The first parameter is
-  the attribute name you wish to get. The second is the format of the
-  characteristic. At most time, the first one is the one that is
-  commonly used. However, most attributes contain a format specifier or
-  other characteristics associated with the attribute. To provide
-  efficient usage, the second parameter is the type of the
-  characteristic. The type is is defaulted to double. That is, the
-  common characteristic type is a double storage type. IE, objectLeft,
-  marginTop
-  ...
-  */
+you can
+get a reference to the actual value stored within the tree. this is
+accomplished using the getAttribute function. The first parameter is
+the attribute name you wish to get. The second is the format of the
+characteristic. At most time, the first one is the one that is
+commonly used. However, most attributes contain a format specifier or
+other characteristics associated with the attribute. To provide
+efficient usage, the second parameter is the type of the
+characteristic. The type is is defaulted to double. That is, the
+common characteristic type is a double storage type. IE, objectLeft,
+marginTop
+...
+*/
   if (mainArea.parent())
     mainArea.data() = {"Hey attached to another container."};
   // walk children
@@ -233,7 +261,7 @@ void test1(Viewer &vm) {
  */
 void test1a(Viewer &vm) {
   testStart(__FUNCTION__);
-  //testStart(__func__);
+  // testStart(__func__);
   ElementList chapter;
   int m = randomInt(100);
   // notice here that the createElement is not chained because a reference
@@ -270,8 +298,9 @@ void test2(Viewer &vm) {
     vm.appendChild(information);
   }
 
-  // randomize attributes, usually the test would contain a larger number that 1 for testing the performance.
-  // hwoever with exceptions being caught, within the terminal, one iteration is fine for the debug.
+  // randomize attributes, usually the test would contain a larger number that 1
+  // for testing the performance. hwoever with exceptions being caught, within
+  // the terminal, one iteration is fine for the debug.
   for (int i = 0; i < 1; i++) {
     for (auto n : query("*"))
       randomAttributeSettings(n);
@@ -340,9 +369,9 @@ void test6(Viewer &vm) {
     auto &e = createElement<PARAGRAPH>(
         indexBy{"rndTEST5BookletParagraph_" + to_string(i)});
 
-    e  <<  "Hello "
-        << "anthony"
-        << "can you do the []";
+    e << "Hello "
+      << "anthony"
+      << "can you do the []";
 
     e.appendChild<UL>(indexBy{"bookletNotes_" + to_string(i)},
                       vector<string_view>{"Endurance training", "Biking",
@@ -620,35 +649,35 @@ void test7f(Viewer &view) {
     }
   }
   /* Using a hinted signaller will expose the versitility of the design
-  and standard library usage. As well define typical usage
-  intrinsic with data structure usage rather than reliance on
-  the neccessity of parsed structure definition as html must have. w3c
-  technology h1, h2, h3, div, and ^element. Meaning that these concepts
-  of visual layout technology are the intellectual property of the w3c.
-  So after it works, perhaps some working will have to be attained.
-  a) not all members of the data adaptor will have to be displayed. therefore
-  not all subsequent dom members need reflexition as a clipped viewport.
-  the .size() method and index access according to display rendering
-  position can show the information.
-  b) lighter memory mangement according to clipped cache prune methods
-  of dom tree reflection of templated typed data.
-  c) operating in an error free rate according to limitations of
-  vector standard interface conventions - that is no change. The actual
-  data is exposed. While scrollbar numberical values offer higher
-  memory performance than a browser . The display of large information
-  sets as these structures permits is inaccessible for screen resolutions.
-  That is typically less than 100k of text at a time.
-  Hint hashes about the location of the data are saved within the element
-  strcture. As well, within the onscreen datastructure, hashed information that
-  describe how the data is displayed on the screen. Such as text,color,etc which
-  summarizes the attribute data. When the gui programmer invokes the smart
-  adaptor signaler with the hint, the displayed cache is search for numerical
-  relationships that affect the rendering of the visualized or cached offscreen
-  clipped non visible element. This uery combined with the fact the the on
-  screen 'built' elements are kept to a minimal can be a design to research for
-  the rendering engine and big data performance. This makes the dirtiness of
-  textual attributes more efficient according to their necessity - displayed?.
-  */
+and standard library usage. As well define typical usage
+intrinsic with data structure usage rather than reliance on
+the neccessity of parsed structure definition as html must have. w3c
+technology h1, h2, h3, div, and ^element. Meaning that these concepts
+of visual layout technology are the intellectual property of the w3c.
+So after it works, perhaps some working will have to be attained.
+a) not all members of the data adaptor will have to be displayed. therefore
+not all subsequent dom members need reflexition as a clipped viewport.
+the .size() method and index access according to display rendering
+position can show the information.
+b) lighter memory mangement according to clipped cache prune methods
+of dom tree reflection of templated typed data.
+c) operating in an error free rate according to limitations of
+vector standard interface conventions - that is no change. The actual
+data is exposed. While scrollbar numberical values offer higher
+memory performance than a browser . The display of large information
+sets as these structures permits is inaccessible for screen resolutions.
+That is typically less than 100k of text at a time.
+Hint hashes about the location of the data are saved within the element
+strcture. As well, within the onscreen datastructure, hashed information that
+describe how the data is displayed on the screen. Such as text,color,etc which
+summarizes the attribute data. When the gui programmer invokes the smart
+adaptor signaler with the hint, the displayed cache is search for numerical
+relationships that affect the rendering of the visualized or cached offscreen
+clipped non visible element. This uery combined with the fact the the on
+screen 'built' elements are kept to a minimal can be a design to research for
+the rendering engine and big data performance. This makes the dirtiness of
+textual attributes more efficient according to their necessity - displayed?.
+*/
 }
 void test7g(Viewer &view) {
   // class based linkage for more complex formatters and
@@ -710,15 +739,15 @@ void test7g(Viewer &view) {
     }
   };
   /* format detailed views easily ...
-  now records within the vector template type,
-  combined with
-  the std::function creates the view through dynamic visualization.
-  Because the
-  record format is usertyped always, only defaulted for std::string vectors
-  adapted by constructor. ie:
-  fname, string_view lname, string_view phone,
-  string_view email
-  */
+now records within the vector template type,
+combined with
+the std::function creates the view through dynamic visualization.
+Because the
+record format is usertyped always, only defaulted for std::string vectors
+adapted by constructor. ie:
+fname, string_view lname, string_view phone,
+string_view email
+*/
   view.appendChild<ul>(indexBy{"uniRec"}).data<uniRecord>() = {
       {"anthony", "matarazzo", "(666) 123-4567", "simple@sss.com"},
       {"kevin", "styemark", "222 333 4444", "kevin.styemark@sss.com"},
@@ -748,9 +777,9 @@ void test7g(Viewer &view) {
   // takes info and induces the change.
   ulItems.dataHint<uniRecord>(vegetables.size());
   /*
-  then building complex user interfaces is more objected oriented, separated
-  from the data, and the data interface is the standard library.
-  */
+then building complex user interfaces is more objected oriented, separated
+from the data, and the data interface is the standard library.
+*/
 }
 /*
 These series of tests all provide the easiest most concise
@@ -768,44 +797,44 @@ the data<>.
 */
 void test7h(Viewer &view) {
   /* A dataTransform is required when using the direct data interface.
-  By default, for simple types input into the model, a default exists.
-  However, in most cases, overriding the default format is necessary.
-  To compensate in the complexity of building large document fragments,
-  the system offers a dataTransform that may be described using a string.
-  The form is very simple, integrated within the same type of html and c++
-  style. This is the most compact form to use as well, it can achieve high
-  performance due to the creation.
-  The parameter is given as a string. The significance of the
-  first value enclosed within the paranthesis notes what "name" the main input
-  type is reffereed to as. This must be a container that supports std::get<#>.
-  Ends with a colon. Next is the markup document mapped to the value input
-  column (a tuple in this case). There are some inclusion of format
-  descriptors in form borrowed from python. However this form uses the
-  standard form %s and expands it. A nice time performance about this function
-  is that the information is parsed only once. The internal mechnism creates a
-  deep cloneabled object that can also reflect vectorized expansion during
-  build. Notice the ... expansion for tuple column 4. Formatting and gathering
-  of values from the tuple are iterative based upon index. The
-  function returned will contain the logic to build the tree from vectors. The
-  vectors will also contain the formatter object calls themselves. This will
-  make visualization much quicker as creation of the object, tree structure,
-  attributes, etc will be purely binary. So, small price - parse
-  at transform creation. Yet still using and not interuppting data flow, nor
-  decreasing the volumne of data the transform may handle.
-  This creates multiple expansion using the data interface. As well,
-  advanced formatting.
-  ** adding an evaluator to the internal storage can provide
-  selection of different templates based on the item. Thereform, multiple
-  forms are given as input. The second form of the text template, provides the
-  ability to have the system evaluate which "text template" to use based upon
-  the boolean return of the given lambda.
-  https://docs.python.org/3/library/string.html#string-formatting
-  https://docs.python.org/3/library/string.html#formatspec
-  - control alignment using standard attributes,
-  https://en.wikipedia.org/wiki/Polymer_(library)
-  */
+By default, for simple types input into the model, a default exists.
+However, in most cases, overriding the default format is necessary.
+To compensate in the complexity of building large document fragments,
+the system offers a dataTransform that may be described using a string.
+The form is very simple, integrated within the same type of html and c++
+style. This is the most compact form to use as well, it can achieve high
+performance due to the creation.
+The parameter is given as a string. The significance of the
+first value enclosed within the paranthesis notes what "name" the main input
+type is reffereed to as. This must be a container that supports std::get<#>.
+Ends with a colon. Next is the markup document mapped to the value input
+column (a tuple in this case). There are some inclusion of format
+descriptors in form borrowed from python. However this form uses the
+standard form %s and expands it. A nice time performance about this function
+is that the information is parsed only once. The internal mechnism creates a
+deep cloneabled object that can also reflect vectorized expansion during
+build. Notice the ... expansion for tuple column 4. Formatting and gathering
+of values from the tuple are iterative based upon index. The
+function returned will contain the logic to build the tree from vectors. The
+vectors will also contain the formatter object calls themselves. This will
+make visualization much quicker as creation of the object, tree structure,
+attributes, etc will be purely binary. So, small price - parse
+at transform creation. Yet still using and not interuppting data flow, nor
+decreasing the volumne of data the transform may handle.
+This creates multiple expansion using the data interface. As well,
+advanced formatting.
+** adding an evaluator to the internal storage can provide
+selection of different templates based on the item. Thereform, multiple
+forms are given as input. The second form of the text template, provides the
+ability to have the system evaluate which "text template" to use based upon
+the boolean return of the given lambda.
+https://docs.python.org/3/library/string.html#string-formatting
+https://docs.python.org/3/library/string.html#formatspec
+- control alignment using standard attributes,
+https://en.wikipedia.org/wiki/Polymer_(library)
+*/
   /* a record type such as this, containing dynamic children
-  can be described in the form :*/
+can be described in the form :*/
   using tagInfo = std::tuple<int, std::string, float, std::string,
                              std::vector<std::tuple<std::string, float>>>;
   auto o = view.appendChild<ul>(indexBy{"music"});
@@ -867,15 +896,15 @@ void test7h(Viewer &view) {
 */
 void test7i(Viewer &view) {
   /* dynamic or static. dynamic most likely...
-  These processors are very short for effeciveness. Typically, many
-  other things can occur for these states. This format allows these states
-  to exist, be automatically instaniated, maintained on a separate basis,
-  reduced, and defaulted. So defaulted must be handled as a case as well.
-  And a very robust secret of this type is how c++ programmers can
-  abstract these again into other captured data sets for just
-  modifing specific summaries based upon data these routines
-  may share with internal and exteral communication.
-  */
+These processors are very short for effeciveness. Typically, many
+other things can occur for these states. This format allows these states
+to exist, be automatically instaniated, maintained on a separate basis,
+reduced, and defaulted. So defaulted must be handled as a case as well.
+And a very robust secret of this type is how c++ programmers can
+abstract these again into other captured data sets for just
+modifing specific summaries based upon data these routines
+may share with internal and exteral communication.
+*/
   using processList = std::tuple<int, std::string, float, std::string>;
   view.appendChild<ul>(indexBy{"corp"}).data<processList>() = {
       {0, "favorites", 4.5, "Umbrella Corporation"},
@@ -1024,15 +1053,14 @@ void test10(Viewer &vm) {
           << "</ul>"
           << "</ul>"
           << "</p>";
-    #if 0
+#if 0
        /* rather than mixing the use of pointer withi nthe syntax, the stringPointTag syntax might offer complexity.
          document for the user of the library a query facility that implements the functionality.
          */
     auto Booklet = query("id=
 
     ->setAttribute(textColor{"red"});
-    #endif
-
+#endif
   }
   vm.render();
 }
@@ -1074,7 +1102,7 @@ int randomInt(int a) {
 /************************************************************************
 ************************************************************************/
 void randomAttributeSettings(Element &e) {
-    try {
+  try {
     e.getAttribute<textIndent>().value = randomDouble(0.0, 10.5);
     e.getAttribute<objectTop>().value = randomDouble(0.0, 300);
     e.setAttribute(objectTop{randomDouble(0.0, 300), numericFormat::percent});
@@ -1083,7 +1111,8 @@ void randomAttributeSettings(Element &e) {
     e.getAttribute<objectWidth>().value = randomDouble(0.0, 300);
     e.setAttribute(objectWidth{randomDouble(0.0, 300), numericFormat::percent});
     e.getAttribute<objectHeight>().value = randomDouble(0.0, 300);
-    e.setAttribute(objectHeight{randomDouble(0.0, 300), numericFormat::percent});
+    e.setAttribute(
+        objectHeight{randomDouble(0.0, 300), numericFormat::percent});
     e.getAttribute<textFace>().value = randomString(10);
     e.getAttribute<textWeight>().value = randomDouble(0.0, 1000.0);
     e.getAttribute<tabSize>().value = randomDouble(0.0, 10.0);
@@ -1099,8 +1128,7 @@ void randomAttributeSettings(Element &e) {
     e.getAttribute<marginRight>().value = randomDouble(0.0, 50.0);
     e.getAttribute<borderWidth>().value = randomDouble(0.0, 50.0);
     e.getAttribute<borderRadius>().value = randomDouble(0.0, 10.5);
-    } catch (const std::exception& e) {
-        std::cout << " Exception: "
-                    << e.what() << "\n";
-    }
+  } catch (const std::exception &e) {
+    std::cout << " Exception: " << e.what() << "\n";
+  }
 }

@@ -34,11 +34,11 @@
 #include <cstdarg>
 #include <functional>
 #include <memory>
+#include <stdexcept>
 #include <type_traits>
 #include <typeindex>
 #include <typeinfo>
 #include <utility>
-#include <stdexcept>
 
 #define CONSOLE
 
@@ -47,7 +47,6 @@ OS SPECIFIC HEADERS
 **************************************/
 #if defined(CONSOLE)
 #include <iostream>
-
 
 #elif defined(__linux__)
 #include <X11/keysymdef.h>
@@ -64,7 +63,7 @@ EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 #define HINST_THISCOMPONENT ((HINSTANCE)&__ImageBase)
 #endif
 #endif
-namespace ViewManager {
+namespace viewManager {
 // forward declaration
 class Element;
 class StyleClass;
@@ -214,7 +213,7 @@ developed.
   public:                                                                      \
     double value;                                                              \
     NAME(const double &_val) : value(_val) {}                                  \
-    NAME(const NAME &_val) : value(_val.value) {}                                  \
+    NAME(const NAME &_val) : value(_val.value) {}                              \
   }
 #define _STRING_ATTRIBUTE(NAME)                                                \
   using NAME = class NAME {                                                    \
@@ -229,18 +228,10 @@ developed.
     NAME(const double &_val, const numericFormat &_nf)                         \
         : doubleNF(_val, _nf) {}                                               \
     NAME(const doubleNF &_val) : doubleNF(_val) {}                             \
-    NAME(const NAME &_val) : doubleNF(_val) {}                             \
+    NAME(const NAME &_val) : doubleNF(_val) {}                                 \
   }
 #define _ENUMERATED_ATTRIBUTE(NAME, ...)                                       \
-  using NAME = class NAME {                                                    \
-  public:                                                                      \
-    enum optionEnum : uint8_t { __VA_ARGS__ };                                 \
-    optionEnum value;                                                          \
-                                                                               \
-  public:                                                                      \
-    NAME(const optionEnum &val) : value(val) {}                                \
-    NAME(const NAME &val) : value(val.value) {}                                \
-  }
+  using NAME = enum class NAME : uint8_t { __VA_ARGS__ }
 #define _NUMERIC_WITH_ENUMERATED_ATTRIBUTE(NAME, ...)                          \
   using NAME = class NAME {                                                    \
   public:                                                                      \
@@ -249,7 +240,7 @@ developed.
     optionEnum option;                                                         \
     NAME(const double &_val, const optionEnum &_opt)                           \
         : value(_val), option(_opt) {}                                         \
-    NAME(const NAME &_val) : value(_val.value), option(_val.option) {} \
+    NAME(const NAME &_val) : value(_val.value), option(_val.option) {}         \
   }
 #define _COLOR_ATTRIBUTE(NAME)                                                 \
   using NAME = class NAME : public colorNF {                                   \
@@ -272,7 +263,7 @@ developed.
     std::vector<std::string_view> value;                                       \
     NAME(std::vector<std::string_view> _val) : value(std::move(_val)) {}       \
   }
-// namespace ViewManager
+// namespace viewManager
 /*
 Attributes are classes with registered name aliases. The underlying
 architecture reduces the use of templates but promotes the passing of data.
@@ -386,7 +377,7 @@ private:
 }; // class platform
 }; // namespace Visualizer
 template <typename TYPE>
-TYPE &_createElement(const std::vector<std::any> &attr);
+auto&  _createElement(const std::vector<std::any> &attr);
 /*******************************************************
 Element
 ********************************************************/
@@ -396,13 +387,16 @@ public:
 
 public:
   Element(std::string_view _softName, const std::vector<std::any> &attribs = {})
-      : softName(_softName), m_self(this), m_parent(nullptr), m_firstChild(nullptr),
-        m_lastChild(nullptr), m_nextChild(nullptr), m_previousChild(nullptr),
-        m_nextSibling(nullptr), m_previousSibling(nullptr), m_childCount(0) {
+      : softName(_softName), m_self(this), m_parent(nullptr),
+        m_firstChild(nullptr), m_lastChild(nullptr), m_nextChild(nullptr),
+        m_previousChild(nullptr), m_nextSibling(nullptr),
+        m_previousSibling(nullptr), m_childCount(0) {
     setAttribute(attribs);
   }
   ~Element() { Visualizer::deallocate(surface); }
   Element(const Element &other) {
+    std::cout << "Element(const Element& other)" << std::endl;
+
     m_self = other.m_self;
     m_parent = other.m_parent;
     m_firstChild = other.m_firstChild;
@@ -416,6 +410,8 @@ public:
     styles = other.styles;
   }
   Element(Element &&other) noexcept {
+    std::cout << "Element(Element&& other) noexcept" << std::endl;
+
     m_self = other.m_self;
     m_parent = other.m_parent;
     m_firstChild = other.m_firstChild;
@@ -429,6 +425,8 @@ public:
     styles = std::move(other.styles);
   }
   Element &operator=(const Element &other) {
+    std::cout << "Element& operator=(const Element& other)" << std::endl;
+
     // Self-assignment detection
     if (&other == this)
       return *this;
@@ -446,6 +444,8 @@ public:
     return *this;
   }
   Element &operator=(Element &&other) noexcept {
+    std::cout << "Element& operator=(Element&& other) noexcept" << std::endl;
+
     if (&other == this)
       return *this;
     m_self = other.m_self;
@@ -461,26 +461,12 @@ public:
     styles = std::move(other.styles);
     return *this;
   }
-  // move assignment
-  /// <summary> overload of the stream insertion operator.
-  /// Simply puts the data into the stream. It should be
-  /// noted that flush should be called.
-  /// </summary>
-  template <typename T> Element &operator<<(const T &data) {
-    std::ostringstream s;
-    s << data;
 
-    // append the information to the end of the data vector.
-    auto &vdata=this->data<std::string>();
-    vdata.push_back(s.str());
-
-    return *this;
-  }
   /*
-  Data interface.
-  The data<> templated function provides a standard interface for data
-  projection and building for ease of interface communication.
-  */
+Data interface.
+The data<> templated function provides a standard interface for data
+projection and building for ease of interface communication.
+*/
 private:
   typedef struct _usageAdaptorState {
     std::size_t _size;
@@ -489,16 +475,16 @@ private:
     std::size_t _lastWorkLoad;
   } usageAdaptorState;
   /*
-  usageAdaptor<> - INTERNAL a templated class used only internally,
-  holds the data of a templated type within a vector.
-  Noted that vectors have sequential memory for all of their elements.
-  This property is used by the hinting system to deduce set inclusion.
-  They can be established just by the type leaveing
-  data and fnTransform empty.
-  When just the data is passed, and a default transform function
-  does not exist, the data is saved leaving the fnTransform as a default
-  formatter according to the type.
-  */
+usageAdaptor<> - INTERNAL a templated class used only internally,
+holds the data of a templated type within a vector.
+Noted that vectors have sequential memory for all of their elements.
+This property is used by the hinting system to deduce set inclusion.
+They can be established just by the type leaveing
+data and fnTransform empty.
+When just the data is passed, and a default transform function
+does not exist, the data is saved leaving the fnTransform as a default
+formatter according to the type.
+*/
 private:
   template <typename T> class usageAdaptor {
   public:
@@ -533,9 +519,9 @@ private:
     void saveState(void) { state._size = _data.size(); }
   };
   /* three templated functions provide the data interface,
-  dataTransform<>(), data<>(), and dataHint<>(). All of these
-  templated functions work with the internal data storage mechnism.
-  */
+dataTransform<>(), data<>(), and dataHint<>(). All of these
+templated functions work with the internal data storage mechnism.
+*/
 public:
   template <typename R, typename T>
   void dataTransform(const std::string_view &txtFn) {}
@@ -560,21 +546,21 @@ public:
     }
   }
   /*
-  This data transform uses the named value of the numerical column.
-  While being a constant, this reliance is that of an itm within a tuple
-  column. This tuple column is used as a index into the natural long list
-  of vector data. AS well, the parameter essential is an unordered map
-  reference. Simply that the match index as the key and a std::function
-  as the found item. THe item is used to process a requested data element
-  based upon this match. So, in effect this allows the unordered may to change,
-  over time, and selectively modify traites or visual composition in
-  a strict binary fashion rather than css conteplated sheets. While both are
-  often necessary, this type of solid work code really becomes the marking
-  of complexity and specific layouts that may be dynamically loaded.
-  And also provide effective space for description. I find that simple
-  and complex may go together, yet for usage one must create the sceneros
-  that elvolve in delicate use of competent technology.
-  */
+This data transform uses the named value of the numerical column.
+While being a constant, this reliance is that of an itm within a tuple
+column. This tuple column is used as a index into the natural long list
+of vector data. AS well, the parameter essential is an unordered map
+reference. Simply that the match index as the key and a std::function
+as the found item. THe item is used to process a requested data element
+based upon this match. So, in effect this allows the unordered may to change,
+over time, and selectively modify traites or visual composition in
+a strict binary fashion rather than css conteplated sheets. While both are
+often necessary, this type of solid work code really becomes the marking
+of complexity and specific layouts that may be dynamically loaded.
+And also provide effective space for description. I find that simple
+and complex may go together, yet for usage one must create the sceneros
+that elvolve in delicate use of competent technology.
+*/
   template <std::size_t I, typename T>
   void dataTransform(
       const std::unordered_map<const typename std::tuple_element<I, T>::type &,
@@ -609,9 +595,26 @@ public:
       // adaptor.hint(hint1, hint2, hint3);
     }
   }
+
+  // move assignment
+  /// <summary> overload of the stream insertion operator.
+  /// Simply puts the data into the stream. It should be
+  /// noted that flush should be called.
+  /// </summary>
+  template <typename T> Element &operator<<(const T &data) {
+    std::ostringstream s;
+    s << data;
+
+    // append the information to the end of the data vector.
+    auto &vdata = this->data<std::string>();
+    vdata.push_back(s.str());
+
+    return *this;
+  }
+
   /* query at this level must allow traversal of types, and direction.
-  siblings, parent, children...
-  */
+siblings, parent, children...
+*/
   auto query(const std::string_view &queryString) -> ElementList{};
   auto query(const ElementQuery &queryFunction) -> ElementList{};
   // private data menbers to hold the information of the class
@@ -637,7 +640,7 @@ public:
   _REF_INTERFACE(lastChild, m_lastChild);
   _REF_INTERFACE(nextChild, m_nextChild);
   _REF_INTERFACE(previousChild, m_previousChild);
-  _REF_INTERFACE(nextSibling, m_nextChild);
+  _REF_INTERFACE(nextSibling, m_nextSibling);
   _REF_INTERFACE(previousSibling, m_previousSibling);
   inline std::size_t &childCount(void) { return m_childCount; }
   std::vector<std::reference_wrapper<StyleClass>> styles;
@@ -649,30 +652,35 @@ private:
 
 public:
   auto appendChild(const std::string_view &sMarkup) -> Element & {
-    return ingestMarkup(*this, sMarkup);
+    return (ingestMarkup(*this, sMarkup));
   }
   auto appendChild(Element &newChild) -> Element & {
     newChild.m_parent = this;
     newChild.m_previousSibling = m_lastChild;
+
+    if (!m_firstChild)
+      m_firstChild = newChild.m_self;
+
     if (m_lastChild)
       m_lastChild->m_nextSibling = newChild.m_self;
+
     m_lastChild = newChild.m_self;
     m_childCount++;
-    return newChild;
+    return (newChild);
   }
 
-  auto appendChild(const ElementList &elementCollection) -> Element & {
+  auto appendChild(const ElementList &elementCollection)
+      -> std::add_lvalue_reference<Element>::type {
     for (auto e : elementCollection) {
       appendChild(e.get());
     }
-    return *this;
+    return (*this);
   }
   template <typename TYPE, typename... ATTRS>
   auto appendChild(const ATTRS &... attrs) -> Element & {
-    std::vector<std::any> attrvector{attrs...};
-    TYPE &e = _createElement<TYPE>(attrvector);
+    TYPE &e = _createElement<TYPE>({attrs...});
     appendChild(e);
-    return e;
+    return (e);
   }
 
 public:
@@ -680,38 +688,44 @@ public:
     Element *base = this->m_parent;
     if (base == nullptr)
       base = this;
-    return ingestMarkup(*base, sMarkup);
+    return (ingestMarkup(*base, sMarkup));
   }
   auto append(Element &sibling) -> Element & {
     m_nextSibling = sibling.m_self;
     sibling.m_parent = this->m_parent;
     sibling.m_previousSibling = this;
+
+    if (!this->m_parent->m_firstChild)
+      this->m_parent->m_firstChild = sibling.m_self;
+
+    this->m_parent->m_lastChild = sibling.m_self;
+
     this->m_parent->m_childCount++;
-    return sibling;
+    return (sibling);
   }
   template <typename TYPE, typename... ATTRS>
   auto append(const ATTRS &... attrs) -> Element & {
-    std::vector<std::any> attrvector{attrs...};
-    TYPE &e = _createElement<TYPE>(attrvector);
+    TYPE &e = _createElement<TYPE>({attrs...});
     append(e);
-    return e;
+    return (e);
   }
   auto append(ElementList &elementCollection) -> Element & {
     for (auto &e : elementCollection)
       append(e);
-    return *this;
+    return (*this);
   }
 
 public:
   /* setAttribute
-  The set attribute accepts an std::any, typesafe and convertable.
-  There are several predetermined types that are recoginized through
-  the type stored with the std::any parameter.
-  The filter allows compact input for vector and simple c++ based
-  types direction from the creation functions (createElement<>, append<>, and
-  appendChild<> which there are
-  typically few entries. */
+The set attribute accepts an std::any, typesafe and convertable.
+There are several predetermined types that are recoginized through
+the type stored with the std::any parameter.
+The filter allows compact input for vector and simple c++ based
+types direction from the creation functions (createElement<>, append<>, and
+appendChild<> which there are
+typically few entries. */
   Element &setAttribute(const std::any &setting) {
+
     // filter list
     enum _enumTypeFilter {
       dt_char,
@@ -719,6 +733,7 @@ public:
       dt_float,
       dt_int,
       dt_std_string_view,
+      dt_const_char,
       dt_vector_char,
       dt_vector_double,
       dt_vector_float,
@@ -727,6 +742,7 @@ public:
       dt_vector_vector_string_view,
       dt_vector_pair_int_string_view,
       dt_indexBy,
+
       dt_nonFiltered
     };
     // filter map
@@ -737,6 +753,7 @@ public:
         {std::type_index(typeid(int)).hash_code(), dt_int},
         {std::type_index(typeid(std::string_view)).hash_code(),
          dt_std_string_view},
+        {std::type_index(typeid(const char *)).hash_code(), dt_const_char},
         {std::type_index(typeid(std::vector<char>)).hash_code(),
          dt_vector_char},
         {std::type_index(typeid(std::vector<double>)).hash_code(),
@@ -761,10 +778,11 @@ public:
         _umapTypeFilter.find(setting.type().hash_code());
     if (it != _umapTypeFilter.end())
       dtFilter = it->second;
+
     /* filter these types specifically and do not store them in the map.
-    these items change the dataAdaptor. This creates a more usable
-    syntax for population of large and small data within the
-    simple initializer list format given within the attribute list.*/
+these items change the dataAdaptor. This creates a more usable
+syntax for population of large and small data within the
+simple initializer list format given within the attribute list.*/
     switch (dtFilter) {
     case dt_char: {
       auto v = std::any_cast<char>(setting);
@@ -781,6 +799,10 @@ public:
     case dt_int: {
       auto v = std::any_cast<int>(setting);
       data<int>() = std::vector<int>{v};
+    } break;
+    case dt_const_char: {
+      auto v = std::any_cast<const char *>(setting);
+      data<std::string_view>() = std::vector<std::string_view>{v};
     } break;
     case dt_std_string_view: {
       auto v = std::any_cast<std::string_view>(setting);
@@ -821,11 +843,13 @@ public:
       updateIndexBy(std::any_cast<indexBy>(setting));
       bSaveInMap = true;
     } break;
+
     // other items are not filtered, so just pass through to storage.
     case dt_nonFiltered: {
       bSaveInMap = true;
     } break;
     }
+
     if (bSaveInMap)
       attributes[std::type_index(setting.type())] = setting;
     return *this;
@@ -848,10 +872,10 @@ public:
     if (it != attributes.end()) {
       ret = &std::any_cast<ATTR_TYPE &>(it->second);
     } else {
-        std::string info = typeid(ret).name();
-        info+=" attribute not found";
+      std::string info = typeid(ret).name();
+      info += " attribute not found";
 
-        throw std::invalid_argument( info );
+      throw std::invalid_argument(info);
     }
     return *ret;
   }
@@ -927,41 +951,42 @@ public:
 using H1 = class H1 : public Element {
 public:
   H1(const std::vector<std::any> &attribs)
-      : Element("h1",{display::block, marginTop{.67_em}, marginLeft{.67_em},
-                 marginBottom{0_em}, marginRight{0_em}, textSize{2_em},
-                 textWeight{800}}) {
+      : Element("h1", {display::block, marginTop{.67_em}, marginLeft{.67_em},
+                       marginBottom{0_em}, marginRight{0_em}, textSize{2_em},
+                       textWeight{800}}) {
     setAttribute(attribs);
   }
 };
 using H2 = class H2 : public Element {
 public:
   H2(const std::vector<std::any> &attribs)
-      : Element("h2",{display::block, marginTop{.83_em}, marginLeft{.83_em},
-                 marginBottom{0_em}, marginRight{0_em}, textSize{1.5_em},
-                 textWeight{800}}) {
+      : Element("h2", {display::block, marginTop{.83_em}, marginLeft{.83_em},
+                       marginBottom{0_em}, marginRight{0_em}, textSize{1.5_em},
+                       textWeight{800}}) {
     setAttribute(attribs);
   }
 };
 using H3 = class H3 : public Element {
 public:
   H3(const std::vector<std::any> &attribs)
-      : Element("h3",{display::block, marginTop{1_em}, marginLeft{1_em},
-                 marginBottom{0_em}, marginRight{0_em}, textSize{1.17_em},
-                 textWeight{800}}) {
+      : Element("h3", {display::block, marginTop{1_em}, marginLeft{1_em},
+                       marginBottom{0_em}, marginRight{0_em}, textSize{1.17_em},
+                       textWeight{800}}) {
     setAttribute(attribs);
   }
 };
 using PARAGRAPH = class PARAGRAPH : public Element {
 public:
   PARAGRAPH(const std::vector<std::any> &attribs)
-      : Element("paragraph",{listStyleType::disc, marginTop{1_em}, marginLeft{1_em},
+      : Element("paragraph",
+                {listStyleType::disc, marginTop{1_em}, marginLeft{1_em},
                  marginBottom{0_em}, marginRight{0_em}}) {
     setAttribute(attribs);
   }
 };
 using DIV = class DIV : public Element {
 public:
-  DIV(const std::vector<std::any> &attribs) : Element("div",{display::block}) {
+  DIV(const std::vector<std::any> &attribs) : Element("div", {display::block}) {
     setAttribute(attribs);
   }
 };
@@ -974,18 +999,18 @@ public:
 using UL = class UL : public Element {
 public:
   UL(const std::vector<std::any> &attribs)
-      : Element("ul",{listStyleType::disc, display::block, marginTop{1_em},
-                 marginLeft{1_em}, marginBottom{0_em}, marginRight{0_em},
-                 paddingLeft{40_px}}) {
+      : Element("ul", {listStyleType::disc, display::block, marginTop{1_em},
+                       marginLeft{1_em}, marginBottom{0_em}, marginRight{0_em},
+                       paddingLeft{40_px}}) {
     setAttribute(attribs);
   }
 };
 using OL = class OL : public Element {
 public:
   OL(const std::vector<std::any> &attribs)
-      : Element("ol",{listStyleType::decimal, display::block, marginTop{1_em},
-                 marginLeft{1_em}, marginBottom{0_em}, marginRight{0_em},
-                 paddingLeft{40_px}}) {
+      : Element("ol", {listStyleType::decimal, display::block, marginTop{1_em},
+                       marginLeft{1_em}, marginBottom{0_em}, marginRight{0_em},
+                       paddingLeft{40_px}}) {
     setAttribute(attribs);
   }
 };
@@ -1056,17 +1081,19 @@ proper deallocation.
 
 void consoleRender(Element &e, int iLevel);
 
-template <class TYPE>
-auto _createElement(const std::vector<std::any> &attrs) -> TYPE & {
+template <typename TYPE>
+auto& _createElement(const std::vector<std::any> &attrs) {
   std::unique_ptr<TYPE> e = std::make_unique<TYPE>(attrs);
   elements.push_back(std::move(e));
-  return static_cast<TYPE &>(*elements.back().get());
+  TYPE &ret=static_cast<TYPE &>(*elements.back().get());
+  return ret;
 }
+
 template <class TYPE, typename... ATTRS>
-auto createElement(const ATTRS &... attribs) -> TYPE & {
-  std::vector<std::any> attrvector{attribs...};
-  return _createElement<TYPE>(attrvector);
+auto& createElement(const ATTRS &... attribs) {
+  return _createElement<TYPE>({attribs...});;
 }
+
 template <typename... Types> auto createStyle(Types... args) -> StyleClass & {
   std::unique_ptr<StyleClass> newStyle = std::make_unique<StyleClass>(args...);
   styles.push_back(std::move(newStyle));
@@ -1077,9 +1104,9 @@ auto query(const ElementQuery &queryFunction) -> ElementList;
 
 template <class T = Element &>
 auto getElement(const std::string_view &key) -> T & {
-auto it = indexedElements.find(key);
-T ret = it->second.get();
-return ret;
+  auto it = indexedElements.find(key);
+  T ret = it->second.get();
+  return ret;
 }
 
 bool hasElement(const std::string_view &key);
@@ -1089,17 +1116,17 @@ bool hasElement(const std::string_view &key);
         [](const std::vector <std::any> &attrs)                                \
              -> Element & { return _createElement<OBJECT_TYPE>(attrs); }       \
   }
+
 #define CREATE_OBJECT(OBJECT_TYPE) CREATE_OBJECT_ALIAS(OBJECT_TYPE, OBJECT_TYPE)
 static std::unordered_map<
     std::string_view,
     std::function<Element &(const std::vector<std::any> &attr)>>
-    objectFactoryMap = {CREATE_OBJECT(BR),        CREATE_OBJECT(H1),
-                        CREATE_OBJECT(H2),        CREATE_OBJECT(H3),
-                        CREATE_OBJECT(PARAGRAPH), CREATE_OBJECT(DIV),
-                        CREATE_OBJECT(SPAN),      CREATE_OBJECT(UL),
-                        CREATE_OBJECT(OL),        CREATE_OBJECT(LI),
-                        CREATE_OBJECT(MENU),      CREATE_OBJECT(UX),
-                        CREATE_OBJECT(IMAGE)};
+    objectFactoryMap = {
+        CREATE_OBJECT(BR),   CREATE_OBJECT(H1),        CREATE_OBJECT(H2),
+        CREATE_OBJECT(H3),   CREATE_OBJECT(PARAGRAPH), CREATE_OBJECT(DIV),
+        CREATE_OBJECT(SPAN), CREATE_OBJECT(UL),        CREATE_OBJECT(OL),
+        CREATE_OBJECT(LI),   CREATE_OBJECT(MENU),      CREATE_OBJECT(UX),
+        CREATE_OBJECT(IMAGE)};
 /****************************************************************
 Viewer
 *****************************************************************/
@@ -1107,7 +1134,7 @@ class Viewer : public Element {
 public:
   Viewer(const std::vector<std::any> &attribs);
   ~Viewer();
-  Viewer(const Viewer &) : Element("viewer") {}
+  Viewer(const Viewer &) : Element("Viewer") {}
   Viewer &operator=(const Viewer &) {}
   Viewer &operator=(Viewer &&other) noexcept {} // move assignment
   void render(void);
@@ -1174,5 +1201,5 @@ upon the compiler.
 
   return ss.str();
 }
-};     // namespace ViewManager
+};     // namespace viewManager
 #endif // VIEW_MANAGER_HPP_INCLUDED

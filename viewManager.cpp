@@ -8,21 +8,22 @@
 ///
 #include "viewManager.hpp"
 using namespace std;
-using namespace ViewManager;
+using namespace viewManager;
 /**********
 These namespace global lists contain the objects as a system ownership.
 ********/
-std::vector<std::unique_ptr<Element>> ViewManager::elements;
+std::vector<std::unique_ptr<Element>> viewManager::elements;
 std::unordered_map<std::string_view, std::reference_wrapper<Element>>
-    ViewManager::indexedElements;
-std::vector<std::unique_ptr<StyleClass>> ViewManager::styles;
-ViewManager::Viewer::Viewer(const vector<any> &attrs) : Element("viewer", attrs) {
+    viewManager::indexedElements;
+std::vector<std::unique_ptr<StyleClass>> viewManager::styles;
+viewManager::Viewer::Viewer(const vector<any> &attrs)
+    : Element("Viewer", attrs) {
   // setAttribute(indexBy{"_root"};
   Visualizer::openWindow(*this);
 }
 /// <summary>deconstructor for the view manager object.
 /// </summary>
-ViewManager::Viewer::~Viewer() { Visualizer::closeWindow(*this); }
+viewManager::Viewer::~Viewer() { Visualizer::closeWindow(*this); }
 /// <summary>The main entry point for clients after their initial
 /// buildup. The function simply calls the traversing function
 /// with the main root as the starting point.
@@ -30,31 +31,30 @@ ViewManager::Viewer::~Viewer() { Visualizer::closeWindow(*this); }
 ///
 /// </summary>
 
-void ViewManager::consoleRender(Element &e, int iLevel) {
-    int iWidth = iLevel *4;
+void viewManager::consoleRender(Element &e, int iLevel) {
+  int iWidth = iLevel * 4;
 
-    cout.width(iWidth);
-    cout.fill(' ');
+  cout.fill(' ');
+  cout.width(iWidth);
 
-    cout << e.softName << endl;
+  cout << e.softName << endl;
 
-    auto n = e.firstChild();
-    e.render();
-    while (n) {
-        consoleRender(n->get(),iLevel+1);
-        n = n->get().nextChild();
-    }
+  e.render();
 
+  auto n = e.firstChild();
 
+  while (n) {
+    consoleRender(n->get(), iLevel + 1);
+    n = n->get().nextChild();
+  }
 }
 
-void ViewManager::Viewer::render(void) {
+void viewManager::Viewer::render(void) {
 
 #if defined(CONSOLE)
-consoleRender(*this, 0);
+  consoleRender(*this, 0);
 
 #endif
-
 }
 /// <summary>
 /// This is the only entry point from the platform for the event
@@ -67,7 +67,7 @@ consoleRender(*this, 0);
 /// routines. The main thing to rememeber is that the information is
 /// processed from a queue and using a background thread.
 /// </summary>
-void ViewManager::Viewer::dispatchEvent(const event &evt) {
+void viewManager::Viewer::dispatchEvent(const event &evt) {
   switch (evt.evtType) {
   case eventType::resize:
     break;
@@ -107,50 +107,50 @@ eventType::mouseleave
 /// programs as vlc, the routine simply places pixels into the memory
 /// buffer. while on windows the direct x library is used in combination
 /// with windows message queue processing. </summary>
-void ViewManager::Viewer::processEvents(void) { m_device->messageLoop(); }
+void viewManager::Viewer::processEvents(void) { m_device->messageLoop(); }
 
-auto ViewManager::operator""_pt(unsigned long long int value) -> doubleNF {
+auto viewManager::operator""_pt(unsigned long long int value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::pt};
 }
-auto ViewManager::operator""_pt(long double value) -> doubleNF {
+auto viewManager::operator""_pt(long double value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::pt};
 }
-auto ViewManager::operator""_em(unsigned long long int value) -> doubleNF {
+auto viewManager::operator""_em(unsigned long long int value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::em};
 }
-auto ViewManager::operator""_em(long double value) -> doubleNF {
+auto viewManager::operator""_em(long double value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::em};
 }
-auto ViewManager::operator""_px(unsigned long long int value) -> doubleNF {
+auto viewManager::operator""_px(unsigned long long int value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::px};
 }
-auto ViewManager::operator""_px(long double value) -> doubleNF {
+auto viewManager::operator""_px(long double value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::px};
 }
-auto ViewManager::operator""_percent(unsigned long long int value) -> doubleNF {
+auto viewManager::operator""_percent(unsigned long long int value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::percent};
 }
-auto ViewManager::operator""_percent(long double value) -> doubleNF {
+auto viewManager::operator""_percent(long double value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::percent};
 }
-auto ViewManager::operator""_pct(unsigned long long int value) -> doubleNF {
+auto viewManager::operator""_pct(unsigned long long int value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::percent};
 }
-auto ViewManager::operator""_pct(long double value) -> doubleNF {
+auto viewManager::operator""_pct(long double value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::percent};
 }
-auto ViewManager::operator""_normal(unsigned long long int value)
+auto viewManager::operator""_normal(unsigned long long int value)
     -> lineHeight {
   return lineHeight{static_cast<double>(value), lineHeight::normal};
 }
-auto ViewManager::operator""_normal(long double value) -> lineHeight {
+auto viewManager::operator""_normal(long double value) -> lineHeight {
   return lineHeight{static_cast<double>(value), lineHeight::normal};
 }
-auto ViewManager::operator""_numeric(unsigned long long int value)
+auto viewManager::operator""_numeric(unsigned long long int value)
     -> lineHeight {
   return lineHeight{static_cast<double>(value), lineHeight::numeric};
 }
-auto ViewManager::operator""_numeric(long double value) -> lineHeight {
+auto viewManager::operator""_numeric(long double value) -> lineHeight {
   return lineHeight{static_cast<double>(value), lineHeight::numeric};
 }
 
@@ -163,7 +163,7 @@ auto ViewManager::operator""_numeric(long double value) -> lineHeight {
 /// #, or *, or partial matches. Change attributes?
 /// @ for style,
 /// </summary>
-auto ViewManager::query(const std::string_view &queryString) -> ElementList {
+auto viewManager::query(const std::string_view &queryString) -> ElementList {
   ElementList results;
   if (queryString == "*") {
     for (const auto &n : elements) {
@@ -176,12 +176,12 @@ auto ViewManager::query(const std::string_view &queryString) -> ElementList {
     for (const auto &n : elements) {
       if (std::regex_match(n->getAttribute<indexBy>().value.data(),
                            matchExpression))
-      results.push_back(std::ref(*(n.get())));
+        results.push_back(std::ref(*(n.get())));
     }
   }
   return results;
 }
-auto ViewManager::query(const ElementQuery &queryFunction) -> ElementList {
+auto viewManager::query(const ElementQuery &queryFunction) -> ElementList {
   ElementList results;
   for (const auto &n : elements) {
     if (queryFunction(std::ref(*(n.get()))))
@@ -189,7 +189,7 @@ auto ViewManager::query(const ElementQuery &queryFunction) -> ElementList {
   }
   return results;
 }
-bool ViewManager::hasElement(const std::string_view &key) {
+bool viewManager::hasElement(const std::string_view &key) {
   auto it = indexedElements.find(key);
   return it != indexedElements.end();
 }
@@ -203,7 +203,7 @@ Element
  * changed.
  *
  */
-void ViewManager::Element::updateIndexBy(const indexBy &setting) {
+void viewManager::Element::updateIndexBy(const indexBy &setting) {
   // changing id just changes
   // the key in elementById
   // map
@@ -238,7 +238,7 @@ void ViewManager::Element::updateIndexBy(const indexBy &setting) {
   }
   return;
 }
-auto ViewManager::Element::insertBefore(Element &newChild,
+auto viewManager::Element::insertBefore(Element &newChild,
                                         Element &existingElement) -> Element & {
   Element &child = newChild;
   // maintain tree structure
@@ -258,35 +258,35 @@ auto ViewManager::Element::insertBefore(Element &newChild,
   m_childCount++;
   return child;
 }
-auto ViewManager::Element::insertAfter(Element &newChild,
+auto viewManager::Element::insertAfter(Element &newChild,
                                        Element &existingElement) -> Element & {
   return newChild;
 }
-auto ViewManager::Element::removeChild(Element &oldChild) -> Element & {
+auto viewManager::Element::removeChild(Element &oldChild) -> Element & {
   return *this;
 }
-auto ViewManager::Element::replaceChild(Element &newChild, Element &oldChild)
+auto viewManager::Element::replaceChild(Element &newChild, Element &oldChild)
     -> Element & {
   return *this;
 }
-auto ViewManager::Element::move(const double t, const double l) -> Element & {
+auto viewManager::Element::move(const double t, const double l) -> Element & {
   getAttribute<objectTop>().value = t;
   getAttribute<objectLeft>().value = l;
   return *this;
 }
-auto ViewManager::Element::resize(const double w, const double h) -> Element & {
+auto viewManager::Element::resize(const double w, const double h) -> Element & {
   getAttribute<objectWidth>().value = w;
   getAttribute<objectHeight>().value = h;
   return *this;
 }
-void ViewManager::Element::remove(void) { return; }
-auto ViewManager::Element::removeChildren(Element &e) -> Element & {
+void viewManager::Element::remove(void) { return; }
+auto viewManager::Element::removeChildren(Element &e) -> Element & {
   return *this;
 }
 /// <summary>The function mapps the event id to the appropiate vector.
 /// This is kept statically here for resource management.</summary>
 ///
-vector<eventHandler> &ViewManager::Element::getEventVector(eventType evtType) {
+vector<eventHandler> &viewManager::Element::getEventVector(eventType evtType) {
   static unordered_map<eventType, vector<eventHandler> &> eventTypeMap = {
       {eventType::focus, onfocus},
       {eventType::blur, onblur},
@@ -318,7 +318,7 @@ size_t getAddress(std::function<T(U...)> f) {
   fnType **fnPointer = f.template target<fnType *>();
   return (size_t)*fnPointer;
 }
-auto ViewManager::Element::addListener(eventType evtType,
+auto viewManager::Element::addListener(eventType evtType,
                                        eventHandler evtHandler) -> Element & {
   getEventVector(evtType).push_back(evtHandler);
   return *this;
@@ -329,7 +329,7 @@ auto ViewManager::Element::addListener(eventType evtType,
 /// <param name="evtHandler"> is the event to remove.?</param>
 ///
 ///
-auto ViewManager::Element::removeListener(eventType evtType,
+auto viewManager::Element::removeListener(eventType evtType,
                                           eventHandler evtHandler)
     -> Element & {
   auto eventList = getEventVector(evtType);
@@ -350,14 +350,24 @@ auto ViewManager::Element::removeListener(eventType evtType,
 /// work performed by this routine is accomplished using the surface image.
 /// </ summary>
 ///
-void ViewManager::Element::render(void) {
-     std::cout<<m_childCount<<std::endl;
+void viewManager::Element::render(void) {
+#if 0
+    std::string_view idName;
+    try {
+        idName = getAttribute<indexBy>().value;
 
-     // print information in the default string vector buffer
-     auto vdata=this->data<std::string>();
-     for(auto s:vdata)
+    } catch (const std::exception& e) {
+        idName = "noID";
+    }
+
+    std::cout << "indexBy " << idName << endl;
+    std::cout << "children " << m_childCount << std::endl;
+
+    // print information in the default string vector buffer
+    auto vdata = data();
+    for (auto s : vdata)
         std::cout << s << endl;
-
+#endif
 }
 /// <summary>Uses the vasprint standard function to format the given
 /// parameters with the format string. Inserts the named
@@ -397,7 +407,7 @@ void ViewManager::Element::render(void) {
 /// class member. So when a literal is not used for the first
 /// parameter, a warning is issued.</para>
 /// </note>
-void ViewManager::Element::printf(const char *fmt, ...) {
+void viewManager::Element::printf(const char *fmt, ...) {
 #if defined(__linux__)
   va_list ap;
   va_start(ap, fmt);
@@ -428,7 +438,7 @@ void ViewManager::Element::printf(const char *fmt, ...) {
   va_end(ap);
 #endif
 }
-Element &ViewManager::Element::ingestMarkup(Element &node,
+Element &viewManager::Element::ingestMarkup(Element &node,
                                             const std::string_view &markup) {
   return *this;
 }
@@ -436,20 +446,20 @@ Element &ViewManager::Element::ingestMarkup(Element &node,
 Visualizer module
 ***************************************************************************/
 std::unordered_map<std::size_t, std::reference_wrapper<Element>> nodes;
-std::size_t ViewManager::Visualizer::allocate(Element &e) {
+std::size_t viewManager::Visualizer::allocate(Element &e) {
   static std::size_t token = 0;
   std::size_t ret = token;
   nodes.emplace(ret, std::ref<Element>(e));
   token++;
   return ret;
 }
-void ViewManager::Visualizer::deallocate(const std::size_t &token) {}
-void ViewManager::Visualizer::openWindow(Element &e) {}
-void ViewManager::Visualizer::closeWindow(Element &e) {}
+void viewManager::Visualizer::deallocate(const std::size_t &token) {}
+void viewManager::Visualizer::openWindow(Element &e) {}
+void viewManager::Visualizer::closeWindow(Element &e) {}
 /***************************************************************************
 Visualizer Platform module
 ***************************************************************************/
-ViewManager::Visualizer::platform::platform(eventHandler evtDispatcher,
+viewManager::Visualizer::platform::platform(eventHandler evtDispatcher,
                                             unsigned short width,
                                             unsigned short height) {
   dispatchEvent = evtDispatcher;
@@ -502,10 +512,10 @@ ViewManager::Visualizer::platform::platform(eventHandler evtDispatcher,
   wcex.hbrBackground = NULL;
   wcex.lpszMenuName = NULL;
   wcex.hCursor = LoadCursor(NULL, IDI_APPLICATION);
-  wcex.lpszClassName = "ViewManagerApp";
+  wcex.lpszClassName = "viewManagerApp";
   RegisterClassEx(&wcex);
   // Create the window.
-  m_hwnd = CreateWindow("ViewManagerApp", "ViewManager Application",
+  m_hwnd = CreateWindow("viewManagerApp", "viewManager Application",
                         WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
                         static_cast<UINT>(width), static_cast<UINT>(height),
                         NULL, NULL, HINST_THISCOMPONENT, 0L);
@@ -531,7 +541,7 @@ ViewManager::Visualizer::platform::platform(eventHandler evtDispatcher,
 ///< summary>The default window message procesor for the application.
 /// This is the version ofr the Microsoft Windows operating system.
 ///</summary>
-LRESULT CALLBACK ViewManager::Visualizer::platform::WndProc(HWND hwnd,
+LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
                                                             UINT message,
                                                             WPARAM wParam,
                                                             LPARAM lParam) {
@@ -637,7 +647,7 @@ LRESULT CALLBACK ViewManager::Visualizer::platform::WndProc(HWND hwnd,
 /// <summary>terminates the xserver connection
 /// and frees resources.
 /// </summary>
-ViewManager::Visualizer::platform::~platform() {
+viewManager::Visualizer::platform::~platform() {
 #if defined(CONSOLE)
 
 #elif defined(__linux__)
@@ -650,7 +660,7 @@ ViewManager::Visualizer::platform::~platform() {
   m_offScreenBitmap->Release();
 #endif
 }
-void ViewManager::Visualizer::platform::messageLoop(void) {
+void viewManager::Visualizer::platform::messageLoop(void) {
 #if defined(CONSOLE)
 
 #elif defined(__linux__)
@@ -692,4 +702,4 @@ void ViewManager::Visualizer::platform::messageLoop(void) {
   }
 #endif
 }
-void ViewManager::Visualizer::platform::flip() {}
+void viewManager::Visualizer::platform::flip() {}
