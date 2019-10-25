@@ -13,7 +13,7 @@ using namespace viewManager;
 These namespace global lists contain the objects as a system ownership.
 ********/
 std::vector<std::unique_ptr<Element>> viewManager::elements;
-std::unordered_map<std::string_view, std::reference_wrapper<Element>>
+std::unordered_map<std::string, std::reference_wrapper<Element>>
     viewManager::indexedElements;
 std::vector<std::unique_ptr<StyleClass>> viewManager::styles;
 viewManager::Viewer::Viewer(const vector<any> &attrs)
@@ -37,7 +37,18 @@ void viewManager::consoleRender(Element &e, int iLevel) {
   cout.fill(' ');
   cout.width(iWidth);
 
-  cout << e.softName << endl;
+  cout << iLevel << " " << e.softName << " ";
+
+  std::string sID;
+
+  try {
+      sID=e.getAttribute<indexBy>().value;
+  } catch(const std::exception &e) {
+    sID="-noID-";
+  }
+
+
+  cout << "(" << sID << ")" << endl;
 
   e.render();
 
@@ -45,7 +56,7 @@ void viewManager::consoleRender(Element &e, int iLevel) {
 
   while (n) {
     consoleRender(n->get(), iLevel + 1);
-    n = n->get().nextChild();
+    n = n->get().nextSibling();
   }
 }
 
@@ -112,45 +123,43 @@ void viewManager::Viewer::processEvents(void) { m_device->messageLoop(); }
 auto viewManager::operator""_pt(unsigned long long int value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::pt};
 }
-auto viewManager::operator""_pt(long double value) -> doubleNF {
+auto viewManager::operator""_pt(long double value)  -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::pt};
 }
-auto viewManager::operator""_em(unsigned long long int value) -> doubleNF {
+auto viewManager::operator""_em(unsigned long long int value)  -> doubleNF{
   return doubleNF{static_cast<double>(value), numericFormat::em};
 }
-auto viewManager::operator""_em(long double value) -> doubleNF {
+auto viewManager::operator""_em(long double value)  -> doubleNF{
   return doubleNF{static_cast<double>(value), numericFormat::em};
 }
-auto viewManager::operator""_px(unsigned long long int value) -> doubleNF {
+auto viewManager::operator""_px(unsigned long long int value)  -> doubleNF{
   return doubleNF{static_cast<double>(value), numericFormat::px};
 }
-auto viewManager::operator""_px(long double value) -> doubleNF {
+auto viewManager::operator""_px(long double value)  -> doubleNF{
   return doubleNF{static_cast<double>(value), numericFormat::px};
 }
-auto viewManager::operator""_percent(unsigned long long int value) -> doubleNF {
+auto viewManager::operator""_percent(unsigned long long int value)  -> doubleNF{
   return doubleNF{static_cast<double>(value), numericFormat::percent};
 }
-auto viewManager::operator""_percent(long double value) -> doubleNF {
+auto viewManager::operator""_percent(long double value)  -> doubleNF{
   return doubleNF{static_cast<double>(value), numericFormat::percent};
 }
-auto viewManager::operator""_pct(unsigned long long int value) -> doubleNF {
+auto viewManager::operator""_pct(unsigned long long int value)  -> doubleNF{
   return doubleNF{static_cast<double>(value), numericFormat::percent};
 }
-auto viewManager::operator""_pct(long double value) -> doubleNF {
+auto viewManager::operator""_pct(long double value)  -> doubleNF{
   return doubleNF{static_cast<double>(value), numericFormat::percent};
 }
-auto viewManager::operator""_normal(unsigned long long int value)
-    -> lineHeight {
+auto viewManager::operator""_normal(unsigned long long int value) -> lineHeight {
   return lineHeight{static_cast<double>(value), lineHeight::normal};
 }
-auto viewManager::operator""_normal(long double value) -> lineHeight {
+auto viewManager::operator""_normal(long double value) -> lineHeight  {
   return lineHeight{static_cast<double>(value), lineHeight::normal};
 }
-auto viewManager::operator""_numeric(unsigned long long int value)
-    -> lineHeight {
+auto viewManager::operator""_numeric(unsigned long long int value) -> lineHeight  {
   return lineHeight{static_cast<double>(value), lineHeight::numeric};
 }
-auto viewManager::operator""_numeric(long double value) -> lineHeight {
+auto viewManager::operator""_numeric(long double value)  -> lineHeight  {
   return lineHeight{static_cast<double>(value), lineHeight::numeric};
 }
 
@@ -163,7 +172,7 @@ auto viewManager::operator""_numeric(long double value) -> lineHeight {
 /// #, or *, or partial matches. Change attributes?
 /// @ for style,
 /// </summary>
-auto viewManager::query(const std::string_view &queryString) -> ElementList {
+auto viewManager::query(const std::string &queryString) -> ElementList {
   ElementList results;
   if (queryString == "*") {
     for (const auto &n : elements) {
@@ -181,7 +190,7 @@ auto viewManager::query(const std::string_view &queryString) -> ElementList {
   }
   return results;
 }
-auto viewManager::query(const ElementQuery &queryFunction) -> ElementList {
+auto viewManager::query(const ElementQuery &queryFunction) -> ElementList{
   ElementList results;
   for (const auto &n : elements) {
     if (queryFunction(std::ref(*(n.get()))))
@@ -189,7 +198,7 @@ auto viewManager::query(const ElementQuery &queryFunction) -> ElementList {
   }
   return results;
 }
-bool viewManager::hasElement(const std::string_view &key) {
+bool viewManager::hasElement(const std::string &key) {
   auto it = indexedElements.find(key);
   return it != indexedElements.end();
 }
@@ -207,14 +216,15 @@ void viewManager::Element::updateIndexBy(const indexBy &setting) {
   // changing id just changes
   // the key in elementById
   // map
-  std::string_view oldKey = "";
-  const std::string_view &newKey = setting.value;
-  std::unordered_map<std::type_index, std::any>::iterator it =
-      attributes.find(std::type_index(typeid(indexBy)));
+  std::string oldKey = "";
+  const std::string &newKey = setting.value;
+  auto it = attributes.find(std::type_index(typeid(indexBy)));
+
   // get the key of the old id
   if (it != attributes.end()) {
     oldKey = std::any_cast<indexBy>(it->second).value;
   }
+
   // case a. key is not blank,
   // yet it is the same value
   // as the old key therefore
@@ -262,25 +272,25 @@ auto viewManager::Element::insertAfter(Element &newChild,
                                        Element &existingElement) -> Element & {
   return newChild;
 }
-auto viewManager::Element::removeChild(Element &oldChild) -> Element & {
+auto viewManager::Element::removeChild(Element &oldChild)  -> Element & {
   return *this;
 }
-auto viewManager::Element::replaceChild(Element &newChild, Element &oldChild)
-    -> Element & {
+auto viewManager::Element::replaceChild(Element &newChild, Element &oldChild)  -> Element &
+    {
   return *this;
 }
-auto viewManager::Element::move(const double t, const double l) -> Element & {
+auto viewManager::Element::move(const double t, const double l)  -> Element &{
   getAttribute<objectTop>().value = t;
   getAttribute<objectLeft>().value = l;
   return *this;
 }
-auto viewManager::Element::resize(const double w, const double h) -> Element & {
+auto viewManager::Element::resize(const double w, const double h)  -> Element & {
   getAttribute<objectWidth>().value = w;
   getAttribute<objectHeight>().value = h;
   return *this;
 }
 void viewManager::Element::remove(void) { return; }
-auto viewManager::Element::removeChildren(Element &e) -> Element & {
+auto viewManager::Element::removeChildren(Element &e)  -> Element & {
   return *this;
 }
 /// <summary>The function mapps the event id to the appropiate vector.
@@ -319,7 +329,7 @@ size_t getAddress(std::function<T(U...)> f) {
   return (size_t)*fnPointer;
 }
 auto viewManager::Element::addListener(eventType evtType,
-                                       eventHandler evtHandler) -> Element & {
+                                       eventHandler evtHandler)  -> Element &{
   getEventVector(evtType).push_back(evtHandler);
   return *this;
 } /// <summary>The function will remove an event listener from the list of
@@ -330,8 +340,8 @@ auto viewManager::Element::addListener(eventType evtType,
 ///
 ///
 auto viewManager::Element::removeListener(eventType evtType,
-                                          eventHandler evtHandler)
-    -> Element & {
+                                          eventHandler evtHandler)  -> Element &
+    {
   auto eventList = getEventVector(evtType);
   auto it = eventList.begin();
   while (it != eventList.end()) {
@@ -342,6 +352,16 @@ auto viewManager::Element::removeListener(eventType evtType,
   }
   return *this;
 }
+
+///
+/// <summary>The function removes all children and data from the
+/// the element.
+/// </ summary>
+///
+auto viewManager::Element::clear(void)  -> Element &{
+    return *this;
+}
+
 ///
 /// <summary>This is the main function which invokes drawing of the item and
 /// its children. It is called recursively when painting needs to occur.
@@ -351,8 +371,7 @@ auto viewManager::Element::removeListener(eventType evtType,
 /// </ summary>
 ///
 void viewManager::Element::render(void) {
-#if 0
-    std::string_view idName;
+    std::string idName;
     try {
         idName = getAttribute<indexBy>().value;
 
@@ -367,7 +386,6 @@ void viewManager::Element::render(void) {
     auto vdata = data();
     for (auto s : vdata)
         std::cout << s << endl;
-#endif
 }
 /// <summary>Uses the vasprint standard function to format the given
 /// parameters with the format string. Inserts the named
@@ -439,7 +457,7 @@ void viewManager::Element::printf(const char *fmt, ...) {
 #endif
 }
 Element &viewManager::Element::ingestMarkup(Element &node,
-                                            const std::string_view &markup) {
+                                            const std::string &markup) {
   return *this;
 }
 /***************************************************************************

@@ -47,7 +47,7 @@ int WINAPI WinMain(HINSTANCE /* hInstance */, HINSTANCE /* hPrevInstance */,
   // create the main window area. This may this is called a Viewer object.
   // The main browsing window. It is an element as well.
   cout << "start viewer create" << endl;
-  auto vm = createElement<Viewer>(
+  auto &vm = createElement<Viewer>(
       objectTop{10_pct}, objectLeft{10_pct}, objectHeight{80_pct},
       objectWidth{80_pct}, textFace{"arial"}, textSize{16_pt}, textWeight{400},
       textIndent{2_em}, lineHeight::normal, textAlignment::left,
@@ -55,26 +55,57 @@ int WINAPI WinMain(HINSTANCE /* hInstance */, HINSTANCE /* hPrevInstance */,
       paddingBottom{5_pt}, paddingRight{5_pt}, marginTop{5_pt},
       marginLeft{5_pt}, marginBottom{5_pt}, marginRight{5_pt});
   cout << "viewer created." << endl;
+
   test0b(vm);
-#if 0
+  vm.clear();
+
   test0(vm);
+  vm.clear();
+
   test1(vm);
+  vm.clear();
+
   test1a(vm);
+  vm.clear();
+
   test2(vm);
+  vm.clear();
+
   test3(vm);
+  vm.clear();
+
   test4(vm);
+  vm.clear();
+
   test5(vm);
+  vm.clear();
+
   test6(vm);
+  vm.clear();
+
   test7(vm);
+  vm.clear();
+
   test7a(vm);
+  vm.clear();
+
   test7b(vm);
+  vm.clear();
+
   test7c(vm);
+  vm.clear();
+
   test8(vm);
+  vm.clear();
+
   test8a(vm);
+  vm.clear();
+
   test10(vm);
-#endif
+  vm.clear();
+
 }
-string_view randomString(int nChars);
+string randomString(int nChars);
 double randomDouble(double a, double b);
 int randomInt(int a);
 void randomAttributeSettings(Element &e);
@@ -93,27 +124,11 @@ void test0(Viewer &vm) {
 void test0b(Viewer &vm) {
   testStart(__FUNCTION__);
 
-  cout << "createElement DIV" << endl;
-  auto e = createElement<DIV>(indexBy{"divTTT"}, "test",
-                              vector<float>{.3, .6, .3, .777, 10.33});
-  if (std::is_lvalue_reference<decltype(e)>::value)
-    cout << "&";
-  else if (std::is_rvalue_reference<decltype(e)>::value)
-    cout << "&&";
-  cout << typeid(e).name() << endl;
+  auto &e = createElement<DIV>(indexBy{"divTTT"}, "test",
+                               vector<float>{.3, .6, .3, .777, 10.33});
 
-  cout << "createElement DIV END" << endl;
-
-  cout << "createElement H1 BEGIN" << endl;
   auto &appTitle = createElement<H1>(indexBy{"title"}, objectTop{10_px},
                                      textAlignment::center, "Type XCB");
-  if (std::is_lvalue_reference<decltype(appTitle)>::value)
-    cout << "&";
-  else if (std::is_rvalue_reference<decltype(appTitle)>::value)
-    cout << "&&";
-  cout << typeid(e).name() << endl;
-
-  cout << "createElement H1 END" << endl;
 
   e.appendChild(appTitle);
   e.appendChild<H2>(indexBy{"subTitle"}, textAlignment::center,
@@ -122,7 +137,7 @@ void test0b(Viewer &vm) {
   vm.appendChild(e);
   vm.appendChild<PARAGRAPH>(indexBy{"content"},
                             "The information must add two children");
-  e.data() = {"This is replace as a data node"};
+  e.data() = {"This is replaced as a data node"};
   vm.appendChild("<div id=testAdd/>");
   vm.render();
 }
@@ -131,15 +146,15 @@ void test0b(Viewer &vm) {
 ************************************************************************/
 //! [test1]
 void test1(Viewer &vm) {
-  // testStart(__func__);
-  auto mainArea = createElement<DIV>(
+  testStart(__FUNCTION__);
+  auto &mainArea = createElement<DIV>(
       indexBy{"mainArea"}, objectTop{10_pct}, objectLeft{10_pct},
       objectWidth{90_pct}, objectHeight{90_pct}, textColor{50, 50, 50},
       background{100, 200, 200}, textFace{"FiraMono-Regular"}, textSize{20_pt},
       textWeight{400});
-  auto appTitle = createElement<H1>(indexBy{"title"}, objectTop{10_px},
-                                    textAlignment::center, "Type XCB");
-  auto appSubTitle =
+  auto &appTitle = createElement<H1>(indexBy{"title"}, objectTop{10_px},
+                                     textAlignment::center, "Type XCB");
+  auto &appSubTitle =
       createElement<H2>(indexBy{"subtitle"}, objectTop{10_px},
                         textAlignment::center, "A starter testing Application");
   appTitle.setAttribute(objectTop{20_percent});
@@ -183,7 +198,7 @@ void test1(Viewer &vm) {
   getElement("bodyText").setAttribute(indexBy{"bodyInformation"}).data() = {
       "The new text information is not quite as long"};
   vm.render();
-  auto statusText =
+  auto &statusText =
       createElement<H3>(indexBy{"statusText"}, "Status Line Updated:");
   mainArea.insertBefore(statusText, getElement("bodyInformation"));
   vm.render();
@@ -261,7 +276,6 @@ marginTop
  */
 void test1a(Viewer &vm) {
   testStart(__FUNCTION__);
-  // testStart(__func__);
   ElementList chapter;
   int m = randomInt(100);
   // notice here that the createElement is not chained because a reference
@@ -269,16 +283,16 @@ void test1a(Viewer &vm) {
   // this must be a single function so that the correct reference is
   // computed.
   for (int i = 0; i < m; i++) {
-    auto info = createElement<paragraph>(
+    auto &info = createElement<paragraph>(
         indexBy{"rndTEST3BookletParagraph_" + to_string(i)},
-        vector<string_view>{randomString(200), randomString(200),
+        vector<string>{randomString(200), randomString(200),
                             randomString(200)});
     info.appendChild<ul>(
         indexBy{"idbikes"},
-        vector<string_view>{"Huffy", "Schwinn", "Giant", "Road Master"});
+        vector<string>{"Huffy", "Schwinn", "Giant", "Road Master"});
     chapter.push_back(info);
   }
-  auto booklet = createElement<dblock>(indexBy{"booklet3"});
+  auto &booklet = createElement<dblock>(indexBy{"booklet3"});
   vm.appendChild(booklet);
   booklet.appendChild(chapter);
   vm.render();
@@ -288,9 +302,9 @@ void test1a(Viewer &vm) {
 ************************************************************************/
 //! [test2]
 void test2(Viewer &vm) {
-  testStart(__func__);
+  testStart(__FUNCTION__);
   for (int i = 0; i < randomInt(100); i++) {
-    auto information = createElement<DIV>(indexBy{"rndDIV_" + to_string(i)});
+    auto &information = createElement<DIV>(indexBy{"rndDIV_" + to_string(i)});
     for (int j = 0; j < randomInt(100); j++) {
       information.appendChild<PARAGRAPH>(
           indexBy{"rndParagraph_" + to_string(j)}, randomString(200));
@@ -312,7 +326,8 @@ void test2(Viewer &vm) {
 ************************************************************************/
 //! [test3]
 void test3(Viewer &vm) {
-  testStart(__func__);
+  testStart(__FUNCTION__);
+
   ElementList chapter;
   int m = randomInt(100);
   for (int i = 0; i < m; i++) {
@@ -320,7 +335,7 @@ void test3(Viewer &vm) {
         indexBy{"rndTEST3BookletParagraph_" + to_string(i)},
         randomString(200)));
   }
-  auto booklet = createElement<DIV>(indexBy{"booklet3"});
+  auto &booklet = createElement<DIV>(indexBy{"booklet3"});
   vm.appendChild(booklet);
   booklet.appendChild(chapter);
   vm.render();
@@ -328,9 +343,10 @@ void test3(Viewer &vm) {
 //! [test3]
 //! [test4]
 void test4(Viewer &vm) {
-  testStart(__func__);
+  testStart(__FUNCTION__);
+
   int m = randomInt(100);
-  Element eBooklet = vm.appendChild<DIV>(indexBy{"booklet4"});
+  Element &eBooklet = vm.appendChild<DIV>(indexBy{"booklet4"});
   for (int i = 0; i < m; i++)
     eBooklet.appendChild<PARAGRAPH>(
         indexBy{"rndTEST4BookletParagraph_" + to_string(i)}, randomString(200));
@@ -339,7 +355,8 @@ void test4(Viewer &vm) {
 //! [test4]
 //! [test5]
 void test5(Viewer &vm) {
-  testStart(__func__);
+  testStart(__FUNCTION__);
+
   ElementList chapter;
   int m = randomInt(100);
   for (int i = 0; i < m; i++) {
@@ -362,7 +379,8 @@ void test5(Viewer &vm) {
 ************************************************************************/
 //! [test6]
 void test6(Viewer &vm) {
-  testStart(__func__);
+  testStart(__FUNCTION__);
+
   ElementList chapter;
   int m = randomInt(5);
   for (int i = 0; i < m; i++) {
@@ -374,11 +392,11 @@ void test6(Viewer &vm) {
       << "can you do the []";
 
     e.appendChild<UL>(indexBy{"bookletNotes_" + to_string(i)},
-                      vector<string_view>{"Endurance training", "Biking",
+                      vector<string>{"Endurance training", "Biking",
                                           "Meals", "Schedule"})
         .append<UL>(
             indexBy{"guestCompanies_" + to_string(i)},
-            vector<pair<int, string_view>>{{0, "Gyms"},
+            vector<pair<int, string>>{{0, "Gyms"},
                                            {1, "Gold's Gym"},
                                            {1, "Core Fitness"},
                                            {1, "Tommy Doright's"},
@@ -387,7 +405,7 @@ void test6(Viewer &vm) {
                                            {1, "Scwitchers"},
                                            {1, "Clock Down Industrials"}})
         .append<UL>(indexBy{"bookletReferences_" + to_string(i)},
-                    vector<string_view>{"The 26inch Road", "Flatters Chain",
+                    vector<string>{"The 26inch Road", "Flatters Chain",
                                         "Wheelers and Handlebars",
                                         "Rim's n Chains"});
     chapter.push_back(e);
@@ -402,7 +420,8 @@ void test6(Viewer &vm) {
 ************************************************************************/
 //! [test7]
 void test7(Viewer &vm) {
-  testStart(__func__);
+  testStart(__FUNCTION__);
+
   ElementList vParagraphs;
   vParagraphs.push_back(createElement<PARAGRAPH>(indexBy{"testpara1"}));
   vParagraphs.push_back(createElement<PARAGRAPH>(indexBy{"testpara2"}));
@@ -432,7 +451,8 @@ void test7(Viewer &vm) {
 //! [test7]
 //! [test7a]
 void test7a(Viewer &vm) {
-  testStart(__func__);
+  testStart(__FUNCTION__);
+
   ElementList vParagraphs;
   vParagraphs.push_back(createElement<PARAGRAPH>(indexBy{"testpara1"}));
   vParagraphs.push_back(createElement<PARAGRAPH>(indexBy{"testpara2"}));
@@ -455,7 +475,8 @@ void test7a(Viewer &vm) {
 //! [test7a]
 //! [test7b]
 void test7b(Viewer &vm) {
-  testStart(__func__);
+  testStart(__FUNCTION__);
+
   ElementList vParagraphs;
   vParagraphs.push_back(createElement<PARAGRAPH>(indexBy{"testpara1"}));
   vParagraphs.push_back(createElement<PARAGRAPH>(indexBy{"testpara2"}));
@@ -479,8 +500,9 @@ void test7b(Viewer &vm) {
 //! [test7b]
 //! [test7c]
 void test7c(Viewer &vm) {
-  testStart(__func__);
-  auto divTest = vm.appendChild<DIV>(indexBy{"testAnother"});
+  testStart(__FUNCTION__);
+
+  auto &divTest = vm.appendChild<DIV>(indexBy{"testAnother"});
   // the append and appendChild with texts.
   divTest.appendChild("<ul></ul>")
       .appendChild("<li>test1</li>")
@@ -493,13 +515,14 @@ void test7c(Viewer &vm) {
 }
 //! [test7d]
 void test7d(Viewer &vm) {
-  testStart(__func__);
-  auto divTest = vm.appendChild<DIV>(indexBy{"testAnother"});
+  testStart(__FUNCTION__);
+
+  auto &divTest = vm.appendChild<DIV>(indexBy{"testAnother"});
   // the append and appendChild with texts.
   divTest.appendChild("<ul></ul>").data() = {"2222", "3333", "444", "6.66",
                                              "7"};
   divTest.appendChild<ul>().data<double>() = {1, 4, 5, 3, 4, 4, 4, 33, 4, 5};
-  divTest.appendChild<ul>().data<pair<int, string_view>>() = {
+  divTest.appendChild<ul>().data<pair<int, string>>() = {
       {0, "AC/DC"},
       {1, "Hell's Bells"},
       {1, "You Shook Me All Night Long"},
@@ -514,7 +537,7 @@ void test7d(Viewer &vm) {
                                              "ghhhht"};
 }
 void test7e(Viewer &view) {
-  auto tblCost = createElement<TABLE>(
+  auto &tblCost = createElement<TABLE>(
       objectLeft{10_pct}, objectTop{10_pct}, objectWidth{80_pct},
       objectHeight{80_pct},
       tableColumns{
@@ -575,10 +598,10 @@ supports these facets of modern design benefits.
 void test7f(Viewer &view) {
   // build a fancy <ul> list with <li> children consisting
   // of varying details...
-  static array<string_view, 3> sIconNames = {"base.raw", "contentIcon.raw",
+  static array<string, 3> sIconNames = {"base.raw", "contentIcon.raw",
                                              "normal.raw"};
   // dataAdaptor
-  using tagInfo = tuple<int, string_view, float>;
+  using tagInfo = tuple<int, string, float>;
 #define idRecords "id_records"
   // format detailed views easily ...
   view.appendChild<ul>(indexBy{idRecords}).data<tagInfo>() = {
@@ -589,8 +612,8 @@ void test7f(Viewer &view) {
       {1, "Squeeler", 9.1},
       {0, "Books", 10},
       {1, "The Button Bubble - Digital Economics By Anthony Matarazzo", 5.5}};
-  auto urecords = getElement(idRecords);
-  auto recordPlex = urecords.data<tagInfo>();
+  auto &urecords = getElement(idRecords);
+  auto &recordPlex = urecords.data<tagInfo>();
   recordPlex.push_back({0, "Variodic Blackhearts", .2});
   recordPlex.push_back({1, "Sympathetic Voting Machines", .001});
   recordPlex.push_back(
@@ -626,7 +649,7 @@ void test7f(Viewer &view) {
   // Data insertion using the stdandard libary
   //
   // get reference to actual memory. std interface.
-  auto ulRecords = getElement(idRecords);
+  auto &ulRecords = getElement(idRecords);
   // tagFormatter is needed for hash map to get the structure.
   // templated for user defined storage and reflexion.
   // state information is saved when getAdaptor is invoked,
@@ -634,7 +657,7 @@ void test7f(Viewer &view) {
   // the problem to solve for the system that will create
   // high performance "implementation error free" solution
   // exception raised from non created item from absorb.
-  auto recordPlex2 = ulRecords.data<tagInfo>();
+  auto &recordPlex2 = ulRecords.data<tagInfo>();
   for (int i = 1; i < 10; i++)
     recordPlex2.push_back({i, "STD::MOVE", randomDouble(0, 10)});
   // senses that 10 added to the end of a list of 1000 already/ - no display
@@ -696,16 +719,16 @@ void test7g(Viewer &view) {
   public:
     size_t index;
     uniRecordSchema schema;
-    uniRecord(const string_view &broadName) {}
-    uniRecord(const string_view &fname, const string_view &lname,
-              const string_view &phone, const string_view &email) {
+    uniRecord(const string &broadName) {}
+    uniRecord(const string &fname, const string &lname,
+              const string &phone, const string &email) {
       schema = contact;
     };
-    uniRecord(const string_view &_fileName, const size_t &fileSizeKiloByte,
+    uniRecord(const string &_fileName, const size_t &fileSizeKiloByte,
               const size_t &indexPreviewKey) {
       schema = filelist;
     };
-    uniRecord(const string_view &fname, const string_view &format,
+    uniRecord(const string &fname, const string &format,
               const int &depth, const tuple<double, double, double> gps,
               const size_t summaryIndexKey) {
       schema = pictureThumb;
@@ -764,15 +787,16 @@ string_view email
       {"apple.jpg", 2344, 0x676778534},
       {"orange.jpg", 5545, 0x99887},
       {"pineapple.jpg", 1346, 0x454567}};
-  auto ulItems = getElement("uniRec");
+  auto &ulItems = getElement("uniRec");
   // transform lambda
   ulItems.dataTransform<li, uniRecord>(
       [](auto &o) -> auto & { return o.build(); });
+
   vector<uniRecord> vegetables = {{"Broccoli"},        {"Broccoli Rabe "},
                                   {"Brussel Sprouts"}, {"Cabbage, Green"},
                                   {"Cabbage, Red"},    {"Carrot"},
                                   {"Cassava"},         {"Cauliflower"}};
-  auto vecItems = ulItems.data<uniRecord>();
+  auto &vecItems = ulItems.data<uniRecord>();
   vecItems.insert(vecItems.end(), vegetables.begin(), vegetables.end());
   // takes info and induces the change.
   ulItems.dataHint<uniRecord>(vegetables.size());
@@ -985,7 +1009,8 @@ library for specific types of uses.
 *******************************************************************/
 //! [test8a]
 void test8a(Viewer &vm) {
-  testStart(__func__);
+  testStart(__FUNCTION__);
+
   auto dBook = vm.appendChild<DIV>(indexBy{"booklet5"});
   PARAGRAPH *pBooklet = nullptr;
   // a warning is issued which is what is required.
@@ -1009,7 +1034,8 @@ void test8a(Viewer &vm) {
 *******************************************************************/
 //! [test8]
 void test8(Viewer &vm) {
-  testStart(__func__);
+  testStart(__FUNCTION__);
+
   int m = randomInt(5);
   auto dBook = vm.appendChild<DIV>(indexBy{"booklet5"});
   vm.render();
@@ -1035,7 +1061,8 @@ void test8(Viewer &vm) {
 //! [test8]
 //! [test10]
 void test10(Viewer &vm) {
-  testStart(__func__);
+  testStart(__FUNCTION__);
+
   int m = randomInt(5);
   auto dBook = vm.appendChild<DIV>(indexBy{"booklet5"});
   vm.render();
@@ -1067,7 +1094,7 @@ void test10(Viewer &vm) {
 //! [test10]
 /************************************************************************
 ************************************************************************/
-string_view randomString(int nChars) {
+string randomString(int nChars) {
   unsigned int numChars =
       1u +
       (std::rand() / ((RAND_MAX + 1u) / static_cast<unsigned int>(nChars)));
@@ -1080,8 +1107,8 @@ string_view randomString(int nChars) {
   };
   string s1(numChars, 0);
   ;
-  string_view str(s1);
-  // std::generate_n(str.begin(), numChars, randchar);
+  string str(s1);
+  std::generate_n(std::back_inserter(str), numChars, randchar);
   return str;
 }
 /************************************************************************

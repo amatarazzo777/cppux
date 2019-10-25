@@ -72,7 +72,7 @@ class event;
 typedef std::function<void(const event &)> eventHandler;
 typedef std::function<bool(const Element &)> ElementQuery;
 typedef std::vector<std::reference_wrapper<Element>> ElementList;
-using tableData = std::vector<std::vector<std::string_view>>;
+using tableData = std::vector<std::vector<std::string>>;
 template <std::size_t I, typename T>
 using dataTransformMap =
     std::unordered_map<const typename std::tuple_element<I, T>::type &,
@@ -81,7 +81,7 @@ using dataTransformMap =
 These namespace global lists contain the objects as a system ownership.
 **/
 extern std::vector<std::unique_ptr<Element>> elements;
-extern std::unordered_map<std::string_view, std::reference_wrapper<Element>>
+extern std::unordered_map<std::string, std::reference_wrapper<Element>>
     indexedElements;
 extern std::vector<std::unique_ptr<StyleClass>> styles;
 /*******************************************************
@@ -180,7 +180,7 @@ public:
   colorFormat option;
   colorNF(const colorFormat &_opt, const std::array<double, 4> &_val)
       : option(_opt), value(_val) {}
-  colorNF(const std::string_view &_colorName) { option = colorFormat::name; }
+  colorNF(const std::string &_colorName) { option = colorFormat::name; }
   void lighter(const double &step = 0.1) {}
   void darker(const double &step = 0.1) {}
   void monochromatic(const double &step = 0.1) {}
@@ -218,8 +218,8 @@ developed.
 #define _STRING_ATTRIBUTE(NAME)                                                \
   using NAME = class NAME {                                                    \
   public:                                                                      \
-    std::string_view value;                                                    \
-    NAME(const std::string_view &_val) : value(_val) {}                        \
+    std::string value;                                                    \
+    NAME(const std::string &_val) : value(_val) {}                        \
     NAME(const NAME &_val) : value(_val.value) {}                              \
   }
 #define _NUMERIC_WITH_FORMAT_ATTRIBUTE(NAME)                                   \
@@ -247,7 +247,7 @@ developed.
   public:                                                                      \
     NAME(const double &_v1, const double &_v2, const double &_v3)              \
         : colorNF(colorFormat::rgb, {_v1, _v2, _v3, 0}) {}                     \
-    NAME(const std::string_view &_colorName) : colorNF(_colorName) {}          \
+    NAME(const std::string &_colorName) : colorNF(_colorName) {}          \
     NAME(const colorFormat &_opt, const std::array<double, 4> &_val)           \
         : colorNF(_opt, _val) {}                                               \
     NAME(const colorFormat _opt, const double &_v1, const double &_v2,         \
@@ -260,8 +260,8 @@ developed.
 #define _VECTOR_ATTRIBUTE(NAME)                                                \
   using NAME = class NAME {                                                    \
   public:                                                                      \
-    std::vector<std::string_view> value;                                       \
-    NAME(std::vector<std::string_view> _val) : value(std::move(_val)) {}       \
+    std::vector<std::string> value;                                       \
+    NAME(std::vector<std::string> _val) : value(std::move(_val)) {}       \
   }
 // namespace viewManager
 /*
@@ -377,7 +377,7 @@ private:
 }; // class platform
 }; // namespace Visualizer
 template <typename TYPE>
-auto&  _createElement(const std::vector<std::any> &attr);
+auto &_createElement(const std::vector<std::any> &attr);
 /*******************************************************
 Element
 ********************************************************/
@@ -386,7 +386,7 @@ public:
   std::string_view softName;
 
 public:
-  Element(std::string_view _softName, const std::vector<std::any> &attribs = {})
+  Element(const std::string_view &_softName, const std::vector<std::any> &attribs = {})
       : softName(_softName), m_self(this), m_parent(nullptr),
         m_firstChild(nullptr), m_lastChild(nullptr), m_nextChild(nullptr),
         m_previousChild(nullptr), m_nextSibling(nullptr),
@@ -497,14 +497,14 @@ private:
         : _data(_d), fnTransform(_fn) {
       saveState();
     }
-    auto data(void) -> std::vector<T> & {
+    auto &data(void) {
       saveState();
-      return _data;
+      return (_data);
     }
-    auto data(std::vector<T> &_input) -> std::vector<T> & {
+    auto &data(std::vector<T> &_input) {
       _data = std::move(_input);
       saveState();
-      return _data;
+      return (_data);
     }
     std::function<Element &(T &)> &transform(void) { return fnTransform; }
     // analyze hint data and deduce states
@@ -524,9 +524,9 @@ templated functions work with the internal data storage mechnism.
 */
 public:
   template <typename R, typename T>
-  void dataTransform(const std::string_view &txtFn) {}
+  void dataTransform(const std::string &txtFn) {}
   template <typename R, typename T>
-  void dataTransform(const std::string_view &txtFn,
+  void dataTransform(const std::string &txtFn,
                      const std::function<bool(T &)> &_fn) {}
   template <typename R, typename T>
   void dataTransform(const std::function<R &(T &)> &_fn) {
@@ -541,7 +541,7 @@ public:
       std::function<Element &(T &)> fnDefault;
       m_usageAdaptorMap[tIndex] = usageAdaptor<T>(fnDefault);
     } else {
-      const usageAdaptor<T> &adaptor =
+      const auto &adaptor =
           std::any_cast<usageAdaptor<T> &>(m_usageAdaptorMap[tIndex]);
     }
   }
@@ -567,8 +567,8 @@ that elvolve in delicate use of competent technology.
                                std::function<Element &(T &)>> &_transformList) {
   }
   /************** data access ***************/
-  template <typename T = std::string_view> auto &data(void) {
-    std::type_index tIndex = std::type_index(typeid(std::vector<T>));
+  template <typename T = std::string> auto &data(void) {
+    auto tIndex = std::type_index(typeid(std::vector<T>));
     // if the requested data adaptor does not exist,
     // create its position within the adaptor member vector
     // return this to the caller.
@@ -577,9 +577,10 @@ that elvolve in delicate use of competent technology.
       // create a default data display for the type here.
       std::function<Element &(T &)> fnDefault;
       m_usageAdaptorMap[tIndex] = usageAdaptor<T>(fnDefault);
-      return std::any_cast<usageAdaptor<T> &>(m_usageAdaptorMap[tIndex]).data();
+      return (
+          std::any_cast<usageAdaptor<T> &>(m_usageAdaptorMap[tIndex]).data());
     } else {
-      return std::any_cast<usageAdaptor<T> &>(it->second).data();
+      return (std::any_cast<usageAdaptor<T> &>(it->second).data());
     }
   }
   template <typename T>
@@ -606,8 +607,7 @@ that elvolve in delicate use of competent technology.
     s << data;
 
     // append the information to the end of the data vector.
-    auto &vdata = this->data<std::string>();
-    vdata.push_back(s.str());
+    this->data().push_back(s.str());
 
     return *this;
   }
@@ -615,7 +615,7 @@ that elvolve in delicate use of competent technology.
   /* query at this level must allow traversal of types, and direction.
 siblings, parent, children...
 */
-  auto query(const std::string_view &queryString) -> ElementList{};
+  auto query(const std::string &queryString) -> ElementList{};
   auto query(const ElementQuery &queryFunction) -> ElementList{};
   // private data menbers to hold the information of the class
 private:
@@ -651,10 +651,10 @@ private:
   std::size_t surface;
 
 public:
-  auto appendChild(const std::string_view &sMarkup) -> Element & {
+  auto appendChild(const std::string &sMarkup) -> Element & {
     return (ingestMarkup(*this, sMarkup));
   }
-  auto appendChild(Element &newChild) -> Element & {
+  auto appendChild(Element &newChild) -> Element &  {
     newChild.m_parent = this;
     newChild.m_previousSibling = m_lastChild;
 
@@ -666,11 +666,12 @@ public:
 
     m_lastChild = newChild.m_self;
     m_childCount++;
+
     return (newChild);
   }
 
   auto appendChild(const ElementList &elementCollection)
-      -> std::add_lvalue_reference<Element>::type {
+      -> Element & {
     for (auto e : elementCollection) {
       appendChild(e.get());
     }
@@ -684,7 +685,7 @@ public:
   }
 
 public:
-  auto append(const std::string_view &sMarkup) -> Element & {
+  auto append(const std::string &sMarkup) -> Element & {
     Element *base = this->m_parent;
     if (base == nullptr)
       base = this;
@@ -732,15 +733,15 @@ typically few entries. */
       dt_double,
       dt_float,
       dt_int,
-      dt_std_string_view,
+      dt_std_string,
       dt_const_char,
       dt_vector_char,
       dt_vector_double,
       dt_vector_float,
       dt_vector_int,
-      dt_vector_string_view,
-      dt_vector_vector_string_view,
-      dt_vector_pair_int_string_view,
+      dt_vector_string,
+      dt_vector_vector_string,
+      dt_vector_pair_int_string,
       dt_indexBy,
 
       dt_nonFiltered
@@ -751,8 +752,8 @@ typically few entries. */
         {std::type_index(typeid(double)).hash_code(), dt_double},
         {std::type_index(typeid(float)).hash_code(), dt_float},
         {std::type_index(typeid(int)).hash_code(), dt_int},
-        {std::type_index(typeid(std::string_view)).hash_code(),
-         dt_std_string_view},
+        {std::type_index(typeid(std::string)).hash_code(),
+         dt_std_string},
         {std::type_index(typeid(const char *)).hash_code(), dt_const_char},
         {std::type_index(typeid(std::vector<char>)).hash_code(),
          dt_vector_char},
@@ -761,21 +762,20 @@ typically few entries. */
         {std::type_index(typeid(std::vector<float>)).hash_code(),
          dt_vector_float},
         {std::type_index(typeid(std::vector<int>)).hash_code(), dt_vector_int},
-        {std::type_index(typeid(std::vector<std::string_view>)).hash_code(),
-         dt_vector_string_view},
-        {std::type_index(typeid(std::vector<std::vector<std::string_view>>))
+        {std::type_index(typeid(std::vector<std::string>)).hash_code(),
+         dt_vector_string},
+        {std::type_index(typeid(std::vector<std::vector<std::string>>))
              .hash_code(),
-         dt_vector_vector_string_view},
+         dt_vector_vector_string},
         {std::type_index(
-             typeid(std::vector<std::vector<std::pair<int, std::string_view>>>))
+             typeid(std::vector<std::vector<std::pair<int, std::string>>>))
              .hash_code(),
-         dt_vector_pair_int_string_view},
+         dt_vector_pair_int_string},
         {std::type_index(typeid(indexBy)).hash_code(), dt_indexBy}};
     // set search result defaults for not found in filter
     _enumTypeFilter dtFilter = dt_nonFiltered;
     bool bSaveInMap = false;
-    std::unordered_map<size_t, _enumTypeFilter>::iterator it =
-        _umapTypeFilter.find(setting.type().hash_code());
+    auto it = _umapTypeFilter.find(setting.type().hash_code());
     if (it != _umapTypeFilter.end())
       dtFilter = it->second;
 
@@ -802,11 +802,11 @@ simple initializer list format given within the attribute list.*/
     } break;
     case dt_const_char: {
       auto v = std::any_cast<const char *>(setting);
-      data<std::string_view>() = std::vector<std::string_view>{v};
+      data<std::string>() = std::vector<std::string>{v};
     } break;
-    case dt_std_string_view: {
-      auto v = std::any_cast<std::string_view>(setting);
-      data<std::string_view>() = std::vector<std::string_view>{v};
+    case dt_std_string: {
+      auto v = std::any_cast<std::string>(setting);
+      data<std::string>() = std::vector<std::string>{v};
     } break;
     case dt_vector_char: {
       auto v = std::any_cast<std::vector<char>>(setting);
@@ -824,19 +824,19 @@ simple initializer list format given within the attribute list.*/
       auto v = std::any_cast<std::vector<int>>(setting);
       data<int>() = v;
     } break;
-    case dt_vector_string_view: {
-      auto v = std::any_cast<std::vector<std::string_view>>(setting);
-      data<std::string_view>() = v;
+    case dt_vector_string: {
+      auto v = std::any_cast<std::vector<std::string>>(setting);
+      data<std::string>() = v;
     } break;
-    case dt_vector_vector_string_view: {
+    case dt_vector_vector_string: {
       auto v =
-          std::any_cast<std::vector<std::vector<std::string_view>>>(setting);
-      data<std::vector<std::string_view>>() = v;
+          std::any_cast<std::vector<std::vector<std::string>>>(setting);
+      data<std::vector<std::string>>() = v;
     } break;
-    case dt_vector_pair_int_string_view: {
+    case dt_vector_pair_int_string: {
       auto v =
-          std::any_cast<std::vector<std::pair<int, std::string_view>>>(setting);
-      data<std::pair<int, std::string_view>>() = v;
+          std::any_cast<std::vector<std::pair<int, std::string>>>(setting);
+      data<std::pair<int, std::string>>() = v;
     } break;
     // attributes stored in map but filtered for processing.
     case dt_indexBy: {
@@ -867,10 +867,10 @@ simple initializer list format given within the attribute list.*/
 public:
   template <typename ATTR_TYPE> ATTR_TYPE &getAttribute(void) {
     ATTR_TYPE *ret = nullptr;
-    std::unordered_map<std::type_index, std::any>::iterator it =
-        attributes.find(std::type_index(typeid(ATTR_TYPE)));
+    auto it = attributes.find(std::type_index(typeid(ATTR_TYPE)));
     if (it != attributes.end()) {
       ret = &std::any_cast<ATTR_TYPE &>(it->second);
+
     } else {
       std::string info = typeid(ret).name();
       info += " attribute not found";
@@ -881,7 +881,7 @@ public:
   }
 
 public:
-  Element &clear(void) { return *this; }
+  auto clear(void) -> Element &;
 
 public:
   std::vector<eventHandler> onfocus;
@@ -921,7 +921,7 @@ public:
 #else
   void printf(const char *fmt, ...);
 #endif
-  auto ingestMarkup(Element &node, const std::string_view &markup) -> Element &;
+  auto ingestMarkup(Element &node, const std::string &markup) -> Element &;
 
 private:
   void updateIndexBy(const indexBy &setting);
@@ -1048,8 +1048,8 @@ public:
 };
 class textNode : public Element {
 public:
-  std::string_view &value;
-  textNode(std::string_view &s) : value(s), Element("textNode") {}
+  std::string value;
+  textNode(const std::string &s) : value(s), Element("textNode") {}
 };
 /// USE_LOWER_CASE_ENTITY_NAMES
 /// <summary>Options for compiling that provide recognition of
@@ -1082,16 +1082,16 @@ proper deallocation.
 void consoleRender(Element &e, int iLevel);
 
 template <typename TYPE>
-auto& _createElement(const std::vector<std::any> &attrs) {
+auto &_createElement(const std::vector<std::any> &attrs) {
   std::unique_ptr<TYPE> e = std::make_unique<TYPE>(attrs);
   elements.push_back(std::move(e));
-  TYPE &ret=static_cast<TYPE &>(*elements.back().get());
-  return ret;
+  return static_cast<TYPE &>(*elements.back().get());
 }
 
 template <class TYPE, typename... ATTRS>
-auto& createElement(const ATTRS &... attribs) {
-  return _createElement<TYPE>({attribs...});;
+auto &createElement(const ATTRS &... attribs) {
+  return _createElement<TYPE>({attribs...});
+  ;
 }
 
 template <typename... Types> auto createStyle(Types... args) -> StyleClass & {
@@ -1099,17 +1099,17 @@ template <typename... Types> auto createStyle(Types... args) -> StyleClass & {
   styles.push_back(std::move(newStyle));
   return *styles.back().get();
 }
-auto query(const std::string_view &queryString) -> ElementList;
+auto query(const std::string &queryString) -> ElementList;
 auto query(const ElementQuery &queryFunction) -> ElementList;
 
 template <class T = Element &>
-auto getElement(const std::string_view &key) -> T & {
+auto getElement(const std::string &key) -> T & {
   auto it = indexedElements.find(key);
   T ret = it->second.get();
   return ret;
 }
 
-bool hasElement(const std::string_view &key);
+bool hasElement(const std::string &key);
 #define CREATE_OBJECT_ALIAS(OBJECT_TEXT, OBJECT_TYPE)                          \
   {                                                                            \
 #OBJECT_TEXT,                                                              \
@@ -1119,7 +1119,7 @@ bool hasElement(const std::string_view &key);
 
 #define CREATE_OBJECT(OBJECT_TYPE) CREATE_OBJECT_ALIAS(OBJECT_TYPE, OBJECT_TYPE)
 static std::unordered_map<
-    std::string_view,
+    std::string,
     std::function<Element &(const std::vector<std::any> &attr)>>
     objectFactoryMap = {
         CREATE_OBJECT(BR),   CREATE_OBJECT(H1),        CREATE_OBJECT(H2),
@@ -1139,7 +1139,6 @@ public:
   Viewer &operator=(Viewer &&other) noexcept {} // move assignment
   void render(void);
   void processEvents(void);
-  Viewer &clear(void) {}
   // event implementation
   void dispatchEvent(const event &e);
 
