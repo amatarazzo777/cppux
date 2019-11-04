@@ -12,33 +12,32 @@
 #include <cctype>
 #include <climits>
 #include <cmath>
+#include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <functional>
 #include <future>
 #include <iomanip>
 #include <iostream>
 #include <iterator>
 #include <map>
+#include <memory>
 #include <optional>
 #include <regex>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <tuple>
-#include <unordered_map>
-#include <variant>
-#include <vector>
-//#include <charconv>
-#include <cstdarg>
-#include <functional>
-#include <memory>
-#include <stdexcept>
 #include <type_traits>
 #include <typeindex>
 #include <typeinfo>
+#include <unordered_map>
 #include <utility>
+#include <variant>
+#include <vector>
 
 #define CONSOLE
 
@@ -163,6 +162,7 @@ these are provided as public, and used as a type
 on the input of the class constructor.*/
 using numericFormat = enum option { px, pt, em, percent, autoCalculate };
 using colorFormat = enum colorFormat { rgb, hsl, name };
+
 /*
 Classes used by complex attributes.
 */
@@ -173,28 +173,47 @@ public:
   doubleNF(const doubleNF &_val) : value(_val.value), option(_val.option) {}
   doubleNF(const double &_val, const numericFormat &_nf)
       : value(_val), option(_nf) {}
+  doubleNF(const std::string &_str);
 };
+
+typedef std::unordered_map<std::string, unsigned long> colorMap;
+
 class colorNF {
 public:
   std::array<double, 4> value;
   colorFormat option;
+  static const colorMap colorFactory;
   colorNF(const colorFormat &_opt, const std::array<double, 4> &_val)
       : option(_opt), value(_val) {}
-  colorNF(const std::string &_colorName) { option = colorFormat::name; }
-  void lighter(const double &step = 0.1) {}
-  void darker(const double &step = 0.1) {}
-  void monochromatic(const double &step = 0.1) {}
-  void triad(void) { /*hsl rotate 120*/
-  }
-  void neutralCooler(void) { /* hsl rotate -30 */
-  }
-  void neutralWarmer(void) { /* hsl rotate 30 */
-  }
-  void complementary(void) { /* hsl rotate 180*/
-  }
-  void splitComplements(void) { /*hsl rotate 150 */
-  }
+
+  colorNF(const std::string &_colorName);
+  colorNF(const colorNF &_colorObj) : option(_colorObj.option), value(_colorObj.value) { }
+
+  void lighter(const double &step = 0.1);
+  void darker(const double &step = 0.1);
+  void monochromatic(const double &step = 0.1);
+  void triad(void);            /*hsl rotate 120*/
+  void neutralCooler(void);    /* hsl rotate -30 */
+  void neutralWarmer(void);    /* hsl rotate 30 */
+  void complementary(void);    /* hsl rotate 180*/
+  void splitComplements(void); /*hsl rotate 150 */
 };
+
+// parsing functions within the view manager namespace, these routines
+// are used by the attribute objects when they accept strings as initialization
+// values
+uint8_t strToEnum(const std::string_view &sListName,
+                  const std::unordered_map<std::string, uint8_t> &optionMap,
+                  const std::string &sOption);
+
+std::tuple<double, std::string>
+strToNumericAndEnum(const std::string_view &sListName,
+                    const std::unordered_map<std::string, uint8_t> &optionMap,
+                    const std::string &_sOption);
+
+std::tuple<doubleNF, doubleNF, doubleNF, doubleNF>
+parseQuadCoordinates(const std::string _sOptions);
+
 /*
 INTERNEL MACROS to reduce code needed for these attribute storage
 implementations. These macros develop the storage class or
@@ -214,14 +233,17 @@ developed.
     double value;                                                              \
     NAME(const double &_val) : value(_val) {}                                  \
     NAME(const NAME &_val) : value(_val.value) {}                              \
+    NAME(const std::string &_str) { value = std::stod(_str, NULL); }           \
   }
+
 #define _STRING_ATTRIBUTE(NAME)                                                \
   using NAME = class NAME {                                                    \
   public:                                                                      \
-    std::string value;                                                    \
-    NAME(const std::string &_val) : value(_val) {}                        \
+    std::string value;                                                         \
+    NAME(const std::string &_val) : value(_val) {}                             \
     NAME(const NAME &_val) : value(_val.value) {}                              \
   }
+
 #define _NUMERIC_WITH_FORMAT_ATTRIBUTE(NAME)                                   \
   using NAME = class NAME : public doubleNF {                                  \
   public:                                                                      \
@@ -229,9 +251,21 @@ developed.
         : doubleNF(_val, _nf) {}                                               \
     NAME(const doubleNF &_val) : doubleNF(_val) {}                             \
     NAME(const NAME &_val) : doubleNF(_val) {}                                 \
+    NAME(const std::string &_str) : doubleNF(_str) {}                          \
   }
+
 #define _ENUMERATED_ATTRIBUTE(NAME, ...)                                       \
-  using NAME = enum class NAME : uint8_t { __VA_ARGS__ }
+  using NAME = class NAME {                                                    \
+  public:                                                                      \
+    enum optionEnum : uint8_t { __VA_ARGS__ };                                 \
+    optionEnum value;                                                          \
+                                                                               \
+  public:                                                                      \
+    NAME(const optionEnum &val) : value(val) {}                                \
+    NAME(const NAME &val) : value(val.value) {}                                \
+    NAME(const std::string &_opt);                                             \
+  }
+
 #define _NUMERIC_WITH_ENUMERATED_ATTRIBUTE(NAME, ...)                          \
   using NAME = class NAME {                                                    \
   public:                                                                      \
@@ -241,13 +275,15 @@ developed.
     NAME(const double &_val, const optionEnum &_opt)                           \
         : value(_val), option(_opt) {}                                         \
     NAME(const NAME &_val) : value(_val.value), option(_val.option) {}         \
+    NAME(const std::string &_str);                                             \
   }
+
 #define _COLOR_ATTRIBUTE(NAME)                                                 \
   using NAME = class NAME : public colorNF {                                   \
   public:                                                                      \
     NAME(const double &_v1, const double &_v2, const double &_v3)              \
         : colorNF(colorFormat::rgb, {_v1, _v2, _v3, 0}) {}                     \
-    NAME(const std::string &_colorName) : colorNF(_colorName) {}          \
+    NAME(const std::string &_colorName) : colorNF(_colorName) {}               \
     NAME(const colorFormat &_opt, const std::array<double, 4> &_val)           \
         : colorNF(_opt, _val) {}                                               \
     NAME(const colorFormat _opt, const double &_v1, const double &_v2,         \
@@ -256,13 +292,16 @@ developed.
     NAME(const colorFormat &_opt, const double &_v1, const double &_v2,        \
          const double &_v3, const double &_v4)                                 \
         : colorNF(_opt, {_v1, _v2, _v3, _v4}) {}                               \
+    NAME(const colorNF &_opt) : colorNF(_opt) {}                               \
   }
+
 #define _VECTOR_ATTRIBUTE(NAME)                                                \
   using NAME = class NAME {                                                    \
   public:                                                                      \
-    std::vector<std::string> value;                                       \
-    NAME(std::vector<std::string> _val) : value(std::move(_val)) {}       \
+    std::vector<std::string> value;                                            \
+    NAME(std::vector<std::string> _val) : value(std::move(_val)) {}            \
   }
+
 // namespace viewManager
 /*
 Attributes are classes with registered name aliases. The underlying
@@ -279,6 +318,8 @@ _NUMERIC_WITH_FORMAT_ATTRIBUTE(objectTop);
 _NUMERIC_WITH_FORMAT_ATTRIBUTE(objectLeft);
 _NUMERIC_WITH_FORMAT_ATTRIBUTE(objectHeight);
 _NUMERIC_WITH_FORMAT_ATTRIBUTE(objectWidth);
+_NUMERIC_WITH_FORMAT_ATTRIBUTE(scrollTop);
+_NUMERIC_WITH_FORMAT_ATTRIBUTE(scrollLeft);
 _COLOR_ATTRIBUTE(background);
 _NUMERIC_ATTRIBUTE(opacity);
 _STRING_ATTRIBUTE(textFace);
@@ -297,8 +338,8 @@ _NUMERIC_WITH_FORMAT_ATTRIBUTE(paddingTop);
 _NUMERIC_WITH_FORMAT_ATTRIBUTE(paddingLeft);
 _NUMERIC_WITH_FORMAT_ATTRIBUTE(paddingBottom);
 _NUMERIC_WITH_FORMAT_ATTRIBUTE(paddingRight);
-_NUMERIC_WITH_ENUMERATED_ATTRIBUTE(borderStyle, none, dotted, dashed, solid,
-                                   doubled, groove, ridge, inset, outset);
+_ENUMERATED_ATTRIBUTE(borderStyle, none, dotted, dashed, solid, doubled, groove,
+                      ridge, inset, outset);
 _NUMERIC_WITH_FORMAT_ATTRIBUTE(borderWidth);
 _COLOR_ATTRIBUTE(borderColor);
 _NUMERIC_ATTRIBUTE(borderRadius);
@@ -306,6 +347,7 @@ _NUMERIC_ATTRIBUTE(focusIndex);
 _NUMERIC_ATTRIBUTE(zIndex);
 _ENUMERATED_ATTRIBUTE(listStyleType, none, disc, circle, square, decimal, alpha,
                       greek, latin, roman);
+
 /*******************************************************
 StyleClass
 *******************************************************/
@@ -386,7 +428,8 @@ public:
   std::string_view softName;
 
 public:
-  Element(const std::string_view &_softName, const std::vector<std::any> &attribs = {})
+  Element(const std::string_view &_softName,
+          const std::vector<std::any> &attribs = {})
       : softName(_softName), m_self(this), m_parent(nullptr),
         m_firstChild(nullptr), m_lastChild(nullptr), m_nextChild(nullptr),
         m_previousChild(nullptr), m_nextSibling(nullptr),
@@ -654,7 +697,7 @@ public:
   auto appendChild(const std::string &sMarkup) -> Element & {
     return (ingestMarkup(*this, sMarkup));
   }
-  auto appendChild(Element &newChild) -> Element &  {
+  auto appendChild(Element &newChild) -> Element & {
     newChild.m_parent = this;
     newChild.m_previousSibling = m_lastChild;
 
@@ -670,8 +713,7 @@ public:
     return (newChild);
   }
 
-  auto appendChild(const ElementList &elementCollection)
-      -> Element & {
+  auto appendChild(const ElementList &elementCollection) -> Element & {
     for (auto e : elementCollection) {
       appendChild(e.get());
     }
@@ -752,8 +794,7 @@ typically few entries. */
         {std::type_index(typeid(double)).hash_code(), dt_double},
         {std::type_index(typeid(float)).hash_code(), dt_float},
         {std::type_index(typeid(int)).hash_code(), dt_int},
-        {std::type_index(typeid(std::string)).hash_code(),
-         dt_std_string},
+        {std::type_index(typeid(std::string)).hash_code(), dt_std_string},
         {std::type_index(typeid(const char *)).hash_code(), dt_const_char},
         {std::type_index(typeid(std::vector<char>)).hash_code(),
          dt_vector_char},
@@ -829,13 +870,11 @@ simple initializer list format given within the attribute list.*/
       data<std::string>() = v;
     } break;
     case dt_vector_vector_string: {
-      auto v =
-          std::any_cast<std::vector<std::vector<std::string>>>(setting);
+      auto v = std::any_cast<std::vector<std::vector<std::string>>>(setting);
       data<std::vector<std::string>>() = v;
     } break;
     case dt_vector_pair_int_string: {
-      auto v =
-          std::any_cast<std::vector<std::pair<int, std::string>>>(setting);
+      auto v = std::any_cast<std::vector<std::pair<int, std::string>>>(setting);
       data<std::pair<int, std::string>>() = v;
     } break;
     // attributes stored in map but filtered for processing.
@@ -1073,12 +1112,12 @@ using ux = UX;
 using image = IMAGE;
 using textnode = textNode;
 #endif
+
 /*********************************************************************************
 Templated factory implementation for reference based callee and
 viewManager ownership of the object. The vector deconstructor will cause
 proper deallocation.
 *********************************************************************************/
-
 void consoleRender(Element &e, int iLevel);
 
 template <typename TYPE>
@@ -1102,14 +1141,24 @@ template <typename... Types> auto createStyle(Types... args) -> StyleClass & {
 auto query(const std::string &queryString) -> ElementList;
 auto query(const ElementQuery &queryFunction) -> ElementList;
 
-template <class T = Element &>
-auto getElement(const std::string &key) -> T & {
+template <class T = Element &> auto getElement(const std::string &key) -> T & {
   auto it = indexedElements.find(key);
   T ret = it->second.get();
   return ret;
 }
 
 bool hasElement(const std::string &key);
+
+/*
+The object factory map provides a parser allocation map for base objects.
+Currently the implementation is const. When more elements are added this
+will need updating to support the alternate methods of allocation. Perhaps
+architecturally the functionality can be turned into a function during the
+ingestMarkup routine. When the ingestMarkup routine finds a unrecognized entry
+according to the map lookup, the dynamic map provided for extension is then
+queried. The dynamic extension table is provided for growth when different tools
+are added on top of the viewManager base library.
+*/
 #define CREATE_OBJECT_ALIAS(OBJECT_TEXT, OBJECT_TYPE)                          \
   {                                                                            \
 #OBJECT_TEXT,                                                              \
@@ -1118,17 +1167,30 @@ bool hasElement(const std::string &key);
   }
 
 #define CREATE_OBJECT(OBJECT_TYPE) CREATE_OBJECT_ALIAS(OBJECT_TYPE, OBJECT_TYPE)
-static std::unordered_map<
-    std::string,
-    std::function<Element &(const std::vector<std::any> &attr)>>
-    objectFactoryMap = {
-        CREATE_OBJECT(BR),   CREATE_OBJECT(H1),        CREATE_OBJECT(H2),
-        CREATE_OBJECT(H3),   CREATE_OBJECT(PARAGRAPH), CREATE_OBJECT(DIV),
-        CREATE_OBJECT(SPAN), CREATE_OBJECT(UL),        CREATE_OBJECT(OL),
-        CREATE_OBJECT(LI),   CREATE_OBJECT(MENU),      CREATE_OBJECT(UX),
-        CREATE_OBJECT(IMAGE)};
+
+typedef std::unordered_map<
+    std::string, std::function<Element &(const std::vector<std::any> &attr)>>
+    factoryMap;
+
+const factoryMap objectFactoryMap;
+
+typedef std::unordered_map<
+    std::string, std::function<void(Element &e, const std::string &param)>>
+    attributeTypeIndexMap;
+
+const attributeTypeIndexMap attributeFactory;
+
 /****************************************************************
 Viewer
+
+This is the viewing aparatus of the document object model. Within the codebase,
+the platform object is allocated once per viewer object. The platform
+object contains the implementation of the message queue present on most
+message based graphics interfaces. That is the entry point for windows message
+queue and the xwindows message polling routine. These routines simply create
+event objects and dispatch them to the element that has applicable listeners
+attached.
+
 *****************************************************************/
 class Viewer : public Element {
 public:

@@ -7,8 +7,10 @@
 /// The file contains initialization, termination.</summary>
 ///
 #include "viewManager.hpp"
+
 using namespace std;
 using namespace viewManager;
+
 /**********
 These namespace global lists contain the objects as a system ownership.
 ********/
@@ -16,21 +18,586 @@ std::vector<std::unique_ptr<Element>> viewManager::elements;
 std::unordered_map<std::string, std::reference_wrapper<Element>>
     viewManager::indexedElements;
 std::vector<std::unique_ptr<StyleClass>> viewManager::styles;
+
 viewManager::Viewer::Viewer(const vector<any> &attrs)
     : Element("Viewer", attrs) {
   // setAttribute(indexBy{"_root"};
   Visualizer::openWindow(*this);
 }
+
+const factoryMap objectFactoryMap = {
+    CREATE_OBJECT(BR),        CREATE_OBJECT(H1),
+    CREATE_OBJECT(H2),        CREATE_OBJECT(H3),
+    CREATE_OBJECT(PARAGRAPH), CREATE_OBJECT_ALIAS(P, PARAGRAPH),
+    CREATE_OBJECT(DIV),       CREATE_OBJECT(SPAN),
+    CREATE_OBJECT(UL),        CREATE_OBJECT(OL),
+    CREATE_OBJECT(LI),        CREATE_OBJECT(MENU),
+    CREATE_OBJECT(UX),        CREATE_OBJECT(IMAGE)};
+
+// clang-format off
+const attributeTypeIndexMap
+    attributeFactory = {
+    {"id",
+        [](Element &e, string s) {
+            e.setAttribute(indexBy{s});
+        }
+    },
+
+    {"indexby",
+        [](Element &e, string s) {
+            e.setAttribute(indexBy{s});
+        }
+    },
+
+    {"block",
+        [](Element &e, string s) {
+            e.setAttribute(display::block);
+        }
+    },
+
+    {"inline",
+        [](Element &e, string s) {
+            e.setAttribute(display::in_line);
+        }
+    },
+
+
+    {"hidden",
+        [](Element &e, string s) {
+            e.setAttribute(display::none);
+        }
+    },
+
+    {"display",
+        [](Element &e, string s) {
+            e.setAttribute(display{s});
+        }
+    },
+
+    {"absolute",
+        [](Element &e, string s) {
+            e.setAttribute(position::absolute);
+        }
+    },
+
+    {"relative",
+        [](Element &e, string s) {
+            e.setAttribute(position::relative);
+        }
+    },
+
+    {"position",
+        [](Element &e, string s) {
+            e.setAttribute(position{s});
+        }
+    },
+
+    {"objecttop",
+        [](Element &e, string s) {
+            e.setAttribute(objectTop{doubleNF(s)});
+        }
+    },
+
+    {"top",
+        [](Element &e, string s) {
+            e.setAttribute(objectTop{doubleNF(s)});
+        }
+    },
+
+    {"objectleft",
+        [](Element &e, string s) {
+            e.setAttribute(objectLeft{doubleNF(s)});
+        }
+    },
+
+    {"left",
+        [](Element &e, string s) {
+            e.setAttribute(objectLeft{doubleNF(s)});
+        }
+    },
+
+    {"objectheight",
+        [](Element &e, string s) {
+            e.setAttribute(objectHeight{doubleNF(s)});
+        }
+    },
+
+    {"height",
+        [](Element &e, string s) {
+            e.setAttribute(objectHeight{doubleNF(s)});
+        }
+    },
+
+    {"objectwidth",
+        [](Element &e, string s) {
+            e.setAttribute(objectWidth{doubleNF(s)});
+        }
+    },
+
+    {"width",
+        [](Element &e, string s) {
+            e.setAttribute(objectWidth{doubleNF(s)});
+        }
+    },
+
+    {"coordinates",
+        [](Element &e, string s) {
+            auto coords=parseQuadCoordinates(s);
+
+            e.setAttribute(objectTop{std::get<0>(coords)});
+            e.setAttribute(objectLeft{std::get<1>(coords)});
+            e.setAttribute(objectHeight{std::get<2>(coords)});
+            e.setAttribute(objectWidth{std::get<3>(coords)});
+        }
+    },
+
+
+    {"scrolltop",
+        [](Element &e, string s) {
+            e.setAttribute(scrollTop{doubleNF(s)});
+        }
+    },
+
+    {"scrollleft",
+        [](Element &e, string s) {
+            e.setAttribute(scrollLeft{doubleNF(s)});
+        }
+    },
+
+    {"background",
+        [](Element &e, string s) {
+            e.setAttribute(background{colorNF(s)});
+        }
+    },
+
+    {"opacity",
+        [](Element &e, string s) {
+            e.setAttribute(opacity{s});
+        }
+    },
+
+    {"textface",
+        [](Element &e, string s) {
+            e.setAttribute(textFace{s});
+        }
+    },
+
+    {"textsize",
+        [](Element &e, string s) {
+            e.setAttribute(textSize{doubleNF(s)});
+        }
+    },
+
+    {"textweight",
+        [](Element &e, string s) {
+            e.setAttribute(textWeight{s});
+        }
+    },
+
+    {"textcolor",
+        [](Element &e, string s) {
+            e.setAttribute(textColor{colorNF(s)});
+        }
+    },
+
+    {"textalignment",
+        [](Element &e, string s) {
+            e.setAttribute(textAlignment{s});
+        }
+    },
+
+    {"left",
+        [](Element &e, string s) {
+            e.setAttribute(textAlignment::left);
+        }
+    },
+    {"center",
+        [](Element &e, string s) {
+            e.setAttribute(textAlignment::center);
+        }
+    },
+    {"right",
+        [](Element &e, string s) {
+            e.setAttribute(textAlignment::right);
+        }
+    },
+    {"justified",
+        [](Element &e, string s) {
+            e.setAttribute(textAlignment::justified);
+        }
+    },
+
+
+    {"textindent",
+        [](Element &e, string s) {
+            e.setAttribute(textIndent{doubleNF(s)});
+        }
+    },
+
+
+    {"tabsize",
+        [](Element &e, string s) {
+            e.setAttribute(tabSize{doubleNF(s)});
+        }
+    },
+
+    {"lineheight",
+        [](Element &e, string s) {
+            e.setAttribute(lineHeight{s});
+        }
+    },
+
+    {"normal",
+        [](Element &e, string s) {
+            e.setAttribute(lineHeight::normal);
+        }
+    },
+
+    {"numeric",
+        [](Element &e, string s) {
+            e.setAttribute(lineHeight::numeric);
+        }
+    },
+
+
+    {"margintop",
+        [](Element &e, string s) {
+            e.setAttribute(marginTop{doubleNF(s)});
+        }
+    },
+
+    {"marginleft",
+        [](Element &e, string s) {
+            e.setAttribute(marginLeft{doubleNF(s)});
+        }
+    },
+
+    {"marginbottom",
+        [](Element &e, string s) {
+            e.setAttribute(marginBottom{doubleNF(s)});
+        }
+    },
+
+    {"marginright",
+        [](Element &e, string s) {
+            e.setAttribute(marginRight{doubleNF(s)});
+        }
+    },
+
+    {"margin",
+        [](Element &e, string s) {
+            auto coords=parseQuadCoordinates(s);
+
+            e.setAttribute(marginTop{std::get<0>(coords)});
+            e.setAttribute(marginLeft{std::get<1>(coords)});
+            e.setAttribute(marginBottom{std::get<2>(coords)});
+            e.setAttribute(marginRight{std::get<3>(coords)});
+        }
+    },
+
+    {"paddingtop",
+        [](Element &e, string s) {
+            e.setAttribute(paddingTop{doubleNF(s)});
+        }
+    },
+
+    {"paddingleft",
+        [](Element &e, string s) {
+            e.setAttribute(paddingLeft{doubleNF(s)});
+        }
+    },
+
+    {"paddingbottom",
+        [](Element &e, string s) {
+            e.setAttribute(paddingBottom{doubleNF(s)});
+        }
+    },
+
+    {"paddingright",
+        [](Element &e, string s) {
+            e.setAttribute(paddingRight{doubleNF(s)});
+        }
+    },
+
+    {"padding",
+        [](Element &e, string s) {
+            auto coords=parseQuadCoordinates(s);
+
+            e.setAttribute(paddingTop{std::get<0>(coords)});
+            e.setAttribute(paddingLeft{std::get<1>(coords)});
+            e.setAttribute(paddingBottom{std::get<2>(coords)});
+            e.setAttribute(paddingRight{std::get<3>(coords)});
+        }
+    },
+
+    {"borderstyle",
+        [](Element &e, string s) {
+            e.setAttribute(borderStyle{s});
+        }
+    },
+
+    {"borderwidth",
+        [](Element &e, string s) {
+            e.setAttribute(borderWidth{doubleNF(s)});
+        }
+    },
+
+    {"bordercolor",
+        [](Element &e, string s) {
+            e.setAttribute(borderColor{colorNF(s)});
+        }
+    },
+
+    {"borderradius",
+        [](Element &e, string s) {
+            e.setAttribute(borderRadius{s});
+        }
+    },
+
+    {"focusindex",
+        [](Element &e, string s) {
+            e.setAttribute(focusIndex{s});
+        }
+    },
+
+    {"zindex",
+        [](Element &e, string s) {
+            e.setAttribute(zIndex{s});
+        }
+    },
+
+    {"liststyletype",
+        [](Element &e, string s) {
+            e.setAttribute(listStyleType{s});
+        }
+    }};
+
+
+// color names from https://www.w3schools.com/colors/colors_names.asp
+const colorMap colorNF::colorFactory = {
+    { "aliceblue", 0xF0F8FF },      { "antiquewhite", 0xFAEBD7 },   { "aqua", 0x00FFFF },
+    { "aquamarine", 0x7FFFD4 },     { "azure", 0xF0FFFF },          { "beige", 0xF5F5DC },
+    { "bisque", 0xFFE4C4 },         { "black", 0x000000 },          { "blanchedalmond", 0xFFEBCD },
+    { "blue", 0x0000FF },           { "blueviolet", 0x8A2BE2 },     { "brown", 0xA52A2A },
+    { "burlyWood", 0xDEB887 },      { "cadetblue", 0x5F9EA0 },      { "chartreuse", 0x7FFF00 },
+    { "chocolate", 0xD2691E },      { "coral", 0xFF7F50 },          { "cornflowerblue", 0x6495ED },
+    { "cornsilk", 0xFFF8DC },       { "crimson", 0xDC143C },        { "cyan", 0x00FFFF },
+    { "darkblue", 0x00008B },       { "darkcyan", 0x008B8B },       { "darkgoldenrod", 0xB8860B },
+    { "darkgray", 0xA9A9A9 },       { "darkgrey", 0xA9A9A9 },       { "darkgreen", 0x006400 },
+    { "darkkhaki", 0xBDB76B },      { "darkmagenta", 0x8B008B },    { "darkolivegreen", 0x556B2F },
+    { "darkorange", 0xFF8C00 },     { "darkorchid", 0x9932CC },     { "darkred", 0x8B0000 },
+    { "darksalmon", 0xE9967A },     { "darkseagreen", 0x8FBC8F },   { "darkslateblue", 0x483D8B },
+    { "darkslategray", 0x2F4F4F },  { "darkslategrey", 0x2F4F4F },  { "darkturquoise", 0x00CED1 },
+    { "darkviolet", 0x9400D3 },     { "deeppink", 0xFF1493 },       { "deepskyblue", 0x00BFFF },
+    { "dimgray", 0x696969 },        { "dimgrey", 0x696969 },        { "dodgerblue", 0x1E90FF },
+    { "firebrick", 0xB22222 },      { "floralwhite", 0xFFFAF0 },    { "forestgreen", 0x228B22 },
+    { "fuchsia", 0xFF00FF },        { "gainsboro", 0xDCDCDC },      { "ghostwhite", 0xF8F8FF },
+    { "gold", 0xFFD700 },           { "goldenrod", 0xDAA520 },      { "gray", 0x808080 },
+    { "grey", 0x808080 },           { "green", 0x008000 },          { "greenyellow", 0xADFF2F },
+    { "honeydew", 0xF0FFF0 },       { "hotpink", 0xFF69B4 },        { "indianred", 0xCD5C5C },
+    { "indigo", 0x4B0082 },         { "ivory", 0xFFFFF0 },          { "khaki", 0xF0E68C },
+    { "lavender", 0xE6E6FA },       { "lavenderblush", 0xFFF0F5 },  { "lawngreen", 0x7CFC00 },
+    { "lemonchiffon", 0xFFFACD },   { "lightblue", 0xADD8E6 },      { "lightcoral", 0xF08080 },
+    { "lightcyan", 0xE0FFFF },      { "lightgoldenrodyellow", 0xFAFAD2 },
+    { "lightgray", 0xD3D3D3 },      { "lightgrey", 0xD3D3D3 },      { "lightgreen", 0x90EE90 },
+    { "lightpink", 0xFFB6C1 },      { "lightdalmon", 0xFFA07A },    { "lightseagreen", 0x20B2AA },
+    { "lightskyblue", 0x87CEFA },   { "lightslategray", 0x778899 }, { "lightslategrey", 0x778899 },
+    { "lightsteelblue", 0xB0C4DE }, { "lightyellow", 0xFFFFE0 },    { "lime", 0x00FF00 },
+    { "limegreen", 0x32CD32 },      { "linen", 0xFAF0E6 },          { "magenta", 0xFF00FF },
+    { "maroon", 0x800000 },         { "mediumaquamarine", 0x66CDAA },
+    { "mediumblue", 0x0000CD },     { "mediumorchid", 0xBA55D3 },   { "mediumpurple", 0x9370DB },
+    { "mediumseagreen", 0x3CB371 }, { "mediumslateblue", 0x7B68EE },{ "mediumspringgreen", 0x00FA9A },
+    { "mediumturquoise", 0x48D1CC },{ "mediumvioletred", 0xC71585 },{ "midnightblue", 0x191970 },
+    { "mintcream", 0xF5FFFA },      { "mistyrose", 0xFFE4E1 },      { "moccasin", 0xFFE4B5 },
+    { "navajowhite", 0xFFDEAD },    { "navy", 0x000080 },           { "oldlace", 0xFDF5E6 },
+    { "olive", 0x808000 },          { "olivedrab", 0x6B8E23 },      { "orange", 0xFFA500 },
+    { "orangered", 0xFF4500 },      { "orchid", 0xDA70D6 },         { "palegoldenrod", 0xEEE8AA },
+    { "palegreen", 0x98FB98 },      { "paleturquoise", 0xAFEEEE },  { "palevioletred", 0xDB7093 },
+    { "papayawhip", 0xFFEFD5 },     { "peachpuff", 0xFFDAB9 },      { "peru", 0xCD853F },
+    { "pink", 0xFFC0CB },           { "plum", 0xDDA0DD },           { "powderblue", 0xB0E0E6 },
+    { "purple", 0x800080 },         { "rebeccapurple", 0x663399 },  { "red", 0xFF0000 },
+    { "rosybrown", 0xBC8F8F },      { "royalblue", 0x4169E1 },      { "saddlebrown", 0x8B4513 },
+    { "salmon", 0xFA8072 },         { "sandybrown", 0xF4A460 },     { "seagreen", 0x2E8B57 },
+    { "seashell", 0xFFF5EE },       { "sienna", 0xA0522D },         { "silver", 0xC0C0C0 },
+    { "skyblue", 0x87CEEB },        { "slateblue", 0x6A5ACD },      { "slategray", 0x708090 },
+    { "slategrey", 0x708090 },      { "snow", 0xFFFAFA },           { "springgreen", 0x00FF7F },
+    { "steelblue", 0x4682B4 },      { "tan", 0xD2B48C },            { "teal", 0x008080 },
+    { "thistle", 0xD8BFD8 },        { "tomato", 0xFF6347 },         { "turquoise", 0x40E0D0 },
+    { "violet", 0xEE82EE },         { "wheat", 0xF5DEB3 },          { "white", 0xFFFFFF },
+    { "whitesmoke", 0xF5F5F5 },    { "yellow", 0xFFFF00 },          { "yellowgreen", 0x9ACD32 } };
+
+// clang-format on
+
+/* parsers for the string input of attribute settings. Each attribute object has
+a string
+version of the implementation. Simply the settings are applied from the string.
+*/
+
+// doubleNF(string _sOption)
+// a constructor that takes a string and sets the options.
+viewManager::doubleNF::doubleNF(const string &_sOption) {}
+
+// parseQuadCoordinates(string _sOption)
+// a function that returns a tuple of the four coordinates specified in a
+// doubleNF object. this routine is used by the attributes that accept four at a
+// time, that is the short hand versions of coordinates, margin and padding
+tuple<doubleNF, doubleNF, doubleNF, doubleNF>
+viewManager::parseQuadCoordinates(const string _sOptions) {
+  regex re("^[\\s\\[\\{\\(]*([\\w\\%\\.]+)(?:[,]|\\s*)+"
+           "([\\w\\%\\.]+)(?:[,]|\\s*)+"
+           "([\\w\\%\\.]+)(?:[,]|\\s*)+"
+           "([\\w\\%\\.]+)[\\]\\}\\)\\s]*");
+  smatch coords;
+
+  if (regex_search(_sOptions, coords, re)) {
+    if (coords.size() == 4) {
+      auto ret =
+          std::make_tuple(doubleNF(coords.str(0)), doubleNF(coords.str(1)),
+                          doubleNF(coords.str(2)), doubleNF(coords.str(3)));
+      return ret;
+    }
+  }
+
+  std::string info = "Could not parse attribute string option : ";
+  info += _sOptions;
+
+  throw std::invalid_argument(info);
+}
+
+// colorNF(string _sOption)
+// a constructor that applies a text color name and ues the lookup table to
+// transform the text to a numeric color value. The colors are storedin a 24bit
+// color format.
+viewManager::colorNF::colorNF(const string &_sOption) {
+  option = colorFormat::name;
+  std::regex r("\\s+");
+  std::string sTmpKey = std::regex_replace(_sOption, r, "");
+  std::transform(sTmpKey.begin(), sTmpKey.end(), sTmpKey.begin(),
+                 [](unsigned char c) { return std::tolower(c); });
+  auto it = colorFactory.find(sTmpKey);
+
+  unsigned long color = 0;
+
+  if (it != colorFactory.end())
+    color = it->second;
+
+  value[0] = static_cast<double>((color & 0xFF000000) >> 24);
+  value[1] = static_cast<double>((color & 0x00FF0000) >> 16);
+  value[2] = static_cast<double>((color & 0x0000FF00) >> 8);
+  value[3] = 1.0;
+}
+
+void viewManager::colorNF::lighter(const double &step) {}
+void viewManager::colorNF::darker(const double &step) {}
+void viewManager::colorNF::monochromatic(const double &step) {}
+void viewManager::colorNF::triad(void) { /*hsl rotate 120*/
+}
+void viewManager::colorNF::neutralCooler(void) { /* hsl rotate -30 */
+}
+void viewManager::colorNF::neutralWarmer(void) { /* hsl rotate 30 */
+}
+void viewManager::colorNF::complementary(void) { /* hsl rotate 180*/
+}
+void viewManager::colorNF::splitComplements(void) { /*hsl rotate 150 */
+}
+
+// strToEnum(const string_view &sListName, const unordered_map<string, uint8_t>
+// &optionMap) a function that accepts a unorder map of string and numeric
+// values. the function removes invalid characters and applies a toLower case
+// transform
+uint8_t viewManager::strToEnum(const string_view &sListName,
+                               const unordered_map<string, uint8_t> &optionMap,
+                               const string &_sOption) {
+  uint8_t ret = 0;
+
+  std::regex r("\\s+");
+  std::string sTmpKey = std::regex_replace(_sOption, r, "");
+  std::transform(sTmpKey.begin(), sTmpKey.end(), sTmpKey.begin(),
+                 [](unsigned char c) { return std::tolower(c); });
+  auto it = optionMap.find(sTmpKey);
+
+  if (it != optionMap.end()) {
+    ret = it->second;
+  } else {
+    std::string info(sListName);
+    info += " attribute string option not found: ";
+    info += _sOption;
+
+    throw std::invalid_argument(info);
+  }
+}
+
+tuple<double, string>
+strToNumericAndEnum(const string_view &sListName,
+                    const unordered_map<string, uint8_t> &optionMap,
+                    const string &_sOption) {}
+
+// display(string sOption)
+// transforms the textual input into the display options
+viewManager::display::display(const string &sOption) {
+  static unordered_map<string, uint8_t> enumMap = {
+      {"inline", in_line}, {"block", block}, {"none", none}};
+  value = static_cast<display::optionEnum>(strToEnum("display", enumMap, sOption));
+}
+
+// position(string sOption)
+// transforms the textual input into the position options
+viewManager::position::position(const string &sOption) {
+  static unordered_map<string, uint8_t> enumMap = {{"absolute", absolute},
+                                                   {"relative", relative}};
+  value =   value = static_cast<position::optionEnum>(strToEnum("position", enumMap, sOption));
+}
+
+// textAlignment(string sOption)
+// transforms the textual input into the textAlignment options
+viewManager::textAlignment::textAlignment(const string &sOption) {
+  static unordered_map<string, uint8_t> enumMap = {{"left", left},
+                                                   {"center", center},
+                                                   {"right", right},
+                                                   {"justified", justified}};
+  value = static_cast<textAlignment::optionEnum>(strToEnum("textAlignment", enumMap, sOption));
+}
+
+// lineHeight(string sOption)
+// transforms the textual input into the lineHeight options
+viewManager::lineHeight::lineHeight(const string &sOption) {
+  static unordered_map<string, uint8_t> enumMap = {{"normal", normal},
+                                                   {"numeric", numeric}};
+
+//  tie<value, option> = strToNumericAndEnum("lineHeight", enumMap, sOption);
+}
+
+// lineHeight(string sOption)
+// transforms the textual input into the lineHeight options
+
+viewManager::borderStyle::borderStyle(const string &sOption) {
+  static unordered_map<string, uint8_t> enumMap = {
+      {"none", none},   {"dotted", dotted},   {"dashed", dashed},
+      {"solid", solid}, {"doubled", doubled}, {"groove", groove},
+      {"ridge", ridge}, {"inset", inset},     {"outset", outset}};
+  value = static_cast<borderStyle::optionEnum>(strToEnum("borderStyle", enumMap, sOption));
+}
+
+// listStyleType(const string &_sOption)
+// transforms the string input to the list of options
+viewManager::listStyleType::listStyleType(const string &sOption) {
+  static unordered_map<string, uint8_t> enumMap = {
+      {"none", none},     {"disc", disc},       {"circle", circle},
+      {"square", square}, {"decimal", decimal}, {"alpha", alpha},
+      {"greek", greek},   {"latin", latin},     {"roman", roman}};
+  value = static_cast<listStyleType::optionEnum>(strToEnum("listStyleType", enumMap, sOption));
+}
+
 /// <summary>deconstructor for the view manager object.
 /// </summary>
 viewManager::Viewer::~Viewer() { Visualizer::closeWindow(*this); }
+
 /// <summary>The main entry point for clients after their initial
 /// buildup. The function simply calls the traversing function
 /// with the main root as the starting point.
 ///
 ///
 /// </summary>
-
 void viewManager::consoleRender(Element &e, int iLevel) {
   int iWidth = iLevel * 4;
 
@@ -42,11 +609,10 @@ void viewManager::consoleRender(Element &e, int iLevel) {
   std::string sID;
 
   try {
-      sID=e.getAttribute<indexBy>().value;
-  } catch(const std::exception &e) {
-    sID="-noID-";
+    sID = e.getAttribute<indexBy>().value;
+  } catch (const std::exception &e) {
+    sID = "-noID-";
   }
-
 
   cout << "(" << sID << ")" << endl;
 
@@ -61,7 +627,6 @@ void viewManager::consoleRender(Element &e, int iLevel) {
 }
 
 void viewManager::Viewer::render(void) {
-
 #if defined(CONSOLE)
   consoleRender(*this, 0);
 
@@ -123,43 +688,45 @@ void viewManager::Viewer::processEvents(void) { m_device->messageLoop(); }
 auto viewManager::operator""_pt(unsigned long long int value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::pt};
 }
-auto viewManager::operator""_pt(long double value)  -> doubleNF {
+auto viewManager::operator""_pt(long double value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::pt};
 }
-auto viewManager::operator""_em(unsigned long long int value)  -> doubleNF{
+auto viewManager::operator""_em(unsigned long long int value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::em};
 }
-auto viewManager::operator""_em(long double value)  -> doubleNF{
+auto viewManager::operator""_em(long double value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::em};
 }
-auto viewManager::operator""_px(unsigned long long int value)  -> doubleNF{
+auto viewManager::operator""_px(unsigned long long int value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::px};
 }
-auto viewManager::operator""_px(long double value)  -> doubleNF{
+auto viewManager::operator""_px(long double value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::px};
 }
-auto viewManager::operator""_percent(unsigned long long int value)  -> doubleNF{
+auto viewManager::operator""_percent(unsigned long long int value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::percent};
 }
-auto viewManager::operator""_percent(long double value)  -> doubleNF{
+auto viewManager::operator""_percent(long double value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::percent};
 }
-auto viewManager::operator""_pct(unsigned long long int value)  -> doubleNF{
+auto viewManager::operator""_pct(unsigned long long int value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::percent};
 }
-auto viewManager::operator""_pct(long double value)  -> doubleNF{
+auto viewManager::operator""_pct(long double value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::percent};
 }
-auto viewManager::operator""_normal(unsigned long long int value) -> lineHeight {
+auto viewManager::operator""_normal(unsigned long long int value)
+    -> lineHeight {
   return lineHeight{static_cast<double>(value), lineHeight::normal};
 }
-auto viewManager::operator""_normal(long double value) -> lineHeight  {
+auto viewManager::operator""_normal(long double value) -> lineHeight {
   return lineHeight{static_cast<double>(value), lineHeight::normal};
 }
-auto viewManager::operator""_numeric(unsigned long long int value) -> lineHeight  {
+auto viewManager::operator""_numeric(unsigned long long int value)
+    -> lineHeight {
   return lineHeight{static_cast<double>(value), lineHeight::numeric};
 }
-auto viewManager::operator""_numeric(long double value)  -> lineHeight  {
+auto viewManager::operator""_numeric(long double value) -> lineHeight {
   return lineHeight{static_cast<double>(value), lineHeight::numeric};
 }
 
@@ -190,7 +757,7 @@ auto viewManager::query(const std::string &queryString) -> ElementList {
   }
   return results;
 }
-auto viewManager::query(const ElementQuery &queryFunction) -> ElementList{
+auto viewManager::query(const ElementQuery &queryFunction) -> ElementList {
   ElementList results;
   for (const auto &n : elements) {
     if (queryFunction(std::ref(*(n.get()))))
@@ -272,25 +839,25 @@ auto viewManager::Element::insertAfter(Element &newChild,
                                        Element &existingElement) -> Element & {
   return newChild;
 }
-auto viewManager::Element::removeChild(Element &oldChild)  -> Element & {
+auto viewManager::Element::removeChild(Element &oldChild) -> Element & {
   return *this;
 }
-auto viewManager::Element::replaceChild(Element &newChild, Element &oldChild)  -> Element &
-    {
+auto viewManager::Element::replaceChild(Element &newChild, Element &oldChild)
+    -> Element & {
   return *this;
 }
-auto viewManager::Element::move(const double t, const double l)  -> Element &{
+auto viewManager::Element::move(const double t, const double l) -> Element & {
   getAttribute<objectTop>().value = t;
   getAttribute<objectLeft>().value = l;
   return *this;
 }
-auto viewManager::Element::resize(const double w, const double h)  -> Element & {
+auto viewManager::Element::resize(const double w, const double h) -> Element & {
   getAttribute<objectWidth>().value = w;
   getAttribute<objectHeight>().value = h;
   return *this;
 }
 void viewManager::Element::remove(void) { return; }
-auto viewManager::Element::removeChildren(Element &e)  -> Element & {
+auto viewManager::Element::removeChildren(Element &e) -> Element & {
   return *this;
 }
 /// <summary>The function mapps the event id to the appropiate vector.
@@ -329,7 +896,7 @@ size_t getAddress(std::function<T(U...)> f) {
   return (size_t)*fnPointer;
 }
 auto viewManager::Element::addListener(eventType evtType,
-                                       eventHandler evtHandler)  -> Element &{
+                                       eventHandler evtHandler) -> Element & {
   getEventVector(evtType).push_back(evtHandler);
   return *this;
 } /// <summary>The function will remove an event listener from the list of
@@ -340,8 +907,8 @@ auto viewManager::Element::addListener(eventType evtType,
 ///
 ///
 auto viewManager::Element::removeListener(eventType evtType,
-                                          eventHandler evtHandler)  -> Element &
-    {
+                                          eventHandler evtHandler)
+    -> Element & {
   auto eventList = getEventVector(evtType);
   auto it = eventList.begin();
   while (it != eventList.end()) {
@@ -358,9 +925,7 @@ auto viewManager::Element::removeListener(eventType evtType,
 /// the element.
 /// </ summary>
 ///
-auto viewManager::Element::clear(void)  -> Element &{
-    return *this;
-}
+auto viewManager::Element::clear(void) -> Element & { return *this; }
 
 ///
 /// <summary>This is the main function which invokes drawing of the item and
@@ -371,21 +936,20 @@ auto viewManager::Element::clear(void)  -> Element &{
 /// </ summary>
 ///
 void viewManager::Element::render(void) {
-    std::string idName;
-    try {
-        idName = getAttribute<indexBy>().value;
+  std::string idName;
+  try {
+    idName = getAttribute<indexBy>().value;
+  } catch (const std::exception &e) {
+    idName = "noID";
+  }
 
-    } catch (const std::exception& e) {
-        idName = "noID";
-    }
+  std::cout << "indexBy " << idName << endl;
+  std::cout << "children " << m_childCount << std::endl;
 
-    std::cout << "indexBy " << idName << endl;
-    std::cout << "children " << m_childCount << std::endl;
-
-    // print information in the default string vector buffer
-    auto vdata = data();
-    for (auto s : vdata)
-        std::cout << s << endl;
+  // print information in the default string vector buffer
+  auto vdata = data();
+  for (auto s : vdata)
+    std::cout << s << endl;
 }
 /// <summary>Uses the vasprint standard function to format the given
 /// parameters with the format string. Inserts the named
@@ -456,8 +1020,65 @@ void viewManager::Element::printf(const char *fmt, ...) {
   va_end(ap);
 #endif
 }
+
+/***************************************************************************
+ingestMarkup
+The routine is called by the functions that apply a string markup for parsing.
+This routine uses the object factrory and color map to query the
+contents of the maps. The parser applies is a simplified parser for
+speed in that complete tags must exist within the given text. That does not
+apply to beginngin and ending tabs however. Attribtues may also be captured.
+The text within the enclosed portion is applied as a data item within the
+element.
+
+***************************************************************************/
 Element &viewManager::Element::ingestMarkup(Element &node,
                                             const std::string &markup) {
+
+  const char *p = markup.data();
+
+  bool bCapture = false;
+  bool bTerminal = false;
+  bool bQuery = false;
+  string sCaptureString;
+  vector<string> parsedData;
+  /*
+       <h1>The title is</h1> - as one element
+       <h2>The information</h3> - not an element
+
+  */
+
+  while (p) {
+    switch (*p) {
+    case '<':
+      bCapture = true;
+      break;
+
+    case '>':
+      // has a signal been established with the capture turned on?
+      if (bCapture && bTerminal)
+        bQuery = true;
+      bCapture = false;
+      bTerminal = false;
+      break;
+
+    case '/':
+      bTerminal = true;
+      break;
+    }
+
+    if (bCapture)
+      sCaptureString += *p;
+
+    if (bQuery) {
+      auto it = objectFactoryMap.find(sCaptureString);
+
+      if (it != objectFactoryMap.end()) {
+        Element &e = it->second({});
+      }
+    }
+  }
+
   return *this;
 }
 /***************************************************************************

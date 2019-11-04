@@ -103,7 +103,6 @@ int WINAPI WinMain(HINSTANCE /* hInstance */, HINSTANCE /* hPrevInstance */,
 
   test10(vm);
   vm.clear();
-
 }
 string randomString(int nChars);
 double randomDouble(double a, double b);
@@ -286,7 +285,7 @@ void test1a(Viewer &vm) {
     auto &info = createElement<paragraph>(
         indexBy{"rndTEST3BookletParagraph_" + to_string(i)},
         vector<string>{randomString(200), randomString(200),
-                            randomString(200)});
+                       randomString(200)});
     info.appendChild<ul>(
         indexBy{"idbikes"},
         vector<string>{"Huffy", "Schwinn", "Giant", "Road Master"});
@@ -391,23 +390,22 @@ void test6(Viewer &vm) {
       << "anthony"
       << "can you do the []";
 
-    e.appendChild<UL>(indexBy{"bookletNotes_" + to_string(i)},
-                      vector<string>{"Endurance training", "Biking",
-                                          "Meals", "Schedule"})
-        .append<UL>(
-            indexBy{"guestCompanies_" + to_string(i)},
-            vector<pair<int, string>>{{0, "Gyms"},
-                                           {1, "Gold's Gym"},
-                                           {1, "Core Fitness"},
-                                           {1, "Tommy Doright's"},
-                                           {0, "Tools"},
-                                           {1, "Huffy"},
-                                           {1, "Scwitchers"},
-                                           {1, "Clock Down Industrials"}})
+    e.appendChild<UL>(
+         indexBy{"bookletNotes_" + to_string(i)},
+         vector<string>{"Endurance training", "Biking", "Meals", "Schedule"})
+        .append<UL>(indexBy{"guestCompanies_" + to_string(i)},
+                    vector<pair<int, string>>{{0, "Gyms"},
+                                              {1, "Gold's Gym"},
+                                              {1, "Core Fitness"},
+                                              {1, "Tommy Doright's"},
+                                              {0, "Tools"},
+                                              {1, "Huffy"},
+                                              {1, "Scwitchers"},
+                                              {1, "Clock Down Industrials"}})
         .append<UL>(indexBy{"bookletReferences_" + to_string(i)},
                     vector<string>{"The 26inch Road", "Flatters Chain",
-                                        "Wheelers and Handlebars",
-                                        "Rim's n Chains"});
+                                   "Wheelers and Handlebars",
+                                   "Rim's n Chains"});
     chapter.push_back(e);
   }
 
@@ -599,7 +597,7 @@ void test7f(Viewer &view) {
   // build a fancy <ul> list with <li> children consisting
   // of varying details...
   static array<string, 3> sIconNames = {"base.raw", "contentIcon.raw",
-                                             "normal.raw"};
+                                        "normal.raw"};
   // dataAdaptor
   using tagInfo = tuple<int, string, float>;
 #define idRecords "id_records"
@@ -720,16 +718,16 @@ void test7g(Viewer &view) {
     size_t index;
     uniRecordSchema schema;
     uniRecord(const string &broadName) {}
-    uniRecord(const string &fname, const string &lname,
-              const string &phone, const string &email) {
+    uniRecord(const string &fname, const string &lname, const string &phone,
+              const string &email) {
       schema = contact;
     };
     uniRecord(const string &_fileName, const size_t &fileSizeKiloByte,
               const size_t &indexPreviewKey) {
       schema = filelist;
     };
-    uniRecord(const string &fname, const string &format,
-              const int &depth, const tuple<double, double, double> gps,
+    uniRecord(const string &fname, const string &format, const int &depth,
+              const tuple<double, double, double> gps,
               const size_t summaryIndexKey) {
       schema = pictureThumb;
     };
@@ -1068,7 +1066,6 @@ void test10(Viewer &vm) {
   vm.render();
 
   for (int i = 0; i < m; i++) {
-
     dBook << "<p id=BookletParagraph_" << i << ">"
           << "The paragraph content is here."
           << " <ul id=notes_" << i << ">text content ul"
