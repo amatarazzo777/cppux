@@ -3,6 +3,7 @@ FROM gitpod/workspace-full
 USER root
 
 RUN bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+docker run --cap-add=SYS_PTRACE --security-opt seccomp=unconfined
 
 # Install custom tools, runtime, etc. using apt-get
 # For example, the command below would install "bastet" - a command line tetris clone:

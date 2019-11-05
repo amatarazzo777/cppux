@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <any>
 #include <array>
+#include <bits/stdint-uintn.h>
 #include <cctype>
 #include <climits>
 #include <cmath>
@@ -187,7 +188,8 @@ public:
       : option(_opt), value(_val) {}
 
   colorNF(const std::string &_colorName);
-  colorNF(const colorNF &_colorObj) : option(_colorObj.option), value(_colorObj.value) { }
+  colorNF(const colorNF &_colorObj)
+      : option(_colorObj.option), value(_colorObj.value) {}
 
   void lighter(const double &step = 0.1);
   void darker(const double &step = 0.1);
@@ -206,7 +208,7 @@ uint8_t strToEnum(const std::string_view &sListName,
                   const std::unordered_map<std::string, uint8_t> &optionMap,
                   const std::string &sOption);
 
-std::tuple<double, std::string>
+std::tuple<double, uint8_t>
 strToNumericAndEnum(const std::string_view &sListName,
                     const std::unordered_map<std::string, uint8_t> &optionMap,
                     const std::string &_sOption);
@@ -1087,8 +1089,9 @@ public:
 };
 class textNode : public Element {
 public:
-  std::string value;
-  textNode(const std::string &s) : value(s), Element("textNode") {}
+  textNode(const std::vector<std::any> &attribs) : Element("textNode") {
+    setAttribute(attribs);
+  }
 };
 /// USE_LOWER_CASE_ENTITY_NAMES
 /// <summary>Options for compiling that provide recognition of
@@ -1172,13 +1175,13 @@ typedef std::unordered_map<
     std::string, std::function<Element &(const std::vector<std::any> &attr)>>
     factoryMap;
 
-const factoryMap objectFactoryMap;
+extern const factoryMap objectFactoryMap;
 
 typedef std::unordered_map<
     std::string, std::function<void(Element &e, const std::string &param)>>
-    attributeTypeIndexMap;
+    attributeStringMap;
 
-const attributeTypeIndexMap attributeFactory;
+extern const attributeStringMap attributeFactory;
 
 /****************************************************************
 Viewer

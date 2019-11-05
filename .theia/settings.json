@@ -1,0 +1,28 @@
+{
+   "cpp.buildConfigurations": [
+      {
+         "name": "",
+         "directory": ""
+      },
+      {
+         "name": "",
+         "directory": ""
+      },
+      {
+         "name": "",
+         "directory": ""
+      },
+      {
+         "name": "",
+         "directory": ""
+      },
+      {
+         "name": "",
+         "directory": ""
+      }
+   ],
+   "editor.autoSave": "on"
+   "editor.tabSize": 2,
+   "debug.trace": true,
+   "editor.fontSize": 14
+}

@@ -7,6 +7,7 @@
 /// The file contains initialization, termination.</summary>
 ///
 #include "viewManager.hpp"
+#include <sys/types.h>
 
 using namespace std;
 using namespace viewManager;
@@ -19,13 +20,7 @@ std::unordered_map<std::string, std::reference_wrapper<Element>>
     viewManager::indexedElements;
 std::vector<std::unique_ptr<StyleClass>> viewManager::styles;
 
-viewManager::Viewer::Viewer(const vector<any> &attrs)
-    : Element("Viewer", attrs) {
-  // setAttribute(indexBy{"_root"};
-  Visualizer::openWindow(*this);
-}
-
-const factoryMap objectFactoryMap = {
+const factoryMap viewManager::objectFactoryMap = {
     CREATE_OBJECT(BR),        CREATE_OBJECT(H1),
     CREATE_OBJECT(H2),        CREATE_OBJECT(H3),
     CREATE_OBJECT(PARAGRAPH), CREATE_OBJECT_ALIAS(P, PARAGRAPH),
@@ -35,8 +30,9 @@ const factoryMap objectFactoryMap = {
     CREATE_OBJECT(UX),        CREATE_OBJECT(IMAGE)};
 
 // clang-format off
-const attributeTypeIndexMap
-    attributeFactory = {
+
+const attributeStringMap
+    viewManager::attributeFactory = {
     {"id",
         [](Element &e, string s) {
             e.setAttribute(indexBy{s});
@@ -60,7 +56,6 @@ const attributeTypeIndexMap
             e.setAttribute(display::in_line);
         }
     },
-
 
     {"hidden",
         [](Element &e, string s) {
@@ -372,7 +367,6 @@ const attributeTypeIndexMap
         }
     }};
 
-
 // color names from https://www.w3schools.com/colors/colors_names.asp
 const colorMap colorNF::colorFactory = {
     { "aliceblue", 0xF0F8FF },      { "antiquewhite", 0xFAEBD7 },   { "aqua", 0x00FFFF },
@@ -435,7 +429,25 @@ version of the implementation. Simply the settings are applied from the string.
 
 // doubleNF(string _sOption)
 // a constructor that takes a string and sets the options.
-viewManager::doubleNF::doubleNF(const string &_sOption) {}
+viewManager::doubleNF::doubleNF(const string &sOption) {
+  static unordered_map<string, u_int8_t> annotationMap = {
+      {"px", numericFormat::px},
+      {"pt", numericFormat::pt},
+      {"em", numericFormat::em},
+      {"percent", numericFormat::percent},
+      {"pct", numericFormat::percent},
+      {"%", numericFormat::percent},
+      {"autocalculate", numericFormat::autoCalculate},
+      {"auto", numericFormat::autoCalculate}};
+  // defualt to auto calculate
+  option = numericFormat::autoCalculate;
+  std::regex r("[\\s,_]+");
+  std::string sTmp = std::regex_replace(sOption, r, "");
+
+  u_int8_t opt;
+  tie(value, opt) = strToNumericAndEnum("doubleNF", annotationMap, sOption);
+  option = static_cast<numericFormat>(opt);
+}
 
 // parseQuadCoordinates(string _sOption)
 // a function that returns a tuple of the four coordinates specified in a
@@ -527,17 +539,37 @@ uint8_t viewManager::strToEnum(const string_view &sListName,
   }
 }
 
-tuple<double, string>
-strToNumericAndEnum(const string_view &sListName,
-                    const unordered_map<string, uint8_t> &optionMap,
-                    const string &_sOption) {}
+tuple<double, u_int8_t> viewManager::strToNumericAndEnum(
+    const string_view &sListName,
+    const unordered_map<string, uint8_t> &optionMap, const string &_sOption) {
+
+  std::regex r("[\\s,_]+");
+  std::string sTmp = std::regex_replace(_sOption, r, "");
+  std::transform(sTmp.begin(), sTmp.end(), sTmp.begin(),
+                 [](unsigned char c) { return std::tolower(c); });
+
+  char *pEnd;
+  double dRet = 0;
+  u_int8_t ui8Ret = 0;
+
+  dRet = strtod(sTmp.data(), &pEnd);
+
+  if (pEnd) {
+    auto it = optionMap.find(string(pEnd));
+    if (it != optionMap.end())
+      ui8Ret = it->second;
+  }
+
+  return make_tuple(dRet, ui8Ret);
+}
 
 // display(string sOption)
 // transforms the textual input into the display options
 viewManager::display::display(const string &sOption) {
   static unordered_map<string, uint8_t> enumMap = {
       {"inline", in_line}, {"block", block}, {"none", none}};
-  value = static_cast<display::optionEnum>(strToEnum("display", enumMap, sOption));
+  value =
+      static_cast<display::optionEnum>(strToEnum("display", enumMap, sOption));
 }
 
 // position(string sOption)
@@ -545,7 +577,8 @@ viewManager::display::display(const string &sOption) {
 viewManager::position::position(const string &sOption) {
   static unordered_map<string, uint8_t> enumMap = {{"absolute", absolute},
                                                    {"relative", relative}};
-  value =   value = static_cast<position::optionEnum>(strToEnum("position", enumMap, sOption));
+  value = value = static_cast<position::optionEnum>(
+      strToEnum("position", enumMap, sOption));
 }
 
 // textAlignment(string sOption)
@@ -555,7 +588,8 @@ viewManager::textAlignment::textAlignment(const string &sOption) {
                                                    {"center", center},
                                                    {"right", right},
                                                    {"justified", justified}};
-  value = static_cast<textAlignment::optionEnum>(strToEnum("textAlignment", enumMap, sOption));
+  value = static_cast<textAlignment::optionEnum>(
+      strToEnum("textAlignment", enumMap, sOption));
 }
 
 // lineHeight(string sOption)
@@ -563,8 +597,9 @@ viewManager::textAlignment::textAlignment(const string &sOption) {
 viewManager::lineHeight::lineHeight(const string &sOption) {
   static unordered_map<string, uint8_t> enumMap = {{"normal", normal},
                                                    {"numeric", numeric}};
-
-//  tie<value, option> = strToNumericAndEnum("lineHeight", enumMap, sOption);
+  u_int8_t opt;
+  tie(value, opt) = strToNumericAndEnum("lineHeight", enumMap, sOption);
+  option = static_cast<lineHeight::optionEnum>(opt);
 }
 
 // lineHeight(string sOption)
@@ -575,7 +610,8 @@ viewManager::borderStyle::borderStyle(const string &sOption) {
       {"none", none},   {"dotted", dotted},   {"dashed", dashed},
       {"solid", solid}, {"doubled", doubled}, {"groove", groove},
       {"ridge", ridge}, {"inset", inset},     {"outset", outset}};
-  value = static_cast<borderStyle::optionEnum>(strToEnum("borderStyle", enumMap, sOption));
+  value = static_cast<borderStyle::optionEnum>(
+      strToEnum("borderStyle", enumMap, sOption));
 }
 
 // listStyleType(const string &_sOption)
@@ -585,7 +621,14 @@ viewManager::listStyleType::listStyleType(const string &sOption) {
       {"none", none},     {"disc", disc},       {"circle", circle},
       {"square", square}, {"decimal", decimal}, {"alpha", alpha},
       {"greek", greek},   {"latin", latin},     {"roman", roman}};
-  value = static_cast<listStyleType::optionEnum>(strToEnum("listStyleType", enumMap, sOption));
+  value = static_cast<listStyleType::optionEnum>(
+      strToEnum("listStyleType", enumMap, sOption));
+}
+
+viewManager::Viewer::Viewer(const vector<any> &attrs)
+    : Element("Viewer", attrs) {
+  // setAttribute(indexBy{"_root"};
+  Visualizer::openWindow(*this);
 }
 
 /// <summary>deconstructor for the view manager object.
@@ -1023,64 +1066,300 @@ void viewManager::Element::printf(const char *fmt, ...) {
 
 /***************************************************************************
 ingestMarkup
+
 The routine is called by the functions that apply a string markup for parsing.
 This routine uses the object factrory and color map to query the
-contents of the maps. The parser applies is a simplified parser for
+contents of the maps. The parser applied is a simplified parser for
 speed in that complete tags must exist within the given text. That does not
-apply to beginngin and ending tabs however. Attribtues may also be captured.
+apply to beginning and ending tags however. Attribtues may also be captured.
 The text within the enclosed portion is applied as a data item within the
 element.
+
+Comment blocks are supported as with the html notation <!-- and -->
+Several aliases exist to shorten the attribute list as well as quad versions
+of attributes such as coordinates(a,b,c,d) or margin(a,b,c,d). Options exist for
+the formatting of the string as it uses regular expressions to capture four
+parameters. You can use () {} [] for labling the group and separate the items
+with a space or a comma.
+
+In some regards, the parser is more strict in what can be applied to create
+elements, verses recoginitions of color markup. In general, these rules mark the
+implementation less code. Errors within the markup as implemented by the
+developer will be shown at runtime. There is a program that can generate c++
+code from this markup.
+
+Notation is supported on numeric parameters with a format:
+  coordinates {10% 10% 80% 80%}
+
+
+      <!-- This is a comment block -->
+
+       <h1>The title is</h1>
+       <h2>The information</h3> <!-- not an element -->
+
+      <div id=divtest background=blue>
+         This is the text inside the block.
+         <ul>
+           <li>This is the first item</li>
+           <li>This is the second item</li>
+         </ul>
+      </div>
+
+
+      <blue>When the text is set this way, the color continues until another
+color is selected. <green>This changes the color of the foreground and creates
+textNodes within the current element context.
+
+
 
 ***************************************************************************/
 Element &viewManager::Element::ingestMarkup(Element &node,
                                             const std::string &markup) {
 
-  const char *p = markup.data();
+  /* the parser context applies memory to successive calls to the function.
+    This is important for functions like printf or the stream insertion
+    operators so that markup gets interpreted correctly. Since there is one of
+    these contexts per element, each element operates independently. For ease of
+    implementation, the structure and typedef is located at the function level.
 
-  bool bCapture = false;
-  bool bTerminal = false;
-  bool bQuery = false;
-  string sCaptureString;
-  vector<string> parsedData;
-  /*
-       <h1>The title is</h1> - as one element
-       <h2>The information</h3> - not an element
-
+    The parser acts in a two phase operation, first locating each of the tags as
+    markup and those that appears as tags but are not markup elements. The
+    second phase builds the elements and applies the attributes to the elements.
+    Since document fragments can be nested, the parser function maintains a
+    stack of created elements.
   */
+  enum itemType {
+    element,
+    elementTerminal,
+    attribute,
+    attributeValue,
+    color,
+    stringData
+  };
 
-  while (p) {
+  typedef struct {
+    bool bCapture = false;
+    bool bSkip = false;
+    bool bSignal = false;
+    bool bTerminal = false;
+    bool bAttributeList = false;
+    bool bAttributeListValue = false;
+
+    bool bQuery = false;
+    string sCaptureString;
+    vector<pair<itemType, string>> parsedData;
+    vector<reference_wrapper<Element>> elementStack;
+    std::function<void(Element &e, const std::string &param)> attributeSetFunc;
+    bool bFoundAttributeSet = false;
+  } parserContext;
+
+  static parserContext pc;
+
+  pc.elementStack.push_back(node);
+
+  // pointer to the input buffer.
+  const char *p = markup.data();
+  string sTmp;
+
+  // tokenize the markup string
+  while (*p) {
+
     switch (*p) {
+    // when the markup < character is found, start capturing
     case '<':
-      bCapture = true;
+      cout << "< signal found" << endl;
+      pc.bSignal = true;
+      pc.bSkip = true;
       break;
 
+    // when the space is found, if capturing is occurring, find out if the item
+    // is a markup tag
+    case ' ':
+      cout << "(space) signal found" << endl;
+      if (pc.bSignal) {
+        pc.bQuery = true;
+        pc.bSkip = true;
+      }
+      break;
+    case '=':
+      if (pc.bSignal && pc.bAttributeList) {
+        pc.bQuery = true;
+        pc.bSkip = true;
+      }
+      break;
     case '>':
+      cout << "> signal found" << endl;
       // has a signal been established with the capture turned on?
-      if (bCapture && bTerminal)
-        bQuery = true;
-      bCapture = false;
-      bTerminal = false;
+      if (pc.bSignal && pc.bTerminal) {
+        pc.bSignal = false;
+        pc.bTerminal = false;
+        pc.bCapture = false;
+        pc.bQuery = true;
+        pc.bSkip = true;
+        pc.bAttributeList = false;
+        pc.bAttributeListValue = false;
+
+      } else if (pc.bSignal) {
+        pc.bAttributeList = false;
+        pc.bAttributeListValue = false;
+
+        pc.bQuery = true;
+        pc.bSkip = true;
+        pc.bSignal = false;
+      }
       break;
 
     case '/':
-      bTerminal = true;
+      cout << "/ signal found" << endl;
+      if (pc.bSignal) {
+        pc.bQuery = true;
+        pc.bTerminal = true;
+        pc.bSkip = true;
+      }
+
       break;
     }
 
-    if (bCapture)
-      sCaptureString += *p;
+    // if a query has been requested by a parser condition, do this now.
+    // This is established once within the loop function so that code within
+    // the switch case block is not duplicated.
+    if (pc.bQuery) {
+      cout << "query start " << endl;
 
-    if (bQuery) {
-      auto it = objectFactoryMap.find(sCaptureString);
+      if (pc.bAttributeList && !pc.bAttributeListValue) {
+        cout << "pc.bCapture && pc.bAttributeList && !pc.bAttributeListValue "
+             << endl;
 
+        // convert to lower case, the attribute list is keyed on lower case
+        // names.
+        string sKey = pc.sCaptureString;
+        std::transform(sKey.begin(), sKey.end(), sKey.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+
+        if (attributeFactory.find(sKey) != attributeFactory.end()) {
+          pc.parsedData.emplace_back(attribute, sKey);
+          pc.bAttributeListValue = true;
+          pc.sCaptureString = "";
+        }
+
+      } else if (pc.bAttributeList && pc.bAttributeListValue) {
+        cout << "pc.bCapture && pc.bAttributeList && pc.bAttributeListValue "
+             << endl;
+        pc.parsedData.emplace_back(attributeValue, pc.sCaptureString);
+        pc.bAttributeListValue = false;
+        pc.sCaptureString = "";
+      } else {
+        string sKey = pc.sCaptureString;
+        std::transform(sKey.begin(), sKey.end(), sKey.begin(),
+                       [](unsigned char c) { return std::toupper(c); });
+
+        auto it = objectFactoryMap.find(sKey);
+        if (it != objectFactoryMap.end()) {
+          cout << "(" << sKey << ")" << endl;
+          cout << "pc.bCapture && objectFactoryMap.find(pc.sCaptureString) != "
+                  "objectFactoryMap.end() "
+               << endl;
+
+
+          pc.parsedData.emplace_back(element, sKey);
+          pc.bAttributeList = true;
+          pc.sCaptureString = "";
+
+        } else {
+          string sKey = pc.sCaptureString;
+          std::transform(sKey.begin(), sKey.end(), sKey.begin(),
+                         [](unsigned char c) { return std::tolower(c); });
+          if (colorNF::colorFactory.find(sKey) != colorNF::colorFactory.end())
+            cout << "is a color " << endl;
+          cout << "pc.bCapture && colorNF::colorFactory.find(sTmp) != "
+                  "colorNF::colorFactory.end() "
+               << endl;
+          pc.parsedData.emplace_back(color, sKey);
+        }
+      }
+
+      pc.bQuery = false;
+    }
+
+    if (pc.bSignal && !pc.bSkip) {
+      pc.sCaptureString += *p;
+      cout << "pc.sCaptureString " << pc.sCaptureString << endl;
+
+    } else {
+      pc.bSkip = false;
+    }
+
+    if (pc.bTerminal) {
+      cout << "pc.bTerminal " << endl;
+
+      // place captured data within the enclosing element markers
+      if(pc.sCaptureString.size() != 0)
+        pc.parsedData.emplace_back(stringData, pc.sCaptureString);
+
+      pc.parsedData.emplace_back(elementTerminal, "");
+      pc.bTerminal = false;
+    }
+
+
+    // goto next character
+    p++;
+  }
+
+  // second phase, iterate over the parsed context and develop the elements,
+  // color text nodes, and set attributes for the items on the stack. once items
+  // are processed, they are removed from the stack using the delete range
+  // operator, For a complet etag to exist, the end tab must also exist.
+  for (auto &item : pc.parsedData) {
+    switch (item.first) {
+    case element: {
+      string sKey = item.second;
+      std::transform(sKey.begin(), sKey.end(), sKey.begin(),
+                     [](unsigned char c) { return std::toupper(c); });
+
+      auto it = objectFactoryMap.find(sKey);
       if (it != objectFactoryMap.end()) {
         Element &e = it->second({});
+        pc.elementStack.back().get().appendChild(e);
+        pc.elementStack.push_back(e);
       }
+    } break;
+
+    case elementTerminal: {
+      pc.elementStack.pop_back();
+    } break;
+
+    case attribute: {
+      string sKey = item.second;
+      std::transform(sKey.begin(), sKey.end(), sKey.begin(),
+                     [](unsigned char c) { return std::tolower(c); });
+      auto it = attributeFactory.find(sKey);
+      if (it != attributeFactory.end()) {
+        pc.bFoundAttributeSet = true;
+        pc.attributeSetFunc = it->second;
+      }
+
+    } break;
+
+    case attributeValue: {
+      if (pc.bFoundAttributeSet)
+        pc.attributeSetFunc(pc.elementStack.back(), item.second);
+    } break;
+
+    case color: {
+      auto &e = pc.elementStack.back().get().appendChild<textNode>(
+          textColor{item.second});
+      pc.elementStack.push_back(e);
+    } break;
+
+    case stringData:
+      pc.elementStack.back().get().data().push_back(item.second);
+      break;
     }
   }
 
-  return *this;
+  return pc.elementStack.back().get();
 }
+
 /***************************************************************************
 Visualizer module
 ***************************************************************************/

@@ -103,7 +103,9 @@ int WINAPI WinMain(HINSTANCE /* hInstance */, HINSTANCE /* hPrevInstance */,
 
   test10(vm);
   vm.clear();
+
 }
+
 string randomString(int nChars);
 double randomDouble(double a, double b);
 int randomInt(int a);
@@ -137,7 +139,17 @@ void test0b(Viewer &vm) {
   vm.appendChild<PARAGRAPH>(indexBy{"content"},
                             "The information must add two children");
   e.data() = {"This is replaced as a data node"};
+  cout << "before parser" << endl;
   vm.appendChild("<div id=testAdd/>");
+
+  getElement("testAdd").appendChild("<ul>"
+                        "<li>test item 1</li>"
+                        "<li>test item 2</li>"
+                        "<li>test item 3</li>"
+                        "<li>test item 4</li>"
+                        "<li>test item 5</li></ul>");
+
+
   vm.render();
 }
 //! [test0]
