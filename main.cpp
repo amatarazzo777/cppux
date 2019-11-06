@@ -5,6 +5,7 @@ using namespace viewManager;
 
 void test0(Viewer &vm);
 void test0b(Viewer &vm);
+void test0c(Viewer &vm);
 void test1(Viewer &vm);
 void test1a(Viewer &vm);
 void test2(Viewer &vm);
@@ -33,7 +34,6 @@ void testStart(string_view sFunc) {
 }
 
 /****************************************************************************************************
-
 ***************************************************************************************************/
 #if defined(__linux__)
 int main(int argc, char **argv) {
@@ -56,6 +56,10 @@ int WINAPI WinMain(HINSTANCE /* hInstance */, HINSTANCE /* hPrevInstance */,
       marginLeft{5_pt}, marginBottom{5_pt}, marginRight{5_pt});
   cout << "viewer created." << endl;
 
+  test0c(vm);
+  vm.clear();
+
+#if 0
   test0b(vm);
   vm.clear();
 
@@ -103,6 +107,7 @@ int WINAPI WinMain(HINSTANCE /* hInstance */, HINSTANCE /* hPrevInstance */,
 
   test10(vm);
   vm.clear();
+#endif
 
 }
 
@@ -142,6 +147,25 @@ void test0b(Viewer &vm) {
   cout << "before parser" << endl;
   vm.appendChild("<div id=testAdd/>");
 
+  getElement("testAdd").appendChild("<ul>"
+                        "<li>test item 1</li>"
+                        "<li>test item 2</li>"
+                        "<li>test item 3</li>"
+                        "<li>test item 4</li>"
+                        "<li>test item 5</li></ul>");
+
+
+  vm.render();
+}
+/************************************************************************
+************************************************************************/
+//! [test0]
+void test0c(Viewer &vm) {
+  testStart(__FUNCTION__);
+
+  vm.appendChild("<div id=testAdd/>");
+
+  getElement("testAdd").ingestStream=true;
   getElement("testAdd").appendChild("<ul>"
                         "<li>test item 1</li>"
                         "<li>test item 2</li>"
@@ -821,7 +845,6 @@ building factory methods however at the cost of more parsed data.
 Specifically using the C++ binary string literal interface.
 Within the string format, appearing and communicating with
 a based initializer list,
-
 View manager object notation is a parsed input function prvoding
 the ability to generate very complex dataTransform function for
 the standard input. That is, at times lambda's of this sort may be
@@ -987,7 +1010,6 @@ perhaps direct methods for manulipting it by function may be too assumptive in
 the approach to how the application can be built. So perhaps further definition
 of these typese of traits can be refined with more investigation after
 the base framework is assembled.
-
 A style sheet that can apply itself to a document by classifying terms
 of information system to that of information structure name within the
 document heirarchy. This is typical of how style and the cascade works.

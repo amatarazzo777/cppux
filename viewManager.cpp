@@ -455,17 +455,26 @@ viewManager::doubleNF::doubleNF(const string &sOption) {
 // time, that is the short hand versions of coordinates, margin and padding
 tuple<doubleNF, doubleNF, doubleNF, doubleNF>
 viewManager::parseQuadCoordinates(const string _sOptions) {
-  regex re("^[\\s\\[\\{\\(]*([\\w\\%\\.]+)(?:[,]|\\s*)+"
-           "([\\w\\%\\.]+)(?:[,]|\\s*)+"
-           "([\\w\\%\\.]+)(?:[,]|\\s*)+"
-           "([\\w\\%\\.]+)[\\]\\}\\)\\s]*");
+  //^[\s]*[\{\(]?([\+\-]?[\d]+[.,]?[\d]*[\%]?[\w]{0,7})(?:[\s]*[,]?[\s]*)([\+\-]?[\d]+[.,]?[\d]*[\%]?[\w]{0,7})(?:[\s]*[,]?[\s]*)([\+\-]?[\d]+[.,]?[\d]*[\%]?[\w]{0,7})(?:[\s]*[,]?[\s]*)([\+\-]?[\d]+[.,]?[\d]*[\%]?[\w]{0,7})(?:[\s]*[,]?[\s]*)[\s]*[\}\)]?
+  regex re("^[\\s]*[\\{\\(]?([\\+\\-]?[\\d]+[.,]?[\\d]*[\\%]?[\\w]{0,7})"
+          "(?:[\\s]*[,]?[\\s]*)([\\+\\-]?[\\d]+[.,]?[\\d]*[\\%]?[\\w]{0,7})"
+          "(?:[\\s]*[,]?[\\s]*)([\\+\\-]?[\\d]+[.,]?[\\d]*[\%]?[\\w]{0,7})"
+          "(?:[\\s]*[,]?[\\s]*)([\\+\\-]?[\\d]+[.,]?[\\d]*[\\%]?[\\w]{0,7})"
+          "(?:[\\s]*[,]?[\\s]*)[\\s]*[\\}\\)]?");
   smatch coords;
 
   if (regex_search(_sOptions, coords, re)) {
-    if (coords.size() == 4) {
+    cout <<"did match"<<endl;
+
+    cout << "matches = " << coords.size() << endl;
+    for(int i=0;i<coords.size();i++)
+      cout <<"   ---> "<< coords.str(i)<<endl;
+
+    if (coords.size() == 5) {
+      cout <<"is five items"<<endl;
       auto ret =
-          std::make_tuple(doubleNF(coords.str(0)), doubleNF(coords.str(1)),
-                          doubleNF(coords.str(2)), doubleNF(coords.str(3)));
+          std::make_tuple(doubleNF(coords.str(1)), doubleNF(coords.str(2)),
+                          doubleNF(coords.str(3)), doubleNF(coords.str(4)));
       return ret;
     }
   }
@@ -476,23 +485,49 @@ viewManager::parseQuadCoordinates(const string _sOptions) {
   throw std::invalid_argument(info);
 }
 
-// colorNF(string _sOption)
-// a constructor that applies a text color name and ues the lookup table to
-// transform the text to a numeric color value. The colors are storedin a 24bit
-// color format.
+// colorNF::colorIndex(const std::string &_colorName)
+// The function accepts a name that may have spaces and can have camel case
+// within the color name spelling. the function transforms the name and removes
+// the spaces. It returns an iterator to the colorMap. This saves a find
+// operation on the map when checking for the validity of a color name within
+// the colormap.
+colorMap::const_iterator colorNF::colorIndex(const std::string &_colorName) {
+  std::regex r("\\s+");
+  std::string sKey = std::regex_replace(_colorName, r, "");
+  std::transform(sKey.begin(), sKey.end(), sKey.begin(),
+                 [](unsigned char c) { return std::tolower(c); });
+  auto it = colorNF::colorFactory.find(sKey);
+
+  return it;
+}
+
 viewManager::colorNF::colorNF(const string &_sOption) {
   option = colorFormat::name;
-  std::regex r("\\s+");
-  std::string sTmpKey = std::regex_replace(_sOption, r, "");
-  std::transform(sTmpKey.begin(), sTmpKey.end(), sTmpKey.begin(),
-                 [](unsigned char c) { return std::tolower(c); });
-  auto it = colorFactory.find(sTmpKey);
+  auto it = colorIndex(_sOption);
 
   unsigned long color = 0;
 
   if (it != colorFactory.end())
     color = it->second;
 
+  value[0] = static_cast<double>((color & 0xFF000000) >> 24);
+  value[1] = static_cast<double>((color & 0x00FF0000) >> 16);
+  value[2] = static_cast<double>((color & 0x0000FF00) >> 8);
+  value[3] = 1.0;
+}
+// at times when the parser looks up a color name, this uses the iterator
+// which came from the name
+viewManager::colorNF::colorNF(colorMap::const_iterator it) {
+  option = colorFormat::name;
+  unsigned long color = it->second;
+
+  value[0] = static_cast<double>((color & 0xFF000000) >> 24);
+  value[1] = static_cast<double>((color & 0x00FF0000) >> 16);
+  value[2] = static_cast<double>((color & 0x0000FF00) >> 8);
+  value[3] = 1.0;
+}
+
+viewManager::colorNF::colorNF(const unsigned long &color) {
   value[0] = static_cast<double>((color & 0xFF000000) >> 24);
   value[1] = static_cast<double>((color & 0x00FF0000) >> 16);
   value[2] = static_cast<double>((color & 0x0000FF00) >> 8);
@@ -923,8 +958,7 @@ vector<eventHandler> &viewManager::Element::getEventVector(eventType evtType) {
       {eventType::dblclick, ondblclick},
       {eventType::contextmenu, oncontextmenu},
       {eventType::wheel, onwheel}};
-  unordered_map<eventType, vector<eventHandler> &>::iterator it;
-  it = eventTypeMap.find(evtType);
+  auto it = eventTypeMap.find(evtType);
   return it->second;
 }
 /// <summary>
@@ -1047,7 +1081,13 @@ void viewManager::Element::printf(const char *fmt, ...) {
   vasprintf(&buffer, fmt, ap);
 #pragma clang diagnostic warning "-Wformat-security"
 #pragma clang diagnostic warning "-Wformat-nonliteral"
-  ingestMarkup(*this, buffer);
+
+  // if stream ingestion is on, interprest the markup as it arrives.
+  if (ingestStream)
+    ingestMarkup(*this, buffer);
+  else
+    data().push_back(buffer);
+
   free(buffer);
   va_end(ap);
 #elif defined(__WIN64)
@@ -1058,7 +1098,13 @@ void viewManager::Element::printf(const char *fmt, ...) {
   len = _vscprintf(fmt, ap) + 1;
   buffer = (char *)malloc(len * sizeof(char));
   vsprintf(buffer, fmt, ap);
-  ingestMarkup(*this, buffer);
+
+  // if stream ingestion is on, interprest the markup as it arrives.
+  if (ingestStream)
+    ingestMarkup(*this, buffer);
+  else
+    data().push_back(buffer);
+
   free(buffer);
   va_end(ap);
 #endif
@@ -1137,6 +1183,10 @@ Element &viewManager::Element::ingestMarkup(Element &node,
     stringData
   };
 
+  // the varaint holds the payload from the parser
+  typedef variant<string, factoryLambda, attributeLambda, colorNF>
+      parserOperator;
+
   typedef struct {
     bool bCapture = false;
     bool bSkip = false;
@@ -1147,9 +1197,8 @@ Element &viewManager::Element::ingestMarkup(Element &node,
 
     bool bQuery = false;
     string sCaptureString;
-    vector<pair<itemType, string>> parsedData;
+    vector<pair<itemType, parserOperator>> parsedData;
     vector<reference_wrapper<Element>> elementStack;
-    std::function<void(Element &e, const std::string &param)> attributeSetFunc;
     bool bFoundAttributeSet = false;
   } parserContext;
 
@@ -1194,7 +1243,7 @@ Element &viewManager::Element::ingestMarkup(Element &node,
         pc.bSignal = false;
         pc.bTerminal = false;
         pc.bCapture = false;
-        pc.bQuery = true;
+        pc.bQuery = false;
         pc.bSkip = true;
         pc.bAttributeList = false;
         pc.bAttributeListValue = false;
@@ -1226,9 +1275,11 @@ Element &viewManager::Element::ingestMarkup(Element &node,
     if (pc.bQuery) {
       cout << "query start " << endl;
 
+      // check the state of scanning for attribtues but not the attribute value.
+      // this acts as a flip flop state between the attribute name and the
+      // attribute value.
       if (pc.bAttributeList && !pc.bAttributeListValue) {
-        cout << "pc.bCapture && pc.bAttributeList && !pc.bAttributeListValue "
-             << endl;
+        cout << "check for attribute " << endl;
 
         // convert to lower case, the attribute list is keyed on lower case
         // names.
@@ -1236,45 +1287,51 @@ Element &viewManager::Element::ingestMarkup(Element &node,
         std::transform(sKey.begin(), sKey.end(), sKey.begin(),
                        [](unsigned char c) { return std::tolower(c); });
 
+        // store iterator to the function
+        auto it = attributeFactory.find(sKey);
         if (attributeFactory.find(sKey) != attributeFactory.end()) {
-          pc.parsedData.emplace_back(attribute, sKey);
+          cout << "-----> is attribtue " << endl;
+          pc.parsedData.emplace_back(attribute, it->second);
           pc.bAttributeListValue = true;
           pc.sCaptureString = "";
         }
 
       } else if (pc.bAttributeList && pc.bAttributeListValue) {
-        cout << "pc.bCapture && pc.bAttributeList && pc.bAttributeListValue "
-             << endl;
+        cout << "attribute value " << endl;
         pc.parsedData.emplace_back(attributeValue, pc.sCaptureString);
         pc.bAttributeListValue = false;
         pc.sCaptureString = "";
+
       } else {
         string sKey = pc.sCaptureString;
         std::transform(sKey.begin(), sKey.end(), sKey.begin(),
                        [](unsigned char c) { return std::toupper(c); });
 
+        cout << "check is object element (" << sKey << ")" << endl;
+
         auto it = objectFactoryMap.find(sKey);
         if (it != objectFactoryMap.end()) {
-          cout << "(" << sKey << ")" << endl;
-          cout << "pc.bCapture && objectFactoryMap.find(pc.sCaptureString) != "
-                  "objectFactoryMap.end() "
-               << endl;
+          cout << "----->  is element " << endl;
 
-
-          pc.parsedData.emplace_back(element, sKey);
+          // store lambda for the element factory
+          pc.parsedData.emplace_back(element, it->second);
           pc.bAttributeList = true;
           pc.sCaptureString = "";
 
         } else {
-          string sKey = pc.sCaptureString;
-          std::transform(sKey.begin(), sKey.end(), sKey.begin(),
-                         [](unsigned char c) { return std::tolower(c); });
-          if (colorNF::colorFactory.find(sKey) != colorNF::colorFactory.end())
-            cout << "is a color " << endl;
-          cout << "pc.bCapture && colorNF::colorFactory.find(sTmp) != "
-                  "colorNF::colorFactory.end() "
-               << endl;
-          pc.parsedData.emplace_back(color, sKey);
+          cout << "check to see if it is a color  " << sKey << endl;
+          // store the color object within the parser payload
+          auto it = colorNF::colorIndex(pc.sCaptureString);
+          if (it != colorNF::colorFactory.end()) {
+            cout << "----->  is color " << endl;
+            pc.parsedData.emplace_back(color, colorNF(it));
+            pc.sCaptureString = "";
+
+          } else {
+            pc.parsedData.emplace_back(stringData, pc.sCaptureString);
+            pc.sCaptureString = "";
+
+          }
         }
       }
 
@@ -1293,13 +1350,12 @@ Element &viewManager::Element::ingestMarkup(Element &node,
       cout << "pc.bTerminal " << endl;
 
       // place captured data within the enclosing element markers
-      if(pc.sCaptureString.size() != 0)
+      if (pc.sCaptureString.size() != 0)
         pc.parsedData.emplace_back(stringData, pc.sCaptureString);
 
       pc.parsedData.emplace_back(elementTerminal, "");
       pc.bTerminal = false;
     }
-
 
     // goto next character
     p++;
@@ -1309,55 +1365,51 @@ Element &viewManager::Element::ingestMarkup(Element &node,
   // color text nodes, and set attributes for the items on the stack. once items
   // are processed, they are removed from the stack using the delete range
   // operator, For a complet etag to exist, the end tab must also exist.
-  for (auto &item : pc.parsedData) {
-    switch (item.first) {
+  auto item = pc.parsedData.begin();
+  while (item != pc.parsedData.end()) {
+    switch (item->first) {
     case element: {
-      string sKey = item.second;
-      std::transform(sKey.begin(), sKey.end(), sKey.begin(),
-                     [](unsigned char c) { return std::toupper(c); });
-
-      auto it = objectFactoryMap.find(sKey);
-      if (it != objectFactoryMap.end()) {
-        Element &e = it->second({});
-        pc.elementStack.back().get().appendChild(e);
-        pc.elementStack.push_back(e);
-      }
+      Element &e = get<factoryLambda>(item->second)({});
+      pc.elementStack.back().get().appendChild(e);
+      pc.elementStack.push_back(e);
     } break;
 
     case elementTerminal: {
       pc.elementStack.pop_back();
     } break;
 
+    // the attribute and value are handled here together
     case attribute: {
-      string sKey = item.second;
-      std::transform(sKey.begin(), sKey.end(), sKey.begin(),
-                     [](unsigned char c) { return std::tolower(c); });
-      auto it = attributeFactory.find(sKey);
-      if (it != attributeFactory.end()) {
-        pc.bFoundAttributeSet = true;
-        pc.attributeSetFunc = it->second;
+      auto itAttributeValue = std::next(item, 1);
+      if (itAttributeValue != pc.parsedData.end() &&
+          itAttributeValue->first == attributeValue) {
+        get<attributeLambda>(item->second)(
+            pc.elementStack.back(), get<string>(itAttributeValue->second));
+        item++;
       }
 
     } break;
 
-    case attributeValue: {
-      if (pc.bFoundAttributeSet)
-        pc.attributeSetFunc(pc.elementStack.back(), item.second);
-    } break;
-
     case color: {
       auto &e = pc.elementStack.back().get().appendChild<textNode>(
-          textColor{item.second});
+          textColor{get<colorNF>(item->second)});
       pc.elementStack.push_back(e);
     } break;
 
     case stringData:
-      pc.elementStack.back().get().data().push_back(item.second);
+      pc.elementStack.back().get().data().push_back(get<string>(item->second));
       break;
     }
+
+    // goto next item
+    item++;
   }
 
-  return pc.elementStack.back().get();
+  // return the the item on the stack appropiate
+  Element &eRet = pc.elementStack.back().get();
+  pc.elementStack.pop_back();
+
+  return eRet;
 }
 
 /***************************************************************************

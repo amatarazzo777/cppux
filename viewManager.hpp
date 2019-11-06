@@ -184,10 +184,12 @@ public:
   std::array<double, 4> value;
   colorFormat option;
   static const colorMap colorFactory;
+  static colorMap::const_iterator colorIndex(const std::string &_colorName);
   colorNF(const colorFormat &_opt, const std::array<double, 4> &_val)
       : option(_opt), value(_val) {}
-
+  colorNF(const unsigned long &ulColor);
   colorNF(const std::string &_colorName);
+  colorNF(colorMap::const_iterator);
   colorNF(const colorNF &_colorObj)
       : option(_colorObj.option), value(_colorObj.value) {}
 
@@ -435,7 +437,7 @@ public:
       : softName(_softName), m_self(this), m_parent(nullptr),
         m_firstChild(nullptr), m_lastChild(nullptr), m_nextChild(nullptr),
         m_previousChild(nullptr), m_nextSibling(nullptr),
-        m_previousSibling(nullptr), m_childCount(0) {
+        m_previousSibling(nullptr), m_childCount(0), ingestStream(false) {
     setAttribute(attribs);
   }
   ~Element() { Visualizer::deallocate(surface); }
@@ -647,12 +649,19 @@ that elvolve in delicate use of competent technology.
   /// Simply puts the data into the stream. It should be
   /// noted that flush should be called.
   /// </summary>
+  bool ingestStream; // change form documentation
+
   template <typename T> Element &operator<<(const T &data) {
     std::ostringstream s;
     s << data;
+    std::string sData = s.str();
 
-    // append the information to the end of the data vector.
-    this->data().push_back(s.str());
+    if (this->ingestStream) {
+      ingestMarkup(*this, sData);
+    } else {
+      // append the information to the end of the data vector.
+      this->data().push_back(sData);
+    }
 
     return *this;
   }
@@ -1171,15 +1180,15 @@ are added on top of the viewManager base library.
 
 #define CREATE_OBJECT(OBJECT_TYPE) CREATE_OBJECT_ALIAS(OBJECT_TYPE, OBJECT_TYPE)
 
-typedef std::unordered_map<
-    std::string, std::function<Element &(const std::vector<std::any> &attr)>>
-    factoryMap;
+typedef std::function<Element &(const std::vector<std::any> &attr)>
+    factoryLambda;
+typedef std::unordered_map<std::string, factoryLambda> factoryMap;
 
 extern const factoryMap objectFactoryMap;
 
-typedef std::unordered_map<
-    std::string, std::function<void(Element &e, const std::string &param)>>
-    attributeStringMap;
+typedef std::function<void(Element &e, const std::string &param)>
+    attributeLambda;
+typedef std::unordered_map<std::string, attributeLambda> attributeStringMap;
 
 extern const attributeStringMap attributeFactory;
 
