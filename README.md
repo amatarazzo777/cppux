@@ -1,12 +1,13 @@
 # guidom
 
-This is the new format in research for C++ 17 and above. The product is designed to be cross platform. 
+This project is a research API for the C++ 17 and above language to provide a document object model. 
+The product is designed to be cross platform. 
 Currently the macOS, iOS, and Android NDK library needs research. The template dom library works 
 precisely with the standard library without adding new data types. It supports rapid development and 
-incorporates a small set of memorable names within its model. it is a templated oriented coded 
-implementation for higher performance than any of the preceding syntaxes. It offers the document 
+incorporates a small set of memorable names within its model. It is a templated oriented 
+implementation for higher performance and integrated syntax. It offers the document 
 object model integrated with C++ language as a natural syntax that appears like HTML because of the use of <>.
-The product is designed to be a cross platform product line. The following development platforms and 
+The following development platforms and rendering
 technologies are capable of use for development and distribution.
 
 <ul>
