@@ -2,6 +2,9 @@ FROM gitpod/workspace-full
 
 USER root
 
+RUN apt-get update \
+    && apt-get install -y doxygen
+
 RUN bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
 docker run --cap-add=SYS_PTRACE --security-opt seccomp=unconfined
 

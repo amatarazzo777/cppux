@@ -20,6 +20,16 @@ std::unordered_map<std::string, std::reference_wrapper<Element>>
     viewManager::indexedElements;
 std::vector<std::unique_ptr<StyleClass>> viewManager::styles;
 
+/*
+
+The objectFactoryMap provides an easy to maintain table of document
+entities. The syntax, for consilidation, uses the macros CREATE_OBJECT
+and CREATE_OBJECT_ALIAS. These macros expand to a string and a lambda
+function which calls the createElement document api. The function
+returns the newly created element. The table is used by the
+parser to instianiate document elements.
+
+*/
 const factoryMap viewManager::objectFactoryMap = {
     CREATE_OBJECT(BR),        CREATE_OBJECT(H1),
     CREATE_OBJECT(H2),        CREATE_OBJECT(H3),
@@ -31,6 +41,15 @@ const factoryMap viewManager::objectFactoryMap = {
 
 // clang-format off
 
+/*
+The attribtueStringMap provides a lookup table for
+lower case attributes and aliases of an attribute.
+The second map storage is a lambda function which
+sets the specific attribute. The lambda accepts to parameters,
+the base element for which to set the attribute on and
+the string value of the setting. It should be noted that the
+attribute objects themselves parse the input parameter where needed.
+*/
 const attributeStringMap
     viewManager::attributeFactory = {
     {"id",
@@ -455,23 +474,22 @@ viewManager::doubleNF::doubleNF(const string &sOption) {
 // time, that is the short hand versions of coordinates, margin and padding
 tuple<doubleNF, doubleNF, doubleNF, doubleNF>
 viewManager::parseQuadCoordinates(const string _sOptions) {
-  //^[\s]*[\{\(]?([\+\-]?[\d]+[.,]?[\d]*[\%]?[\w]{0,7})(?:[\s]*[,]?[\s]*)([\+\-]?[\d]+[.,]?[\d]*[\%]?[\w]{0,7})(?:[\s]*[,]?[\s]*)([\+\-]?[\d]+[.,]?[\d]*[\%]?[\w]{0,7})(?:[\s]*[,]?[\s]*)([\+\-]?[\d]+[.,]?[\d]*[\%]?[\w]{0,7})(?:[\s]*[,]?[\s]*)[\s]*[\}\)]?
   regex re("^[\\s]*[\\{\\(]?([\\+\\-]?[\\d]+[.,]?[\\d]*[\\%]?[\\w]{0,7})"
-          "(?:[\\s]*[,]?[\\s]*)([\\+\\-]?[\\d]+[.,]?[\\d]*[\\%]?[\\w]{0,7})"
-          "(?:[\\s]*[,]?[\\s]*)([\\+\\-]?[\\d]+[.,]?[\\d]*[\%]?[\\w]{0,7})"
-          "(?:[\\s]*[,]?[\\s]*)([\\+\\-]?[\\d]+[.,]?[\\d]*[\\%]?[\\w]{0,7})"
-          "(?:[\\s]*[,]?[\\s]*)[\\s]*[\\}\\)]?");
+           "(?:[\\s]*[,]?[\\s]*)([\\+\\-]?[\\d]+[.,]?[\\d]*[\\%]?[\\w]{0,7})"
+           "(?:[\\s]*[,]?[\\s]*)([\\+\\-]?[\\d]+[.,]?[\\d]*[\%]?[\\w]{0,7})"
+           "(?:[\\s]*[,]?[\\s]*)([\\+\\-]?[\\d]+[.,]?[\\d]*[\\%]?[\\w]{0,7})"
+           "(?:[\\s]*[,]?[\\s]*)[\\s]*[\\}\\)]?");
   smatch coords;
 
   if (regex_search(_sOptions, coords, re)) {
-    cout <<"did match"<<endl;
+    cout << "did match" << endl;
 
     cout << "matches = " << coords.size() << endl;
-    for(int i=0;i<coords.size();i++)
-      cout <<"   ---> "<< coords.str(i)<<endl;
+    for (int i = 0; i < coords.size(); i++)
+      cout << "   ---> " << coords.str(i) << endl;
 
     if (coords.size() == 5) {
-      cout <<"is five items"<<endl;
+      cout << "is five items" << endl;
       auto ret =
           std::make_tuple(doubleNF(coords.str(1)), doubleNF(coords.str(2)),
                           doubleNF(coords.str(3)), doubleNF(coords.str(4)));
@@ -485,12 +503,13 @@ viewManager::parseQuadCoordinates(const string _sOptions) {
   throw std::invalid_argument(info);
 }
 
-// colorNF::colorIndex(const std::string &_colorName)
-// The function accepts a name that may have spaces and can have camel case
-// within the color name spelling. the function transforms the name and removes
-// the spaces. It returns an iterator to the colorMap. This saves a find
-// operation on the map when checking for the validity of a color name within
-// the colormap.
+/* colorNF::colorIndex(const std::string &_colorName)
+ The function accepts a name that may have spaces and can have camel case
+ within the color name spelling. the function transforms the name and removes
+ the spaces. It returns an iterator to the colorMap. This saves a find
+ operation on the map when checking for the validity of a color name within
+ the colormap.
+*/
 colorMap::const_iterator colorNF::colorIndex(const std::string &_colorName) {
   std::regex r("\\s+");
   std::string sKey = std::regex_replace(_colorName, r, "");
@@ -501,6 +520,7 @@ colorMap::const_iterator colorNF::colorIndex(const std::string &_colorName) {
   return it;
 }
 
+/*The constructor provides a string lookup of a passed color name.*/
 viewManager::colorNF::colorNF(const string &_sOption) {
   option = colorFormat::name;
   auto it = colorIndex(_sOption);
@@ -574,6 +594,17 @@ uint8_t viewManager::strToEnum(const string_view &sListName,
   }
 }
 
+/*
+strToNumericAndEnum
+
+returns: tuple<double, u_int8_t>
+
+The routine provides a translation from a string format to a
+c++ enumeration. The expected input type for the enumeration is a
+uint8_t. The c++ compiler automatically translates the options
+during the list initializer. However the output must be statically cast
+back to the enumeration value.
+*/
 tuple<double, u_int8_t> viewManager::strToNumericAndEnum(
     const string_view &sListName,
     const unordered_map<string, uint8_t> &optionMap, const string &_sOption) {
@@ -639,7 +670,6 @@ viewManager::lineHeight::lineHeight(const string &sOption) {
 
 // lineHeight(string sOption)
 // transforms the textual input into the lineHeight options
-
 viewManager::borderStyle::borderStyle(const string &sOption) {
   static unordered_map<string, uint8_t> enumMap = {
       {"none", none},   {"dotted", dotted},   {"dashed", dashed},
@@ -660,6 +690,10 @@ viewManager::listStyleType::listStyleType(const string &sOption) {
       strToEnum("listStyleType", enumMap, sOption));
 }
 
+/*********************************************************************************/
+
+/* the viewer constructor opens an window and establishes a root document object.
+*/
 viewManager::Viewer::Viewer(const vector<any> &attrs)
     : Element("Viewer", attrs) {
   // setAttribute(indexBy{"_root"};
@@ -710,6 +744,7 @@ void viewManager::Viewer::render(void) {
 
 #endif
 }
+
 /// <summary>
 /// This is the only entry point from the platform for the event
 /// dispatching system. The routine expects only certain types
@@ -763,6 +798,10 @@ eventType::mouseleave
 /// with windows message queue processing. </summary>
 void viewManager::Viewer::processEvents(void) { m_device->messageLoop(); }
 
+/*
+The following user defined literals provide the consolidated syntax for ease of numeric
+literal input.
+*/
 auto viewManager::operator""_pt(unsigned long long int value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::pt};
 }
@@ -835,6 +874,13 @@ auto viewManager::query(const std::string &queryString) -> ElementList {
   }
   return results;
 }
+
+/*
+This version of the query interface provides a
+syntax whereby a lambda or a function may be used to provide matching.
+The function is simply passed an element within the traversal.
+The function is expected to return a true or false value.
+*/
 auto viewManager::query(const ElementQuery &queryFunction) -> ElementList {
   ElementList results;
   for (const auto &n : elements) {
@@ -843,13 +889,312 @@ auto viewManager::query(const ElementQuery &queryFunction) -> ElementList {
   }
   return results;
 }
+
+/*
+hasElement
+the hasElement function returns a true or false value if the index is found
+within the index. This may be used to avoid possible exceptions.
+*/
 bool viewManager::hasElement(const std::string &key) {
   auto it = indexedElements.find(key);
   return it != indexedElements.end();
 }
+
 /******************************************************************************************
-Element
+                    Element
 *******************************************************************************************/
+viewManager::Element::Element(const Element &other) {
+  std::cout << "Element(const Element& other)" << std::endl;
+
+  m_self = other.m_self;
+  m_parent = other.m_parent;
+  m_firstChild = other.m_firstChild;
+  m_lastChild = other.m_lastChild;
+  m_nextChild = other.m_nextChild;
+  m_previousChild = other.m_previousChild;
+  m_nextSibling = other.m_nextSibling;
+  m_previousSibling = other.m_previousSibling;
+  m_childCount = other.m_childCount;
+  attributes = other.attributes;
+  styles = other.styles;
+}
+
+viewManager::Element::Element(Element &&other) noexcept {
+  std::cout << "Element(Element&& other) noexcept" << std::endl;
+
+  m_self = other.m_self;
+  m_parent = other.m_parent;
+  m_firstChild = other.m_firstChild;
+  m_lastChild = other.m_lastChild;
+  m_nextChild = other.m_nextChild;
+  m_previousChild = other.m_previousChild;
+  m_nextSibling = other.m_nextSibling;
+  m_previousSibling = other.m_previousSibling;
+  m_childCount = other.m_childCount;
+  attributes = std::move(other.attributes);
+  styles = std::move(other.styles);
+}
+
+Element &viewManager::Element::operator=(const Element &other) {
+  std::cout << "Element& operator=(const Element& other)" << std::endl;
+
+  // Self-assignment detection
+  if (&other == this)
+    return *this;
+  m_self = other.m_self;
+  m_parent = other.m_parent;
+  m_firstChild = other.m_firstChild;
+  m_lastChild = other.m_lastChild;
+  m_nextChild = other.m_nextChild;
+  m_previousChild = other.m_previousChild;
+  m_nextSibling = other.m_nextSibling;
+  m_previousSibling = other.m_previousSibling;
+  m_childCount = other.m_childCount;
+  attributes = other.attributes;
+  styles = other.styles;
+  return *this;
+}
+
+Element &viewManager::Element::operator=(Element &&other) noexcept {
+  std::cout << "Element& operator=(Element&& other) noexcept" << std::endl;
+
+  if (&other == this)
+    return *this;
+  m_self = other.m_self;
+  m_parent = other.m_parent;
+  m_firstChild = other.m_firstChild;
+  m_lastChild = other.m_lastChild;
+  m_nextChild = other.m_nextChild;
+  m_previousChild = other.m_previousChild;
+  m_nextSibling = other.m_nextSibling;
+  m_previousSibling = other.m_previousSibling;
+  m_childCount = other.m_childCount;
+  attributes = std::move(other.attributes);
+  styles = std::move(other.styles);
+  return *this;
+}
+
+/**
+ The function will parse the string as input searching for document tags.
+ These elements are added as children of the element for which the function
+ is invoked.
+
+ @param sMarkup a std::string containing the markup.
+ @return Element& returns the referenced element for continuation syntax.
+
+*/
+auto viewManager::Element::appendChild(const std::string &sMarkup)
+    -> Element & {
+  return (ingestMarkup(*this, sMarkup));
+}
+
+/**
+ The function will append the given document element within the parameter as
+ a child.
+
+ @param newChild a new child element that was previously created.
+ @return Element& returns the referenced element for continuation syntax.
+
+*/
+auto viewManager::Element::appendChild(Element &newChild) -> Element & {
+  newChild.m_parent = this;
+  newChild.m_previousSibling = m_lastChild;
+
+  if (!m_firstChild)
+    m_firstChild = newChild.m_self;
+
+  if (m_lastChild)
+    m_lastChild->m_nextSibling = newChild.m_self;
+
+  m_lastChild = newChild.m_self;
+  m_childCount++;
+
+  return (newChild);
+}
+
+/**
+ The function will append the given document elements within the ElementList
+ parameter as children.
+
+ @param elementCollection an ElementList of new child element that was previously created.
+ @return Element& returns the referenced element for continuation syntax.
+
+*/
+auto viewManager::Element::appendChild(const ElementList &elementCollection)
+    -> Element & {
+  for (auto e : elementCollection) {
+    appendChild(e.get());
+  }
+  return (*this);
+}
+
+/**
+ The function will append the given markup content as a sibling.
+
+ @param elementCollection an ElementList of new child element that was previously created.
+ @return Element& returns the referenced element for continuation syntax.
+
+*/
+auto viewManager::Element::append(const std::string &sMarkup) -> Element & {
+  Element *base = this->m_parent;
+  if (base == nullptr)
+    base = this;
+  return (ingestMarkup(*base, sMarkup));
+}
+
+auto viewManager::Element::append(Element &sibling) -> Element & {
+  m_nextSibling = sibling.m_self;
+  sibling.m_parent = this->m_parent;
+  sibling.m_previousSibling = this;
+
+  if (!this->m_parent->m_firstChild)
+    this->m_parent->m_firstChild = sibling.m_self;
+
+  this->m_parent->m_lastChild = sibling.m_self;
+
+  this->m_parent->m_childCount++;
+  return (sibling);
+}
+
+auto viewManager::Element::append(ElementList &elementCollection) -> Element & {
+  for (auto &e : elementCollection)
+    append(e);
+  return (*this);
+}
+
+Element &viewManager::Element::setAttribute(const std::any &setting) {
+
+  // filter list
+  enum _enumTypeFilter {
+    dt_char,
+    dt_double,
+    dt_float,
+    dt_int,
+    dt_std_string,
+    dt_const_char,
+    dt_vector_char,
+    dt_vector_double,
+    dt_vector_float,
+    dt_vector_int,
+    dt_vector_string,
+    dt_vector_vector_string,
+    dt_vector_pair_int_string,
+    dt_indexBy,
+
+    dt_nonFiltered
+  };
+  // filter map
+  static std::unordered_map<size_t, _enumTypeFilter> _umapTypeFilter = {
+      {std::type_index(typeid(char)).hash_code(), dt_char},
+      {std::type_index(typeid(double)).hash_code(), dt_double},
+      {std::type_index(typeid(float)).hash_code(), dt_float},
+      {std::type_index(typeid(int)).hash_code(), dt_int},
+      {std::type_index(typeid(std::string)).hash_code(), dt_std_string},
+      {std::type_index(typeid(const char *)).hash_code(), dt_const_char},
+      {std::type_index(typeid(std::vector<char>)).hash_code(), dt_vector_char},
+      {std::type_index(typeid(std::vector<double>)).hash_code(),
+       dt_vector_double},
+      {std::type_index(typeid(std::vector<float>)).hash_code(),
+       dt_vector_float},
+      {std::type_index(typeid(std::vector<int>)).hash_code(), dt_vector_int},
+      {std::type_index(typeid(std::vector<std::string>)).hash_code(),
+       dt_vector_string},
+      {std::type_index(typeid(std::vector<std::vector<std::string>>))
+           .hash_code(),
+       dt_vector_vector_string},
+      {std::type_index(
+           typeid(std::vector<std::vector<std::pair<int, std::string>>>))
+           .hash_code(),
+       dt_vector_pair_int_string},
+      {std::type_index(typeid(indexBy)).hash_code(), dt_indexBy}};
+  // set search result defaults for not found in filter
+  _enumTypeFilter dtFilter = dt_nonFiltered;
+  bool bSaveInMap = false;
+  auto it = _umapTypeFilter.find(setting.type().hash_code());
+  if (it != _umapTypeFilter.end())
+    dtFilter = it->second;
+
+  /* filter these types specifically and do not store them in the map.
+these items change the dataAdaptor. This creates a more usable
+syntax for population of large and small data within the
+simple initializer list format given within the attribute list.*/
+  switch (dtFilter) {
+  case dt_char: {
+    auto v = std::any_cast<char>(setting);
+    data<char>() = std::vector<char>{v};
+  } break;
+  case dt_double: {
+    auto v = std::any_cast<double>(setting);
+    data<double>() = std::vector<double>{v};
+  } break;
+  case dt_float: {
+    auto v = std::any_cast<float>(setting);
+    data<float>() = std::vector<float>{v};
+  } break;
+  case dt_int: {
+    auto v = std::any_cast<int>(setting);
+    data<int>() = std::vector<int>{v};
+  } break;
+  case dt_const_char: {
+    auto v = std::any_cast<const char *>(setting);
+    data<std::string>() = std::vector<std::string>{v};
+  } break;
+  case dt_std_string: {
+    auto v = std::any_cast<std::string>(setting);
+    data<std::string>() = std::vector<std::string>{v};
+  } break;
+  case dt_vector_char: {
+    auto v = std::any_cast<std::vector<char>>(setting);
+    data<char>() = v;
+  } break;
+  case dt_vector_double: {
+    auto v = std::any_cast<std::vector<double>>(setting);
+    data<double>() = v;
+  } break;
+  case dt_vector_float: {
+    auto v = std::any_cast<std::vector<float>>(setting);
+    data<float>() = v;
+  } break;
+  case dt_vector_int: {
+    auto v = std::any_cast<std::vector<int>>(setting);
+    data<int>() = v;
+  } break;
+  case dt_vector_string: {
+    auto v = std::any_cast<std::vector<std::string>>(setting);
+    data<std::string>() = v;
+  } break;
+  case dt_vector_vector_string: {
+    auto v = std::any_cast<std::vector<std::vector<std::string>>>(setting);
+    data<std::vector<std::string>>() = v;
+  } break;
+  case dt_vector_pair_int_string: {
+    auto v = std::any_cast<std::vector<std::pair<int, std::string>>>(setting);
+    data<std::pair<int, std::string>>() = v;
+  } break;
+  // attributes stored in map but filtered for processing.
+  case dt_indexBy: {
+    updateIndexBy(std::any_cast<indexBy>(setting));
+    bSaveInMap = true;
+  } break;
+
+  // other items are not filtered, so just pass through to storage.
+  case dt_nonFiltered: {
+    bSaveInMap = true;
+  } break;
+  }
+
+  if (bSaveInMap)
+    attributes[std::type_index(setting.type())] = setting;
+  return *this;
+}
+
+Element &
+viewManager::Element::setAttribute(const std::vector<std::any> &attribs) {
+  for (auto n : attribs)
+    setAttribute(n);
+  return *this;
+}
+
 /**
  * updateElementIdMap
  * updates the id within the
@@ -1197,6 +1542,7 @@ Element &viewManager::Element::ingestMarkup(Element &node,
 
     bool bQuery = false;
     string sCaptureString;
+    string sBackflow;
     vector<pair<itemType, parserOperator>> parsedData;
     vector<reference_wrapper<Element>> elementStack;
     bool bFoundAttributeSet = false;
@@ -1216,6 +1562,13 @@ Element &viewManager::Element::ingestMarkup(Element &node,
     switch (*p) {
     // when the markup < character is found, start capturing
     case '<':
+      // if the capture signal is found, and items exist in the capture string,
+      // store it.
+      if (pc.sBackflow.length() != 0) {
+        pc.parsedData.emplace_back(stringData, pc.sBackflow);
+        pc.sBackflow = "";
+      }
+
       cout << "< signal found" << endl;
       pc.bSignal = true;
       pc.bSkip = true;
@@ -1224,8 +1577,8 @@ Element &viewManager::Element::ingestMarkup(Element &node,
     // when the space is found, if capturing is occurring, find out if the item
     // is a markup tag
     case ' ':
-      cout << "(space) signal found" << endl;
       if (pc.bSignal) {
+        cout << "(space) signal found" << endl;
         pc.bQuery = true;
         pc.bSkip = true;
       }
@@ -1249,8 +1602,6 @@ Element &viewManager::Element::ingestMarkup(Element &node,
         pc.bAttributeListValue = false;
 
       } else if (pc.bSignal) {
-        pc.bAttributeList = false;
-        pc.bAttributeListValue = false;
 
         pc.bQuery = true;
         pc.bSkip = true;
@@ -1313,10 +1664,22 @@ Element &viewManager::Element::ingestMarkup(Element &node,
         if (it != objectFactoryMap.end()) {
           cout << "----->  is element " << endl;
 
-          // store lambda for the element factory
-          pc.parsedData.emplace_back(element, it->second);
-          pc.bAttributeList = true;
-          pc.sCaptureString = "";
+          if (pc.bTerminal) {
+            cout << "pc.bTerminal " << endl;
+
+            pc.parsedData.emplace_back(elementTerminal, "");
+            pc.bTerminal = false;
+            pc.bAttributeList = false;
+            pc.bAttributeListValue = false;
+
+            pc.sCaptureString = "";
+          } else {
+            // store lambda for the element factory
+            pc.parsedData.emplace_back(element, it->second);
+            pc.bAttributeList = true;
+            pc.bAttributeListValue = false;
+            pc.sCaptureString = "";
+          }
 
         } else {
           cout << "check to see if it is a color  " << sKey << endl;
@@ -1326,11 +1689,6 @@ Element &viewManager::Element::ingestMarkup(Element &node,
             cout << "----->  is color " << endl;
             pc.parsedData.emplace_back(color, colorNF(it));
             pc.sCaptureString = "";
-
-          } else {
-            pc.parsedData.emplace_back(stringData, pc.sCaptureString);
-            pc.sCaptureString = "";
-
           }
         }
       }
@@ -1338,28 +1696,55 @@ Element &viewManager::Element::ingestMarkup(Element &node,
       pc.bQuery = false;
     }
 
+    if (!pc.bSignal && !pc.bSkip)
+      pc.sBackflow += *p;
+
     if (pc.bSignal && !pc.bSkip) {
       pc.sCaptureString += *p;
       cout << "pc.sCaptureString " << pc.sCaptureString << endl;
 
     } else {
+
       pc.bSkip = false;
-    }
-
-    if (pc.bTerminal) {
-      cout << "pc.bTerminal " << endl;
-
-      // place captured data within the enclosing element markers
-      if (pc.sCaptureString.size() != 0)
-        pc.parsedData.emplace_back(stringData, pc.sCaptureString);
-
-      pc.parsedData.emplace_back(elementTerminal, "");
-      pc.bTerminal = false;
     }
 
     // goto next character
     p++;
   }
+
+  cout << "==============================" << endl;
+  auto itemdbg = pc.parsedData.begin();
+  while (itemdbg != pc.parsedData.end()) {
+    switch (itemdbg->first) {
+    case element: {
+      cout << "element" << endl;
+    } break;
+
+    case elementTerminal: {
+      cout << "element terminate" << endl;
+    } break;
+
+    // the attribute and value are handled here together
+    case attribute: {
+      cout << "attribute" << endl;
+
+    } break;
+    case attributeValue: {
+      cout << "attributeValue" << get<string>(itemdbg->second) << endl;
+    } break;
+
+    case color: {
+      cout << "color" << endl;
+    } break;
+
+    case stringData:
+      cout << "stringData" << get<string>(itemdbg->second) << endl;
+      break;
+    }
+
+    itemdbg++;
+  }
+  cout << "==============================" << endl;
 
   // second phase, iterate over the parsed context and develop the elements,
   // color text nodes, and set attributes for the items on the stack. once items

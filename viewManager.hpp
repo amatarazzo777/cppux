@@ -441,73 +441,10 @@ public:
     setAttribute(attribs);
   }
   ~Element() { Visualizer::deallocate(surface); }
-  Element(const Element &other) {
-    std::cout << "Element(const Element& other)" << std::endl;
-
-    m_self = other.m_self;
-    m_parent = other.m_parent;
-    m_firstChild = other.m_firstChild;
-    m_lastChild = other.m_lastChild;
-    m_nextChild = other.m_nextChild;
-    m_previousChild = other.m_previousChild;
-    m_nextSibling = other.m_nextSibling;
-    m_previousSibling = other.m_previousSibling;
-    m_childCount = other.m_childCount;
-    attributes = other.attributes;
-    styles = other.styles;
-  }
-  Element(Element &&other) noexcept {
-    std::cout << "Element(Element&& other) noexcept" << std::endl;
-
-    m_self = other.m_self;
-    m_parent = other.m_parent;
-    m_firstChild = other.m_firstChild;
-    m_lastChild = other.m_lastChild;
-    m_nextChild = other.m_nextChild;
-    m_previousChild = other.m_previousChild;
-    m_nextSibling = other.m_nextSibling;
-    m_previousSibling = other.m_previousSibling;
-    m_childCount = other.m_childCount;
-    attributes = std::move(other.attributes);
-    styles = std::move(other.styles);
-  }
-  Element &operator=(const Element &other) {
-    std::cout << "Element& operator=(const Element& other)" << std::endl;
-
-    // Self-assignment detection
-    if (&other == this)
-      return *this;
-    m_self = other.m_self;
-    m_parent = other.m_parent;
-    m_firstChild = other.m_firstChild;
-    m_lastChild = other.m_lastChild;
-    m_nextChild = other.m_nextChild;
-    m_previousChild = other.m_previousChild;
-    m_nextSibling = other.m_nextSibling;
-    m_previousSibling = other.m_previousSibling;
-    m_childCount = other.m_childCount;
-    attributes = other.attributes;
-    styles = other.styles;
-    return *this;
-  }
-  Element &operator=(Element &&other) noexcept {
-    std::cout << "Element& operator=(Element&& other) noexcept" << std::endl;
-
-    if (&other == this)
-      return *this;
-    m_self = other.m_self;
-    m_parent = other.m_parent;
-    m_firstChild = other.m_firstChild;
-    m_lastChild = other.m_lastChild;
-    m_nextChild = other.m_nextChild;
-    m_previousChild = other.m_previousChild;
-    m_nextSibling = other.m_nextSibling;
-    m_previousSibling = other.m_previousSibling;
-    m_childCount = other.m_childCount;
-    attributes = std::move(other.attributes);
-    styles = std::move(other.styles);
-    return *this;
-  }
+  Element(const Element &other);
+  Element(Element &&other) noexcept;
+  Element &operator=(const Element &other);
+  Element &operator=(Element &&other) noexcept;
 
   /*
 Data interface.
@@ -553,7 +490,9 @@ private:
       saveState();
       return (_data);
     }
+
     std::function<Element &(T &)> &transform(void) { return fnTransform; }
+
     // analyze hint data and deduce states
     void hint(void *hint1, std::size_t hint2, std::size_t hint3) {}
 
@@ -630,8 +569,10 @@ that elvolve in delicate use of competent technology.
       return (std::any_cast<usageAdaptor<T> &>(it->second).data());
     }
   }
+
   template <typename T>
   void dataHint(const T &hint1, std::size_t hint2 = 0, std::size_t hint3 = 0) {}
+
   template <typename T>
   void dataHint(int hint1 = 0, std::size_t hint2 = 0, std::size_t hint3 = 0) {
     auto it = m_usageAdaptorMap.find(std::type_index(typeid(std::vector<T>)));
@@ -705,31 +646,9 @@ private:
   std::size_t surface;
 
 public:
-  auto appendChild(const std::string &sMarkup) -> Element & {
-    return (ingestMarkup(*this, sMarkup));
-  }
-  auto appendChild(Element &newChild) -> Element & {
-    newChild.m_parent = this;
-    newChild.m_previousSibling = m_lastChild;
-
-    if (!m_firstChild)
-      m_firstChild = newChild.m_self;
-
-    if (m_lastChild)
-      m_lastChild->m_nextSibling = newChild.m_self;
-
-    m_lastChild = newChild.m_self;
-    m_childCount++;
-
-    return (newChild);
-  }
-
-  auto appendChild(const ElementList &elementCollection) -> Element & {
-    for (auto e : elementCollection) {
-      appendChild(e.get());
-    }
-    return (*this);
-  }
+  auto appendChild(const std::string &sMarkup) -> Element &;
+  auto appendChild(Element &newChild) -> Element &;
+  auto appendChild(const ElementList &elementCollection) -> Element &;
   template <typename TYPE, typename... ATTRS>
   auto appendChild(const ATTRS &... attrs) -> Element & {
     TYPE &e = _createElement<TYPE>({attrs...});
@@ -738,35 +657,14 @@ public:
   }
 
 public:
-  auto append(const std::string &sMarkup) -> Element & {
-    Element *base = this->m_parent;
-    if (base == nullptr)
-      base = this;
-    return (ingestMarkup(*base, sMarkup));
-  }
-  auto append(Element &sibling) -> Element & {
-    m_nextSibling = sibling.m_self;
-    sibling.m_parent = this->m_parent;
-    sibling.m_previousSibling = this;
-
-    if (!this->m_parent->m_firstChild)
-      this->m_parent->m_firstChild = sibling.m_self;
-
-    this->m_parent->m_lastChild = sibling.m_self;
-
-    this->m_parent->m_childCount++;
-    return (sibling);
-  }
+  auto append(const std::string &sMarkup) -> Element &;
+  auto append(Element &sibling) -> Element &;
+  auto append(ElementList &elementCollection) -> Element &;
   template <typename TYPE, typename... ATTRS>
   auto append(const ATTRS &... attrs) -> Element & {
     TYPE &e = _createElement<TYPE>({attrs...});
     append(e);
     return (e);
-  }
-  auto append(ElementList &elementCollection) -> Element & {
-    for (auto &e : elementCollection)
-      append(e);
-    return (*this);
   }
 
 public:
@@ -778,139 +676,10 @@ The filter allows compact input for vector and simple c++ based
 types direction from the creation functions (createElement<>, append<>, and
 appendChild<> which there are
 typically few entries. */
-  Element &setAttribute(const std::any &setting) {
-
-    // filter list
-    enum _enumTypeFilter {
-      dt_char,
-      dt_double,
-      dt_float,
-      dt_int,
-      dt_std_string,
-      dt_const_char,
-      dt_vector_char,
-      dt_vector_double,
-      dt_vector_float,
-      dt_vector_int,
-      dt_vector_string,
-      dt_vector_vector_string,
-      dt_vector_pair_int_string,
-      dt_indexBy,
-
-      dt_nonFiltered
-    };
-    // filter map
-    static std::unordered_map<size_t, _enumTypeFilter> _umapTypeFilter = {
-        {std::type_index(typeid(char)).hash_code(), dt_char},
-        {std::type_index(typeid(double)).hash_code(), dt_double},
-        {std::type_index(typeid(float)).hash_code(), dt_float},
-        {std::type_index(typeid(int)).hash_code(), dt_int},
-        {std::type_index(typeid(std::string)).hash_code(), dt_std_string},
-        {std::type_index(typeid(const char *)).hash_code(), dt_const_char},
-        {std::type_index(typeid(std::vector<char>)).hash_code(),
-         dt_vector_char},
-        {std::type_index(typeid(std::vector<double>)).hash_code(),
-         dt_vector_double},
-        {std::type_index(typeid(std::vector<float>)).hash_code(),
-         dt_vector_float},
-        {std::type_index(typeid(std::vector<int>)).hash_code(), dt_vector_int},
-        {std::type_index(typeid(std::vector<std::string>)).hash_code(),
-         dt_vector_string},
-        {std::type_index(typeid(std::vector<std::vector<std::string>>))
-             .hash_code(),
-         dt_vector_vector_string},
-        {std::type_index(
-             typeid(std::vector<std::vector<std::pair<int, std::string>>>))
-             .hash_code(),
-         dt_vector_pair_int_string},
-        {std::type_index(typeid(indexBy)).hash_code(), dt_indexBy}};
-    // set search result defaults for not found in filter
-    _enumTypeFilter dtFilter = dt_nonFiltered;
-    bool bSaveInMap = false;
-    auto it = _umapTypeFilter.find(setting.type().hash_code());
-    if (it != _umapTypeFilter.end())
-      dtFilter = it->second;
-
-    /* filter these types specifically and do not store them in the map.
-these items change the dataAdaptor. This creates a more usable
-syntax for population of large and small data within the
-simple initializer list format given within the attribute list.*/
-    switch (dtFilter) {
-    case dt_char: {
-      auto v = std::any_cast<char>(setting);
-      data<char>() = std::vector<char>{v};
-    } break;
-    case dt_double: {
-      auto v = std::any_cast<double>(setting);
-      data<double>() = std::vector<double>{v};
-    } break;
-    case dt_float: {
-      auto v = std::any_cast<float>(setting);
-      data<float>() = std::vector<float>{v};
-    } break;
-    case dt_int: {
-      auto v = std::any_cast<int>(setting);
-      data<int>() = std::vector<int>{v};
-    } break;
-    case dt_const_char: {
-      auto v = std::any_cast<const char *>(setting);
-      data<std::string>() = std::vector<std::string>{v};
-    } break;
-    case dt_std_string: {
-      auto v = std::any_cast<std::string>(setting);
-      data<std::string>() = std::vector<std::string>{v};
-    } break;
-    case dt_vector_char: {
-      auto v = std::any_cast<std::vector<char>>(setting);
-      data<char>() = v;
-    } break;
-    case dt_vector_double: {
-      auto v = std::any_cast<std::vector<double>>(setting);
-      data<double>() = v;
-    } break;
-    case dt_vector_float: {
-      auto v = std::any_cast<std::vector<float>>(setting);
-      data<float>() = v;
-    } break;
-    case dt_vector_int: {
-      auto v = std::any_cast<std::vector<int>>(setting);
-      data<int>() = v;
-    } break;
-    case dt_vector_string: {
-      auto v = std::any_cast<std::vector<std::string>>(setting);
-      data<std::string>() = v;
-    } break;
-    case dt_vector_vector_string: {
-      auto v = std::any_cast<std::vector<std::vector<std::string>>>(setting);
-      data<std::vector<std::string>>() = v;
-    } break;
-    case dt_vector_pair_int_string: {
-      auto v = std::any_cast<std::vector<std::pair<int, std::string>>>(setting);
-      data<std::pair<int, std::string>>() = v;
-    } break;
-    // attributes stored in map but filtered for processing.
-    case dt_indexBy: {
-      updateIndexBy(std::any_cast<indexBy>(setting));
-      bSaveInMap = true;
-    } break;
-
-    // other items are not filtered, so just pass through to storage.
-    case dt_nonFiltered: {
-      bSaveInMap = true;
-    } break;
-    }
-
-    if (bSaveInMap)
-      attributes[std::type_index(setting.type())] = setting;
-    return *this;
-  }
+  Element &setAttribute(const std::any &setting);
+  Element &setAttribute(const std::vector<std::any> &attribs);
   template <typename... TYPES> Element &setAttribute(const TYPES... settings) {
     setAttribute(std::vector<std::any>{settings...});
-    return *this;
-  }
-  Element &setAttribute(const std::vector<std::any> &attribs) {
-    for (auto n : attribs)
-      setAttribute(n);
     return *this;
   }
 
@@ -1219,60 +988,6 @@ public:
 private:
   std::unique_ptr<Visualizer::platform> m_device;
 };
-/// <summary>returns a tag string for the pointer. The tag is a double
-/// pointer so that it can be changed. These macros are useful when
-/// element creation is being accomplished using parsing while the
-/// software needs the pointer to the created object.</summary>
-#define stringPointerTag(a) (symbolicPointer(&a))
-/// <summary>useful for a parameter to printf which accepts a char
-/// ///.</summary>
-///
-/// <remarks>
-/// The macro returns a tag string for the pointer. The tag is a double
-/// pointer so that it can be changed. These macros are useful when
-/// element creation is being accomplished using parsing while the
-/// software needs the pointer to the created object. The macro creates
-/// readable printf statements.
-/// </remarks>
-#define charPointerTag(a) (symbolicPointer(&a).c_str())
-/// <summary> The function returns a string identity of the point within
-/// tags. This enables easy integration between textual markup build and c++
-/// pointer facilities. Example symbolic pointer:</summary> <paragraphPtr
-/// typeHash 0x11111 memoryLocation 0x3333adbc>
-///
-/// <param name="e">[in] e</param> should be a double pointer that has not
-/// been populated yet. That is, it should be nullptr. The value is stored
-/// within a tag.</param>
-///
-template <typename ElementType> std::string symbolicPointer(ElementType **e) {
-  std::string elementName = std::type_index(typeid(e)).name();
-/* build meaningful string representative of the object's name.
-The namestring is built differently by the compier depending
-upon the compiler.
-*/
-#if defined(__linux__)
-  std::size_t found = elementName.find_first_of("_0123456789");
-  if (found != std::string::npos) {
-    elementName = elementName.substr(found + 1);
-  }
-#elif defined(_WIN64)
-#define PREFIX_ID "class "
-  std::size_t found = elementName.find_first_of(PREFIX_ID);
-  if (found != std::string::npos) {
-    elementName = elementName.substr(found + strlen(PREFIX_ID));
-    found = elementName.find_first_of(" ");
-    if (found != std::string::npos)
-      elementName = elementName.substr(0, found);
-  }
-#endif
-  std::transform(elementName.begin(), elementName.end(), elementName.begin(),
-                 ::tolower);
-  std::stringstream ss;
-  ss << "<" << elementName << "Ptr typeHash " << std::uppercase
-     << std::setfill('0') << std::hex << std::type_index(typeid(*e)).hash_code()
-     << " memoryLocation " << (unsigned long long)e << ">";
 
-  return ss.str();
-}
 };     // namespace viewManager
 #endif // VIEW_MANAGER_HPP_INCLUDED

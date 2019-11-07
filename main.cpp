@@ -108,7 +108,6 @@ int WINAPI WinMain(HINSTANCE /* hInstance */, HINSTANCE /* hPrevInstance */,
   test10(vm);
   vm.clear();
 #endif
-
 }
 
 string randomString(int nChars);
@@ -148,12 +147,11 @@ void test0b(Viewer &vm) {
   vm.appendChild("<div id=testAdd/>");
 
   getElement("testAdd").appendChild("<ul>"
-                        "<li>test item 1</li>"
-                        "<li>test item 2</li>"
-                        "<li>test item 3</li>"
-                        "<li>test item 4</li>"
-                        "<li>test item 5</li></ul>");
-
+                                    "<li>test item 1</li>"
+                                    "<li>test item 2</li>"
+                                    "<li>test item 3</li>"
+                                    "<li>test item 4</li>"
+                                    "<li>test item 5</li></ul>");
 
   vm.render();
 }
@@ -163,8 +161,12 @@ void test0b(Viewer &vm) {
 void test0c(Viewer &vm) {
   testStart(__FUNCTION__);
 
-  vm.appendChild("<div id=testAdd/>");
+  vm.appendChild("<div id=testAdd>test information inside</div>");
+  vm.appendChild("<div id=markupSecond>the drive to complete is the sincere "
+                 "satisfaction of a working system. While a solution is a "
+                 "compromise, value is found within the description.</div>");
 
+#if 0
   getElement("testAdd").ingestStream=true;
   getElement("testAdd").appendChild("<ul>"
                         "<li>test item 1</li>"
@@ -173,6 +175,7 @@ void test0c(Viewer &vm) {
                         "<li>test item 4</li>"
                         "<li>test item 5</li></ul>");
 
+#endif
 
   vm.render();
 }
