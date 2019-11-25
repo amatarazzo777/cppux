@@ -1,28 +1,38 @@
-/// <file>viewManagement.cpp</file>
-/// <author>Anthony Matarazzo</author>
-/// <date>6/16/18</date>
-/// <version>1.0</version>
-///
-/// <summary>class that implements that main creation interface.
-/// The file contains initialization, termination.</summary>
-///
+/**
+\author Anthony Matarazzo
+\file viewManager.cpp
+\date 11/19/19
+\version 1.0
+\brief class that implements that main creation interface.
+ The file contains initialization, termination.
+*/
+
 #include "viewManager.hpp"
 #include <sys/types.h>
 
 using namespace std;
 using namespace viewManager;
 
-/**********
-These namespace global lists contain the objects as a system ownership.
-********/
+/**
+\internal
+
+\brief These namespace specific data structures hold the system
+level document elements. The tracking of them is done using a
+smart pointer. The elements are indexed using the indexBy attribute
+and the map contains a reference wrapper to the element. These items
+are not normally accessed by the developer. They are accessed using the
+API. The create, append, and getElement functions provide the searching and
+creation of the objects.
+*/
 std::vector<std::unique_ptr<Element>> viewManager::elements;
 std::unordered_map<std::string, std::reference_wrapper<Element>>
     viewManager::indexedElements;
 std::vector<std::unique_ptr<StyleClass>> viewManager::styles;
 
-/*
+/**
+\internal
 
-The objectFactoryMap provides an easy to maintain table of document
+\brief The objectFactoryMap provides an easy to maintain table of document
 entities. The syntax, for consilidation, uses the macros CREATE_OBJECT
 and CREATE_OBJECT_ALIAS. These macros expand to a string and a lambda
 function which calls the createElement document api. The function
@@ -31,17 +41,26 @@ parser to instianiate document elements.
 
 */
 const factoryMap viewManager::objectFactoryMap = {
-    CREATE_OBJECT(BR),        CREATE_OBJECT(H1),
-    CREATE_OBJECT(H2),        CREATE_OBJECT(H3),
-    CREATE_OBJECT(PARAGRAPH), CREATE_OBJECT_ALIAS(P, PARAGRAPH),
-    CREATE_OBJECT(DIV),       CREATE_OBJECT(SPAN),
-    CREATE_OBJECT(UL),        CREATE_OBJECT(OL),
-    CREATE_OBJECT(LI),        CREATE_OBJECT(MENU),
-    CREATE_OBJECT(UX),        CREATE_OBJECT(IMAGE)};
+    CREATE_OBJECT(br, BR),
+    CREATE_OBJECT(h1, H1),
+    CREATE_OBJECT(h2, H2),
+    CREATE_OBJECT(h3, H3),
+    CREATE_OBJECT(paragraph, PARAGRAPH),
+    CREATE_OBJECT(p, PARAGRAPH),
+    CREATE_OBJECT(div, DIV),
+    CREATE_OBJECT(span, SPAN),
+    CREATE_OBJECT(ul, UL),
+    CREATE_OBJECT(ol, OL),
+    CREATE_OBJECT(li, LI),
+    CREATE_OBJECT(menu, MENU),
+    CREATE_OBJECT(ux, UX),
+    CREATE_OBJECT(image, IMAGE)};
 
 // clang-format off
 
-/*
+/**
+\internal
+\details
 The attribtueStringMap provides a lookup table for
 lower case attributes and aliases of an attribute.
 The second map storage is a lambda function which
@@ -49,112 +68,118 @@ sets the specific attribute. The lambda accepts to parameters,
 the base element for which to set the attribute on and
 the string value of the setting. It should be noted that the
 attribute objects themselves parse the input parameter where needed.
+
+the boolean value notes if the item is a compund or single word.
+Items that are single words are shorthand for attributes that have enumeration values
+for example block instead of using display:block.
+This informs the context of the parser to advance and dexcept a secondary value or not.
+
 */
 const attributeStringMap
     viewManager::attributeFactory = {
-    {"id",
+    {"id",{true,
         [](Element &e, string s) {
             e.setAttribute(indexBy{s});
-        }
+        }}
     },
 
-    {"indexby",
+    {"indexby",{true,
         [](Element &e, string s) {
             e.setAttribute(indexBy{s});
-        }
+        }}
     },
 
-    {"block",
+    {"block",{false,
         [](Element &e, string s) {
             e.setAttribute(display::block);
-        }
+        }}
     },
 
-    {"inline",
+    {"inline",{false,
         [](Element &e, string s) {
             e.setAttribute(display::in_line);
-        }
+        }}
     },
 
-    {"hidden",
+    {"hidden",{false,
         [](Element &e, string s) {
             e.setAttribute(display::none);
-        }
+        }}
     },
 
-    {"display",
+    {"display",{false,
         [](Element &e, string s) {
             e.setAttribute(display{s});
-        }
+        }}
     },
 
-    {"absolute",
+    {"absolute",{false,
         [](Element &e, string s) {
             e.setAttribute(position::absolute);
-        }
+        }}
     },
 
-    {"relative",
+    {"relative",{false,
         [](Element &e, string s) {
             e.setAttribute(position::relative);
-        }
+        }}
     },
 
-    {"position",
+    {"position",{true,
         [](Element &e, string s) {
             e.setAttribute(position{s});
-        }
+        }}
     },
 
-    {"objecttop",
+    {"objecttop",{true,
         [](Element &e, string s) {
             e.setAttribute(objectTop{doubleNF(s)});
-        }
+        }}
     },
 
-    {"top",
+    {"top",{true,
         [](Element &e, string s) {
             e.setAttribute(objectTop{doubleNF(s)});
-        }
+        }}
     },
 
-    {"objectleft",
+    {"objectleft",{true,
         [](Element &e, string s) {
             e.setAttribute(objectLeft{doubleNF(s)});
-        }
+        }}
     },
 
-    {"left",
+    {"left",{true,
         [](Element &e, string s) {
             e.setAttribute(objectLeft{doubleNF(s)});
-        }
+        }}
     },
 
-    {"objectheight",
+    {"objectheight",{true,
         [](Element &e, string s) {
             e.setAttribute(objectHeight{doubleNF(s)});
-        }
+        }}
     },
 
-    {"height",
+    {"height",{true,
         [](Element &e, string s) {
             e.setAttribute(objectHeight{doubleNF(s)});
-        }
+        }}
     },
 
-    {"objectwidth",
+    {"objectwidth",{true,
         [](Element &e, string s) {
             e.setAttribute(objectWidth{doubleNF(s)});
-        }
+        }}
     },
 
-    {"width",
+    {"width",{true,
         [](Element &e, string s) {
             e.setAttribute(objectWidth{doubleNF(s)});
-        }
+        }}
     },
 
-    {"coordinates",
+    {"coordinates",{true,
         [](Element &e, string s) {
             auto coords=parseQuadCoordinates(s);
 
@@ -162,143 +187,162 @@ const attributeStringMap
             e.setAttribute(objectLeft{std::get<1>(coords)});
             e.setAttribute(objectHeight{std::get<2>(coords)});
             e.setAttribute(objectWidth{std::get<3>(coords)});
-        }
+        }}
     },
 
-
-    {"scrolltop",
+    {"scrolltop",{true,
         [](Element &e, string s) {
             e.setAttribute(scrollTop{doubleNF(s)});
-        }
+        }}
     },
 
-    {"scrollleft",
+    {"scrollleft",{true,
         [](Element &e, string s) {
             e.setAttribute(scrollLeft{doubleNF(s)});
-        }
+        }}
     },
 
-    {"background",
+    {"background",{true,
         [](Element &e, string s) {
             e.setAttribute(background{colorNF(s)});
-        }
+        }}
     },
 
-    {"opacity",
+    {"opacity",{true,
         [](Element &e, string s) {
             e.setAttribute(opacity{s});
-        }
+        }}
     },
 
-    {"textface",
+    {"textface",{true,
         [](Element &e, string s) {
             e.setAttribute(textFace{s});
-        }
+        }}
     },
 
-    {"textsize",
+    {"textsize",{true,
         [](Element &e, string s) {
             e.setAttribute(textSize{doubleNF(s)});
-        }
+        }}
     },
 
-    {"textweight",
+    {"textweight",{true,
         [](Element &e, string s) {
             e.setAttribute(textWeight{s});
-        }
+        }}
     },
 
-    {"textcolor",
+    {"weight",{true,
+        [](Element &e, string s) {
+            e.setAttribute(textWeight{s});
+        }}
+    },
+    {"textcolor",{true,
         [](Element &e, string s) {
             e.setAttribute(textColor{colorNF(s)});
-        }
+        }}
     },
 
-    {"textalignment",
+    {"color",{true,
+        [](Element &e, string s) {
+            e.setAttribute(textColor{colorNF(s)});
+        }}
+    },
+    {"textalignment",{true,
         [](Element &e, string s) {
             e.setAttribute(textAlignment{s});
-        }
+        }}
     },
 
-    {"left",
+    {"left",{false,
         [](Element &e, string s) {
             e.setAttribute(textAlignment::left);
-        }
+        }}
     },
-    {"center",
+    {"center",{false,
         [](Element &e, string s) {
             e.setAttribute(textAlignment::center);
-        }
+        }}
     },
-    {"right",
+    {"right",{false,
         [](Element &e, string s) {
             e.setAttribute(textAlignment::right);
-        }
+        }}
     },
-    {"justified",
+    {"justified",{false,
         [](Element &e, string s) {
             e.setAttribute(textAlignment::justified);
-        }
+        }}
     },
 
-
-    {"textindent",
+    {"textindent",{true,
         [](Element &e, string s) {
             e.setAttribute(textIndent{doubleNF(s)});
-        }
+        }}
     },
 
+    {"indent",{true,
+        [](Element &e, string s) {
+            e.setAttribute(textIndent{doubleNF(s)});
+        }}
+    },
 
-    {"tabsize",
+    {"tabsize",{true,
         [](Element &e, string s) {
             e.setAttribute(tabSize{doubleNF(s)});
-        }
+        }}
     },
 
-    {"lineheight",
+    {"tab",{true,
+        [](Element &e, string s) {
+            e.setAttribute(tabSize{doubleNF(s)});
+        }}
+    },
+
+    {"lineheight",{true,
         [](Element &e, string s) {
             e.setAttribute(lineHeight{s});
-        }
+        }}
     },
 
-    {"normal",
+    {"normal",{false,
         [](Element &e, string s) {
             e.setAttribute(lineHeight::normal);
-        }
+        }}
     },
 
-    {"numeric",
+    {"numeric",{false,
         [](Element &e, string s) {
             e.setAttribute(lineHeight::numeric);
-        }
+        }}
     },
 
 
-    {"margintop",
+    {"margintop",{true,
         [](Element &e, string s) {
             e.setAttribute(marginTop{doubleNF(s)});
-        }
+        }}
     },
 
-    {"marginleft",
+    {"marginleft",{true,
         [](Element &e, string s) {
             e.setAttribute(marginLeft{doubleNF(s)});
-        }
+        }}
     },
 
-    {"marginbottom",
+    {"marginbottom",{true,
         [](Element &e, string s) {
             e.setAttribute(marginBottom{doubleNF(s)});
-        }
+        }}
     },
 
-    {"marginright",
+    {"marginright",{true,
         [](Element &e, string s) {
             e.setAttribute(marginRight{doubleNF(s)});
-        }
+        }}
     },
 
-    {"margin",
+    {"margin",{true,
         [](Element &e, string s) {
             auto coords=parseQuadCoordinates(s);
 
@@ -306,34 +350,34 @@ const attributeStringMap
             e.setAttribute(marginLeft{std::get<1>(coords)});
             e.setAttribute(marginBottom{std::get<2>(coords)});
             e.setAttribute(marginRight{std::get<3>(coords)});
-        }
+        }}
     },
 
-    {"paddingtop",
+    {"paddingtop",{true,
         [](Element &e, string s) {
             e.setAttribute(paddingTop{doubleNF(s)});
-        }
+        }}
     },
 
-    {"paddingleft",
+    {"paddingleft",{true,
         [](Element &e, string s) {
             e.setAttribute(paddingLeft{doubleNF(s)});
-        }
+        }}
     },
 
-    {"paddingbottom",
+    {"paddingbottom",{true,
         [](Element &e, string s) {
             e.setAttribute(paddingBottom{doubleNF(s)});
-        }
+        }}
     },
 
-    {"paddingright",
+    {"paddingright",{true,
         [](Element &e, string s) {
             e.setAttribute(paddingRight{doubleNF(s)});
-        }
+        }}
     },
 
-    {"padding",
+    {"padding",{true,
         [](Element &e, string s) {
             auto coords=parseQuadCoordinates(s);
 
@@ -341,52 +385,61 @@ const attributeStringMap
             e.setAttribute(paddingLeft{std::get<1>(coords)});
             e.setAttribute(paddingBottom{std::get<2>(coords)});
             e.setAttribute(paddingRight{std::get<3>(coords)});
-        }
+        }}
     },
 
-    {"borderstyle",
+    {"borderstyle",{true,
         [](Element &e, string s) {
             e.setAttribute(borderStyle{s});
-        }
+        }}
     },
 
-    {"borderwidth",
+    {"borderwidth",{true,
         [](Element &e, string s) {
             e.setAttribute(borderWidth{doubleNF(s)});
-        }
+        }}
     },
 
-    {"bordercolor",
+    {"bordercolor",{true,
         [](Element &e, string s) {
             e.setAttribute(borderColor{colorNF(s)});
-        }
+        }}
     },
 
-    {"borderradius",
+    {"borderradius",{true,
         [](Element &e, string s) {
             e.setAttribute(borderRadius{s});
-        }
+        }}
     },
 
-    {"focusindex",
+    {"focusindex",{true,
         [](Element &e, string s) {
             e.setAttribute(focusIndex{s});
-        }
+        }}
     },
-
-    {"zindex",
+    {"focus",{true,
+        [](Element &e, string s) {
+            e.setAttribute(focusIndex{s});
+        }}
+    },
+    {"zindex",{true,
         [](Element &e, string s) {
             e.setAttribute(zIndex{s});
-        }
+        }}
     },
 
-    {"liststyletype",
+    {"liststyletype",{true,
         [](Element &e, string s) {
             e.setAttribute(listStyleType{s});
-        }
+        }}
     }};
-
-// color names from https://www.w3schools.com/colors/colors_names.asp
+  
+/** 
+\internal
+\brief the colorFactory is a static lookup map to translate the 
+textual color name to the 24bit rgb value.
+color names from https://www.w3schools.com/colors/colors_names.asp
+*/
 const colorMap colorNF::colorFactory = {
     { "aliceblue", 0xF0F8FF },      { "antiquewhite", 0xFAEBD7 },   { "aqua", 0x00FFFF },
     { "aquamarine", 0x7FFFD4 },     { "azure", 0xF0FFFF },          { "beige", 0xF5F5DC },
@@ -441,13 +494,9 @@ const colorMap colorNF::colorFactory = {
 
 // clang-format on
 
-/* parsers for the string input of attribute settings. Each attribute object has
-a string
-version of the implementation. Simply the settings are applied from the string.
+/**
+\brief a constructor that takes a string and sets the options.
 */
-
-// doubleNF(string _sOption)
-// a constructor that takes a string and sets the options.
 viewManager::doubleNF::doubleNF(const string &sOption) {
   static unordered_map<string, u_int8_t> annotationMap = {
       {"px", numericFormat::px},
@@ -468,28 +517,23 @@ viewManager::doubleNF::doubleNF(const string &sOption) {
   option = static_cast<numericFormat>(opt);
 }
 
-// parseQuadCoordinates(string _sOption)
-// a function that returns a tuple of the four coordinates specified in a
-// doubleNF object. this routine is used by the attributes that accept four at a
-// time, that is the short hand versions of coordinates, margin and padding
+/**
+\internal
+\brief  a function that returns a tuple of the four coordinates specified in a
+doubleNF object. this routine is used by the attributes that accept four at a
+time, that is the short hand versions of coordinates, margin and padding
+*/
 tuple<doubleNF, doubleNF, doubleNF, doubleNF>
 viewManager::parseQuadCoordinates(const string _sOptions) {
   regex re("^[\\s]*[\\{\\(]?([\\+\\-]?[\\d]+[.,]?[\\d]*[\\%]?[\\w]{0,7})"
            "(?:[\\s]*[,]?[\\s]*)([\\+\\-]?[\\d]+[.,]?[\\d]*[\\%]?[\\w]{0,7})"
-           "(?:[\\s]*[,]?[\\s]*)([\\+\\-]?[\\d]+[.,]?[\\d]*[\%]?[\\w]{0,7})"
+           "(?:[\\s]*[,]?[\\s]*)([\\+\\-]?[\\d]+[.,]?[\\d]*[\\%]?[\\w]{0,7})"
            "(?:[\\s]*[,]?[\\s]*)([\\+\\-]?[\\d]+[.,]?[\\d]*[\\%]?[\\w]{0,7})"
            "(?:[\\s]*[,]?[\\s]*)[\\s]*[\\}\\)]?");
   smatch coords;
 
   if (regex_search(_sOptions, coords, re)) {
-    cout << "did match" << endl;
-
-    cout << "matches = " << coords.size() << endl;
-    for (int i = 0; i < coords.size(); i++)
-      cout << "   ---> " << coords.str(i) << endl;
-
     if (coords.size() == 5) {
-      cout << "is five items" << endl;
       auto ret =
           std::make_tuple(doubleNF(coords.str(1)), doubleNF(coords.str(2)),
                           doubleNF(coords.str(3)), doubleNF(coords.str(4)));
@@ -503,7 +547,8 @@ viewManager::parseQuadCoordinates(const string _sOptions) {
   throw std::invalid_argument(info);
 }
 
-/* colorNF::colorIndex(const std::string &_colorName)
+/**
+\brief colorNF::colorIndex(const std::string &_colorName)
  The function accepts a name that may have spaces and can have camel case
  within the color name spelling. the function transforms the name and removes
  the spaces. It returns an iterator to the colorMap. This saves a find
@@ -520,7 +565,9 @@ colorMap::const_iterator colorNF::colorIndex(const std::string &_colorName) {
   return it;
 }
 
-/*The constructor provides a string lookup of a passed color name.*/
+/**
+\brief The constructor provides a string lookup of a passed color name.
+*/
 viewManager::colorNF::colorNF(const string &_sOption) {
   option = colorFormat::name;
   auto it = colorIndex(_sOption);
@@ -535,8 +582,14 @@ viewManager::colorNF::colorNF(const string &_sOption) {
   value[2] = static_cast<double>((color & 0x0000FF00) >> 8);
   value[3] = 1.0;
 }
-// at times when the parser looks up a color name, this uses the iterator
-// which came from the name
+
+/**
+\brief A constructor for creating the color object from a colorname iterator.
+ at times when the parser looks up a color name, this uses the iterator
+which came from the name
+
+\param colorMap::const_iterator it
+*/
 viewManager::colorNF::colorNF(colorMap::const_iterator it) {
   option = colorFormat::name;
   unsigned long color = it->second;
@@ -546,7 +599,11 @@ viewManager::colorNF::colorNF(colorMap::const_iterator it) {
   value[2] = static_cast<double>((color & 0x0000FF00) >> 8);
   value[3] = 1.0;
 }
+/**
+\brief create a colorNF object using a 24bit rgb value
 
+\param const unsigned long &color
+*/
 viewManager::colorNF::colorNF(const unsigned long &color) {
   value[0] = static_cast<double>((color & 0xFF000000) >> 24);
   value[1] = static_cast<double>((color & 0x00FF0000) >> 16);
@@ -554,24 +611,66 @@ viewManager::colorNF::colorNF(const unsigned long &color) {
   value[3] = 1.0;
 }
 
+/**
+\brief rotates the color for a lighter shade
+
+\param const double &step
+*/
 void viewManager::colorNF::lighter(const double &step) {}
+
+/**
+\brief rotates the color for a darker shade
+
+\param const double &step
+*/
 void viewManager::colorNF::darker(const double &step) {}
+
+/**
+\brief creates a monochromatic shade of the color
+
+\param const double &step - amount to wash 0 - 10, 10 being complete grey
+*/
 void viewManager::colorNF::monochromatic(const double &step) {}
+
+/**
+\brief hsl rotate 120
+*/
 void viewManager::colorNF::triad(void) { /*hsl rotate 120*/
 }
+
+/**
+\brief hsl rotate -30
+*/
 void viewManager::colorNF::neutralCooler(void) { /* hsl rotate -30 */
 }
+
+/**
+\brief hsl rotate 30
+*/
 void viewManager::colorNF::neutralWarmer(void) { /* hsl rotate 30 */
 }
-void viewManager::colorNF::complementary(void) { /* hsl rotate 180*/
-}
+
+/**
+\brief hsl rotate 180
+*/
+void viewManager::colorNF::complementary(void) {}
+
+/**
+\brief hsl rotate 150
+*/
 void viewManager::colorNF::splitComplements(void) { /*hsl rotate 150 */
 }
 
-// strToEnum(const string_view &sListName, const unordered_map<string, uint8_t>
-// &optionMap) a function that accepts a unorder map of string and numeric
-// values. the function removes invalid characters and applies a toLower case
-// transform
+/**
+\internal
+\brief strToEnum a function that accepts a unorder map of string and numeric
+values. the function removes invalid characters and applies a toLower case
+transform
+
+\param const string_view &sListName
+\param const unordered_map<string,uint8_t> &optionMap
+\param const string &_sOption
+*/
 uint8_t viewManager::strToEnum(const string_view &sListName,
                                const unordered_map<string, uint8_t> &optionMap,
                                const string &_sOption) {
@@ -594,8 +693,10 @@ uint8_t viewManager::strToEnum(const string_view &sListName,
   }
 }
 
-/*
-strToNumericAndEnum
+/**
+\internal
+
+\brief strToNumericAndEnum
 
 returns: tuple<double, u_int8_t>
 
@@ -604,6 +705,7 @@ c++ enumeration. The expected input type for the enumeration is a
 uint8_t. The c++ compiler automatically translates the options
 during the list initializer. However the output must be statically cast
 back to the enumeration value.
+
 */
 tuple<double, u_int8_t> viewManager::strToNumericAndEnum(
     const string_view &sListName,
@@ -629,8 +731,10 @@ tuple<double, u_int8_t> viewManager::strToNumericAndEnum(
   return make_tuple(dRet, ui8Ret);
 }
 
-// display(string sOption)
-// transforms the textual input into the display options
+/**
+\brief display(string sOption)
+transforms the textual input into the display options
+*/
 viewManager::display::display(const string &sOption) {
   static unordered_map<string, uint8_t> enumMap = {
       {"inline", in_line}, {"block", block}, {"none", none}};
@@ -638,8 +742,10 @@ viewManager::display::display(const string &sOption) {
       static_cast<display::optionEnum>(strToEnum("display", enumMap, sOption));
 }
 
-// position(string sOption)
-// transforms the textual input into the position options
+/**
+\brief position(string sOption)
+transforms the textual input into the position options
+*/
 viewManager::position::position(const string &sOption) {
   static unordered_map<string, uint8_t> enumMap = {{"absolute", absolute},
                                                    {"relative", relative}};
@@ -647,8 +753,10 @@ viewManager::position::position(const string &sOption) {
       strToEnum("position", enumMap, sOption));
 }
 
-// textAlignment(string sOption)
-// transforms the textual input into the textAlignment options
+/**
+\brief textAlignment(string sOption)
+ transforms the textual input into the textAlignment options
+ */
 viewManager::textAlignment::textAlignment(const string &sOption) {
   static unordered_map<string, uint8_t> enumMap = {{"left", left},
                                                    {"center", center},
@@ -658,8 +766,10 @@ viewManager::textAlignment::textAlignment(const string &sOption) {
       strToEnum("textAlignment", enumMap, sOption));
 }
 
-// lineHeight(string sOption)
-// transforms the textual input into the lineHeight options
+/**
+\brief lineHeight(string sOption)
+transforms the textual input into the lineHeight options
+*/
 viewManager::lineHeight::lineHeight(const string &sOption) {
   static unordered_map<string, uint8_t> enumMap = {{"normal", normal},
                                                    {"numeric", numeric}};
@@ -668,8 +778,10 @@ viewManager::lineHeight::lineHeight(const string &sOption) {
   option = static_cast<lineHeight::optionEnum>(opt);
 }
 
-// lineHeight(string sOption)
-// transforms the textual input into the lineHeight options
+/**
+\brief lineHeight(string sOption)
+transforms the textual input into the lineHeight options
+*/
 viewManager::borderStyle::borderStyle(const string &sOption) {
   static unordered_map<string, uint8_t> enumMap = {
       {"none", none},   {"dotted", dotted},   {"dashed", dashed},
@@ -679,8 +791,11 @@ viewManager::borderStyle::borderStyle(const string &sOption) {
       strToEnum("borderStyle", enumMap, sOption));
 }
 
-// listStyleType(const string &_sOption)
-// transforms the string input to the list of options
+/**
+\brief listStyleType
+transforms the string input to the list of options
+\param const string &_sOption is the option to translate
+*/
 viewManager::listStyleType::listStyleType(const string &sOption) {
   static unordered_map<string, uint8_t> enumMap = {
       {"none", none},     {"disc", disc},       {"circle", circle},
@@ -690,33 +805,52 @@ viewManager::listStyleType::listStyleType(const string &sOption) {
       strToEnum("listStyleType", enumMap, sOption));
 }
 
-/*********************************************************************************/
+/**
+\class Viewer
+\brief
+This is the viewing aparatus of the document object model. Within the
+codebase, the platform object is allocated once per viewer object. The
+platform object contains the implementation of the message queue present on
+most message based graphics interfaces. That is the entry point for windows
+message queue and the xwindows message polling routine. These routines simply
+create event objects and dispatch them to the element that has applicable
+listeners attached.
+*/
 
-/* the viewer constructor opens an window and establishes a root document object.
+/**
+\brief the viewer constructor opens an window and establishes a root document
+object.
 */
 viewManager::Viewer::Viewer(const vector<any> &attrs)
     : Element("Viewer", attrs) {
   // setAttribute(indexBy{"_root"};
-  Visualizer::openWindow(*this);
+  eventHandler ev =
+      std::bind(&Viewer::dispatchEvent, this, std::placeholders::_1);
+  m_device = std::make_unique<Visualizer::platform>(
+      ev, getAttribute<objectWidth>().value,
+      getAttribute<objectHeight>().value);
+  m_device->openWindow();
+  int x = 5;
 }
 
-/// <summary>deconstructor for the view manager object.
-/// </summary>
-viewManager::Viewer::~Viewer() { Visualizer::closeWindow(*this); }
+/**
+\internal
+\brief deconstructor for the view manager object.
+*/
+viewManager::Viewer::~Viewer() {}
 
-/// <summary>The main entry point for clients after their initial
-/// buildup. The function simply calls the traversing function
-/// with the main root as the starting point.
-///
-///
-/// </summary>
-void viewManager::consoleRender(Element &e, int iLevel) {
-  int iWidth = iLevel * 4;
+/**
+\internal
+\brief main entry point for the rendering subsystem. The head of
+the recursive process.
+*/
+void viewManager::Viewer::streamRender(std::stringstream &ss, Element &e, int iLevel) {
+ int iWidth = iLevel * 4;
+  
+  for(int i=0;i<iLevel*iWidth;i++)
+    ss << " ";
 
-  cout.fill(' ');
-  cout.width(iWidth);
-
-  cout << iLevel << " " << e.softName << " ";
+  ss << iLevel << " " << e.softName << " ";
 
   std::string sID;
 
@@ -726,38 +860,47 @@ void viewManager::consoleRender(Element &e, int iLevel) {
     sID = "-noID-";
   }
 
-  cout << "(" << sID << ")" << endl;
+  ss << "(" << sID << ")" << "\n";
 
-  e.render();
+  e.streamRender(ss);
 
   auto n = e.firstChild();
 
   while (n) {
-    consoleRender(n->get(), iLevel + 1);
+    streamRender(ss, n->get(), iLevel + 1);
     n = n->get().nextSibling();
   }
 }
 
-void viewManager::Viewer::render(void) {
-#if defined(CONSOLE)
-  consoleRender(*this, 0);
+void viewManager::Viewer::render(void) { 
+  stringstream ss;
 
-#endif
+  streamRender(ss, *this, 0);
+  string s;
+  m_device->clearText();
+  while(getline(ss,s,'\n')) 
+    m_device->drawText(s);
+
 }
 
-/// <summary>
-/// This is the only entry point from the platform for the event
-/// dispatching system. The routine expects only certain types
-/// of messages from the platform. The other events, that are computed,
-/// are developed by this routine as needed. Each of these events, whether
-/// passed through as the same message, or developed is placed into the
-/// viewManager message queue. The background event dispatching fetches
-/// messages from this queue, and calls the element's event processor
-/// routines. The main thing to rememeber is that the information is
-/// processed from a queue and using a background thread.
-/// </summary>
+/**
+\internal
+\brief
+This is the only entry point from the platform for the event
+dispatching system. The routine expects only certain types
+of messages from the platform. The other events, that are computed,
+are developed by this routine as needed. Each of these events, whether
+passed through as the same message, or developed is placed into the
+viewManager message queue. The background event dispatching fetches
+messages from this queue, and calls the element's event processor
+routines. The main thing to rememeber is that the information is
+processed from a queue and using a background thread.
+*/
 void viewManager::Viewer::dispatchEvent(const event &evt) {
   switch (evt.evtType) {
+  case eventType::paint:
+    render();
+    break;
   case eventType::resize:
     break;
   case eventType::keydown:
@@ -788,74 +931,168 @@ eventType::contextmenu
 eventType::mouseleave
 #endif
 }
-///< summary>The entry point that processes messages from the operating
-/// system application level services. Typically on linux this is a
-/// coupling of xcb and keysyms library for keyboard. Previous
-/// incarnations of techology such as this typically used xserver.
-/// However, XCB is the newer form. Primarily looking at the code of such
-/// programs as vlc, the routine simply places pixels into the memory
-/// buffer. while on windows the direct x library is used in combination
-/// with windows message queue processing. </summary>
+/**
+\internal
+\brief The entry point that processes messages from the operating
+system application level services. Typically on linux this is a
+coupling of xcb and keysyms library for keyboard. Previous
+incarnations of techology such as this typically used xserver.
+However, XCB is the newer form. Primarily looking at the code of such
+programs as vlc, the routine simply places pixels into the memory
+buffer. while on windows the direct x library is used in combination
+with windows message queue processing.
+*/
 void viewManager::Viewer::processEvents(void) { m_device->messageLoop(); }
 
-/*
-The following user defined literals provide the consolidated syntax for ease of numeric
-literal input.
+/**
+\addtogroup udl User Defined Literals
+
+User defined liters are created for the project to consolidate parameter input.
+
+When more information would be required in a C++ constructor creation, the
+syntax provides the returning of the numerical format object in an easy to read
+syntax,
+
+For example:
+    getElement("testDiv").setAttribute<objectTop>(10_px);
+
+rather than
+    getElement("testDiv").setAttribute<objectTop>(10, numericFormat::px);
+
+@{
+*/
+
+/**
+\brief enables labeling numeric literals as _pt. The operator returns a doubleNF
+object.
 */
 auto viewManager::operator""_pt(unsigned long long int value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::pt};
 }
+
+/**
+\brief enables labeling numeric literals as _pt. The operator returns a doubleNF
+object.
+*/
 auto viewManager::operator""_pt(long double value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::pt};
 }
+
+/**
+\brief enables labeling numeric literals as _em. The operator returns a doubleNF
+object.
+*/
 auto viewManager::operator""_em(unsigned long long int value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::em};
 }
+
+/**
+ \brief enables labeling numeric literals as _em. The operator returns a
+ doubleNF object.
+*/
 auto viewManager::operator""_em(long double value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::em};
 }
+
+/**
+\brief enables labeling numeric literals as _px. The operator returns a doubleNF
+object.
+*/
 auto viewManager::operator""_px(unsigned long long int value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::px};
 }
+
+/**
+\brief enables labeling numeric literals as _px. The operator returns a doubleNF
+object.
+*/
 auto viewManager::operator""_px(long double value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::px};
 }
+
+/**
+\brief enables labeling numeric literals as _percent. The operator returns a
+doubleNF object.
+*/
 auto viewManager::operator""_percent(unsigned long long int value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::percent};
 }
+
+/**
+\brief enables labeling numeric literals as _percent. The operator returns a
+doubleNF object.
+*/
 auto viewManager::operator""_percent(long double value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::percent};
 }
+
+/**
+\brief enables labeling numeric literals as _pct. The operator returns a
+doubleNF object.
+*/
 auto viewManager::operator""_pct(unsigned long long int value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::percent};
 }
+
+/**
+\brief enables labeling numeric literals as _pct. The operator returns a
+doubleNF object.
+*/
 auto viewManager::operator""_pct(long double value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::percent};
 }
+
+/**
+\brief enables labeling numeric literals as _normal. The operator returns a
+doubleNF object.
+*/
 auto viewManager::operator""_normal(unsigned long long int value)
     -> lineHeight {
   return lineHeight{static_cast<double>(value), lineHeight::normal};
 }
+
+/**
+\brief enables labeling numeric literals as _normal. The operator returns a
+doubleNF object.
+*/
 auto viewManager::operator""_normal(long double value) -> lineHeight {
   return lineHeight{static_cast<double>(value), lineHeight::normal};
 }
+
+/**
+\brief enables labeling numeric literals as _numeric. The operator returns a
+doubleNF object.
+*/
 auto viewManager::operator""_numeric(unsigned long long int value)
     -> lineHeight {
   return lineHeight{static_cast<double>(value), lineHeight::numeric};
 }
+
+/**
+\brief enables labeling numeric literals as _numeric. The operator returns a
+doubleNF object.
+*/
 auto viewManager::operator""_numeric(long double value) -> lineHeight {
   return lineHeight{static_cast<double>(value), lineHeight::numeric};
 }
+/** @}*/
 
-/// <summary>given the string id, the function returns
-/// the element.
-///
-/// jquery shows that handling large document models can be
-/// effectively managed using searching and iterators. Here,
-/// elements or groups of elements can be accessed through query strings.
-/// #, or *, or partial matches. Change attributes?
-/// @ for style,
-/// </summary>
+/**
+  \addtogroup API Global Document API
+  @{
+*/
+
+/**
+\brief given the string id, the function returns
+the element.
+
+jquery shows that handling large document models can be
+effectively managed using searching and iterators. Here,
+elements or groups of elements can be accessed through query strings.
+#, or *, or partial matches. Change attributes?
+@ for style,
+
+*/
 auto viewManager::query(const std::string &queryString) -> ElementList {
   ElementList results;
   if (queryString == "*") {
@@ -875,8 +1112,8 @@ auto viewManager::query(const std::string &queryString) -> ElementList {
   return results;
 }
 
-/*
-This version of the query interface provides a
+/**
+\brief This version of the query interface provides a
 syntax whereby a lambda or a function may be used to provide matching.
 The function is simply passed an element within the traversal.
 The function is expected to return a true or false value.
@@ -890,21 +1127,22 @@ auto viewManager::query(const ElementQuery &queryFunction) -> ElementList {
   return results;
 }
 
-/*
-hasElement
-the hasElement function returns a true or false value if the index is found
-within the index. This may be used to avoid possible exceptions.
+/**
+\brief The hasElement function returns a true or false value if the
+index is found within the index. This may be used to avoid possible
+exceptions.
 */
 bool viewManager::hasElement(const std::string &key) {
   auto it = indexedElements.find(key);
   return it != indexedElements.end();
 }
+/** @}*/
 
-/******************************************************************************************
-                    Element
-*******************************************************************************************/
+/**
+\internal
+\brief copy constructor
+*/
 viewManager::Element::Element(const Element &other) {
-  std::cout << "Element(const Element& other)" << std::endl;
 
   m_self = other.m_self;
   m_parent = other.m_parent;
@@ -919,8 +1157,11 @@ viewManager::Element::Element(const Element &other) {
   styles = other.styles;
 }
 
+/**
+\internal
+\brief move constructor
+*/
 viewManager::Element::Element(Element &&other) noexcept {
-  std::cout << "Element(Element&& other) noexcept" << std::endl;
 
   m_self = other.m_self;
   m_parent = other.m_parent;
@@ -935,8 +1176,11 @@ viewManager::Element::Element(Element &&other) noexcept {
   styles = std::move(other.styles);
 }
 
+/**
+\internal
+\brief copy assignment operator
+*/
 Element &viewManager::Element::operator=(const Element &other) {
-  std::cout << "Element& operator=(const Element& other)" << std::endl;
 
   // Self-assignment detection
   if (&other == this)
@@ -955,8 +1199,11 @@ Element &viewManager::Element::operator=(const Element &other) {
   return *this;
 }
 
+/**
+\internal
+\brief move assignment operator
+*/
 Element &viewManager::Element::operator=(Element &&other) noexcept {
-  std::cout << "Element& operator=(Element&& other) noexcept" << std::endl;
 
   if (&other == this)
     return *this;
@@ -975,12 +1222,13 @@ Element &viewManager::Element::operator=(Element &&other) noexcept {
 }
 
 /**
- The function will parse the string as input searching for document tags.
- These elements are added as children of the element for which the function
- is invoked.
+\brief
+The function will parse the string as input searching for document tags.
+These elements are added as children of the element for which the function
+is invoked.
 
- @param sMarkup a std::string containing the markup.
- @return Element& returns the referenced element for continuation syntax.
+\param sMarkup a std::string containing the markup.
+\return Element& returns the referenced element for continuation syntax.
 
 */
 auto viewManager::Element::appendChild(const std::string &sMarkup)
@@ -989,11 +1237,11 @@ auto viewManager::Element::appendChild(const std::string &sMarkup)
 }
 
 /**
- The function will append the given document element within the parameter as
- a child.
+\brief The function will append the given document element within
+the parameter as a child.
 
- @param newChild a new child element that was previously created.
- @return Element& returns the referenced element for continuation syntax.
+\param newChild a new child element that was previously created.
+\return Element& returns the referenced element for continuation syntax.
 
 */
 auto viewManager::Element::appendChild(Element &newChild) -> Element & {
@@ -1013,11 +1261,13 @@ auto viewManager::Element::appendChild(Element &newChild) -> Element & {
 }
 
 /**
- The function will append the given document elements within the ElementList
- parameter as children.
+\brief The function will append the given document elements within
+the ElementList parameter as children.
 
- @param elementCollection an ElementList of new child element that was previously created.
- @return Element& returns the referenced element for continuation syntax.
+\param elementCollection an ElementList of new child element that was
+previously created.
+
+\return Element& returns the referenced element for continuation syntax.
 
 */
 auto viewManager::Element::appendChild(const ElementList &elementCollection)
@@ -1029,10 +1279,12 @@ auto viewManager::Element::appendChild(const ElementList &elementCollection)
 }
 
 /**
- The function will append the given markup content as a sibling.
+ \brief The function will append the given markup content as a sibling.
 
- @param elementCollection an ElementList of new child element that was previously created.
- @return Element& returns the referenced element for continuation syntax.
+ \param elementCollection an ElementList of new child element that was
+ previously created.
+
+ \return Element& returns the referenced element for continuation syntax.
 
 */
 auto viewManager::Element::append(const std::string &sMarkup) -> Element & {
@@ -1042,6 +1294,12 @@ auto viewManager::Element::append(const std::string &sMarkup) -> Element & {
   return (ingestMarkup(*base, sMarkup));
 }
 
+/**
+ \brief The function will append the given element as a sibling.
+
+ \return Element& returns the referenced element for continuation syntax.
+
+*/
 auto viewManager::Element::append(Element &sibling) -> Element & {
   m_nextSibling = sibling.m_self;
   sibling.m_parent = this->m_parent;
@@ -1056,15 +1314,53 @@ auto viewManager::Element::append(Element &sibling) -> Element & {
   return (sibling);
 }
 
+/**
+\brief The function will append the collection of elements as a
+siblings.
+
+\param elementCollection an ElementList of new child element that was
+previously created.
+
+\return Element& returns the referenced element for continuation syntax.
+
+*/
 auto viewManager::Element::append(ElementList &elementCollection) -> Element & {
   for (auto &e : elementCollection)
     append(e);
   return (*this);
 }
 
+/**
+\brief The function sets the given attribute inside the elements indexed
+map. Settings are filtered on specific types to determine if it is a true
+attribute or one that is filtered to be a compound. Compoud attributes require
+other operations such as data insertion into the data property or using an
+official attribute object where only an enumeration value is given. \param
+setting an attribute.
+
+The following are supported filtered types:
+- char
+- double
+- float
+- int
+- std::string
+- const char *
+- std::vector<char>
+- std::vector<double>
+- std::vector<float>
+- std::vector<int>
+- std::vector<std::string>
+- std::vector<std::vector<std::string>>
+- std::vector<std::vector<std::pair<int, std::string>>>
+- std::vector<std::vector<std::pair<int, std::string>>>
+
+*/
 Element &viewManager::Element::setAttribute(const std::any &setting) {
 
-  // filter list
+  /**
+  \internal
+  \enum _enumTypeFilter
+  */
   enum _enumTypeFilter {
     dt_char,
     dt_double,
@@ -1115,9 +1411,9 @@ Element &viewManager::Element::setAttribute(const std::any &setting) {
     dtFilter = it->second;
 
   /* filter these types specifically and do not store them in the map.
-these items change the dataAdaptor. This creates a more usable
-syntax for population of large and small data within the
-simple initializer list format given within the attribute list.*/
+  these items change the dataAdaptor. This creates a more usable
+  syntax for population of large and small data within the
+  simple initializer list format given within the attribute list.*/
   switch (dtFilter) {
   case dt_char: {
     auto v = std::any_cast<char>(setting);
@@ -1188,6 +1484,9 @@ simple initializer list format given within the attribute list.*/
   return *this;
 }
 
+/**
+\brief The attribute being set can be contained in an array of std::any
+*/
 Element &
 viewManager::Element::setAttribute(const std::vector<std::any> &attribs) {
   for (auto n : attribs)
@@ -1196,12 +1495,11 @@ viewManager::Element::setAttribute(const std::vector<std::any> &attribs) {
 }
 
 /**
- * updateElementIdMap
- * updates the id within the
- * index if the item has
- * changed.
- *
- */
+\internal
+
+\brief updates the id within the index if the item has changed.
+
+*/
 void viewManager::Element::updateIndexBy(const indexBy &setting) {
   // changing id just changes
   // the key in elementById
@@ -1238,6 +1536,15 @@ void viewManager::Element::updateIndexBy(const indexBy &setting) {
   }
   return;
 }
+
+/**
+\brief inserts the given element before the named second parameter.
+
+\param Element &newChild
+
+\param Element &existingElement
+
+*/
 auto viewManager::Element::insertBefore(Element &newChild,
                                         Element &existingElement) -> Element & {
   Element &child = newChild;
@@ -1258,34 +1565,73 @@ auto viewManager::Element::insertBefore(Element &newChild,
   m_childCount++;
   return child;
 }
+
+/**
+\brief inserts the given element after the named second parameter element.
+
+\param Element &newChild
+
+\param Element &existingElement
+
+*/
 auto viewManager::Element::insertAfter(Element &newChild,
                                        Element &existingElement) -> Element & {
   return newChild;
 }
+
+/**
+\brief removes a child element from the list.
+*/
 auto viewManager::Element::removeChild(Element &oldChild) -> Element & {
   return *this;
 }
+
+/**
+\brief replaces the child with the new one specified.
+*/
 auto viewManager::Element::replaceChild(Element &newChild, Element &oldChild)
     -> Element & {
   return *this;
 }
+
+/**
+\brief moves the element to the specified location.
+*/
 auto viewManager::Element::move(const double t, const double l) -> Element & {
   getAttribute<objectTop>().value = t;
   getAttribute<objectLeft>().value = l;
   return *this;
 }
+
+/**
+\brief resizes the element
+*/
 auto viewManager::Element::resize(const double w, const double h) -> Element & {
   getAttribute<objectWidth>().value = w;
   getAttribute<objectHeight>().value = h;
   return *this;
 }
+
+/**
+\brief removes the element from the document.
+*/
 void viewManager::Element::remove(void) { return; }
+
+/**
+\brief removes all children from the list.
+*/
 auto viewManager::Element::removeChildren(Element &e) -> Element & {
   return *this;
 }
-/// <summary>The function mapps the event id to the appropiate vector.
-/// This is kept statically here for resource management.</summary>
-///
+
+/**
+\internal
+
+\brief The function mapps the event id to the appropiate vector.
+This is kept statically here for resource management.
+
+\param eventType evtType
+*/
 vector<eventHandler> &viewManager::Element::getEventVector(eventType evtType) {
   static unordered_map<eventType, vector<eventHandler> &> eventTypeMap = {
       {eventType::focus, onfocus},
@@ -1306,28 +1652,38 @@ vector<eventHandler> &viewManager::Element::getEventVector(eventType evtType) {
   auto it = eventTypeMap.find(evtType);
   return it->second;
 }
-/// <summary>
-/// The function will return the address of a std::function for the purposes
-/// of equality testing. Function from
-/// https://stackoverflow.com/questions/20833453/comparing-stdfunctions-for-equality
-/// </summary>
+/**
+\brief
+The function will return the address of a std::function for the purposes
+of equality testing. Function from
+https://stackoverflow.com/questions/20833453/comparing-stdfunctions-for-equality
+
+*/
 template <typename T, typename... U>
 size_t getAddress(std::function<T(U...)> f) {
   typedef T(fnType)(U...);
   fnType **fnPointer = f.template target<fnType *>();
   return (size_t)*fnPointer;
 }
+
+/**
+\brief adds a new event handler to the element.
+*/
 auto viewManager::Element::addListener(eventType evtType,
                                        eventHandler evtHandler) -> Element & {
   getEventVector(evtType).push_back(evtHandler);
   return *this;
-} /// <summary>The function will remove an event listener from the list of
-/// events to receive messages.</summary>
-///
-/// <param name="evtType"> is the type of event to remove.</param>
-/// <param name="evtHandler"> is the event to remove.?</param>
-///
-///
+}
+
+/**
+\brief removes dispatching of an event to the caller.
+<summary>The function will remove an event listener from the list of
+events to receive messages.</summary>
+
+\param evtType is the type of event to remove.</param>
+\param evtHandler is the event to remove.?</param>
+
+*/
 auto viewManager::Element::removeListener(eventType evtType,
                                           eventHandler evtHandler)
     -> Element & {
@@ -1342,75 +1698,68 @@ auto viewManager::Element::removeListener(eventType evtType,
   return *this;
 }
 
-///
-/// <summary>The function removes all children and data from the
-/// the element.
-/// </ summary>
-///
+/**
+\brief The function removes all children and data from the
+the element.
+
+*/
 auto viewManager::Element::clear(void) -> Element & { return *this; }
 
-///
-/// <summary>This is the main function which invokes drawing of the item and
-/// its children. It is called recursively when painting needs to occur.
-/// This function is used internally and is not necessary to invoke. That
-/// is, system already invokes this as part of the processing stack. The
-/// work performed by this routine is accomplished using the surface image.
-/// </ summary>
-///
-void viewManager::Element::render(void) {
-  std::string idName;
-  try {
-    idName = getAttribute<indexBy>().value;
-  } catch (const std::exception &e) {
-    idName = "noID";
-  }
+/**
+\brief This is the main function which invokes drawing of the item and
+its children. It is called recursively when painting needs to occur.
+This function is used internally and is not necessary to invoke. That
+is, system already invokes this as part of the processing stack. The
+work performed by this routine is accomplished using the surface image.
+*/
+void viewManager::Element::render(void) {}
 
-  std::cout << "indexBy " << idName << endl;
-  std::cout << "children " << m_childCount << std::endl;
-
-  // print information in the default string vector buffer
-  auto vdata = data();
-  for (auto s : vdata)
-    std::cout << s << endl;
+void viewManager::Element::streamRender(stringstream &ss) {
+  for(auto n : data()) {
+    ss << n << "\n";
+    }
 }
-/// <summary>Uses the vasprint standard function to format the given
-/// parameters with the format string. Inserts the named
-/// elements within the markup into the document.</summary>
-///
-/// <param name="fmt"> is a printf format string. It should be a literal
-/// string.</param> <param name="..."> is a variable argument parameter
-/// passed to the standard printf function. </param>
-///`
-///
-/// <code>
-///
-/// vector<string> movies={"The Hulk",
-/// "Super Action Hero",
-/// "Star Invader Eclipse"};
-///
-/// auto& e=createElement();
-///
-/// e.printf("The movie theatre is <blue>opened</blue> today for matinee.");
-/// e.printf("Here is a list of movies: <ul>");
-/// for(auto n : movies)
-/// e.prinf("<li>%s</li>",n.c_str());
-/// e.printf("</ul>");
-///
-/// </code>
-///
-/// <note>
-/// <para>If a literal is not used for the first parameter, a warning will
-/// be issued. This warning is effective because at times, it reminds the
-/// developer that if the format string comes from a foreign source
-/// and is not controlled, the stack may be violated.</para>
-///
-/// <para>To prevent this, the function has a static attribute type check
-/// that is used during compile time. The actual parameter format
-/// is associated with the 2 parameter. That is
-/// this is actually in the 1 slot due to it being a
-/// class member. So when a literal is not used for the first
-/// parameter, a warning is issued.</para>
-/// </note>
+
+/**
+\brief Uses the vasprint standard function to format the given
+parameters with the format string. Inserts the named
+elements within the markup into the document.</summary>
+
+  \param fmt is a printf format string. It should be a literal
+  string.
+  \param ...  is a variable argument parameter passed to the standard
+  printf function.
+
+  <code>
+  vector<string> movies={"The Hulk",
+                        "Super Action Hero",
+                        "Star Invader Eclipse"};
+
+  auto& e=createElement();
+
+  e.printf("The movie theatre is <blue>opened</blue> today for matinee.");
+  e.printf("Here is a list of movies: <ul>");
+
+  for(auto n : movies)
+    e.prinf("<li>%s</li>",n.c_str());
+  e.printf("</ul>");
+
+  </code>
+
+<note>
+<para>If a literal is not used for the first parameter, a warning will
+be issued. This warning is effective because at times, it reminds the
+developer that if the format string comes from a foreign source
+and is not controlled, the stack may be violated.</para>
+
+<para>To prevent this, the function has a static attribute type check
+that is used during compile time. The actual parameter format
+is associated with the 2 parameter. That is
+this is actually in the 1 slot due to it being a
+class member. So when a literal is not used for the first
+parameter, a warning is issued.</para>
+</note>
+*/
 void viewManager::Element::printf(const char *fmt, ...) {
 #if defined(__linux__)
   va_list ap;
@@ -1455,9 +1804,12 @@ void viewManager::Element::printf(const char *fmt, ...) {
 #endif
 }
 
-/***************************************************************************
-ingestMarkup
+/**
+\brief The ingestMarkup function provides a method to parse markup that is
+simular to HTML. The format is more restrictive in that the parser is not as
+forgiving for errors.
 
+\description
 The routine is called by the functions that apply a string markup for parsing.
 This routine uses the object factrory and color map to query the
 contents of the maps. The parser applied is a simplified parser for
@@ -1483,12 +1835,10 @@ Notation is supported on numeric parameters with a format:
   coordinates {10% 10% 80% 80%}
 
 
-      <!-- This is a comment block -->
-
        <h1>The title is</h1>
        <h2>The information</h3> <!-- not an element -->
 
-      <div id=divtest background=blue>
+      <div id=divtest background=blue center relative>
          This is the text inside the block.
          <ul>
            <li>This is the first item</li>
@@ -1501,9 +1851,7 @@ Notation is supported on numeric parameters with a format:
 color is selected. <green>This changes the color of the foreground and creates
 textNodes within the current element context.
 
-
-
-***************************************************************************/
+*/
 Element &viewManager::Element::ingestMarkup(Element &node,
                                             const std::string &markup) {
 
@@ -1524,8 +1872,9 @@ Element &viewManager::Element::ingestMarkup(Element &node,
     elementTerminal,
     attribute,
     attributeValue,
+    attributeSimple,
     color,
-    stringData
+    textData
   };
 
   // the varaint holds the payload from the parser
@@ -1533,19 +1882,24 @@ Element &viewManager::Element::ingestMarkup(Element &node,
       parserOperator;
 
   typedef struct {
-    bool bCapture = false;
-    bool bSkip = false;
-    bool bSignal = false;
-    bool bTerminal = false;
-    bool bAttributeList = false;
-    bool bAttributeListValue = false;
+    vector<tuple<itemType, bool, parserOperator>>
+        parsedData; // the elements parsed thus far tokenized
+    vector<reference_wrapper<Element>>
+        elementStack; // stack holding the tree of elements
 
-    bool bQuery = false;
-    string sCaptureString;
-    string sBackflow;
-    vector<pair<itemType, parserOperator>> parsedData;
-    vector<reference_wrapper<Element>> elementStack;
-    bool bFoundAttributeSet = false;
+    bool bSignal; // true when a < is encountered, Presumed that the information
+                  // will be a markup
+    bool bToken;
+    bool bSkip;
+    bool
+        bTerminal; // true when the / is encountered and a signal has been found
+    bool bAttributeList;
+    bool bAttributeListValue;
+    bool bQuery; // true when the information should be queried for a token
+    const char *signalStart; // holds the position of the signal start
+    string sCapture;         // the capturing of an element or token name
+    string sText; // text informatin that will be added to the elements data
+
   } parserContext;
 
   static parserContext pc;
@@ -1554,236 +1908,184 @@ Element &viewManager::Element::ingestMarkup(Element &node,
 
   // pointer to the input buffer.
   const char *p = markup.data();
-  string sTmp;
 
   // tokenize the markup string
   while (*p) {
-
     switch (*p) {
-    // when the markup < character is found, start capturing
     case '<':
-      // if the capture signal is found, and items exist in the capture string,
-      // store it.
-      if (pc.sBackflow.length() != 0) {
-        pc.parsedData.emplace_back(stringData, pc.sBackflow);
-        pc.sBackflow = "";
+      if (pc.sText.size() != 0) {
+        pc.parsedData.emplace_back(textData, false, pc.sText);
+        pc.sText = "";
       }
-
-      cout << "< signal found" << endl;
       pc.bSignal = true;
       pc.bSkip = true;
       break;
-
-    // when the space is found, if capturing is occurring, find out if the item
-    // is a markup tag
     case ' ':
-      if (pc.bSignal) {
-        cout << "(space) signal found" << endl;
+      if (pc.bSignal && (!pc.bToken || pc.bAttributeList)) {
         pc.bQuery = true;
         pc.bSkip = true;
       }
       break;
     case '=':
-      if (pc.bSignal && pc.bAttributeList) {
+      if (pc.bAttributeList) {
         pc.bQuery = true;
         pc.bSkip = true;
       }
       break;
     case '>':
-      cout << "> signal found" << endl;
-      // has a signal been established with the capture turned on?
-      if (pc.bSignal && pc.bTerminal) {
+      if (pc.bSignal) {
         pc.bSignal = false;
-        pc.bTerminal = false;
-        pc.bCapture = false;
-        pc.bQuery = false;
+        pc.bToken = false;
         pc.bSkip = true;
-        pc.bAttributeList = false;
-        pc.bAttributeListValue = false;
-
-      } else if (pc.bSignal) {
-
         pc.bQuery = true;
-        pc.bSkip = true;
-        pc.bSignal = false;
       }
       break;
-
     case '/':
-      cout << "/ signal found" << endl;
       if (pc.bSignal) {
-        pc.bQuery = true;
         pc.bTerminal = true;
         pc.bSkip = true;
       }
-
       break;
     }
 
-    // if a query has been requested by a parser condition, do this now.
-    // This is established once within the loop function so that code within
-    // the switch case block is not duplicated.
+    // the query flag is on when a item has been tokenized after a signal has
+    // been found.
     if (pc.bQuery) {
-      cout << "query start " << endl;
 
-      // check the state of scanning for attribtues but not the attribute value.
-      // this acts as a flip flop state between the attribute name and the
-      // attribute value.
-      if (pc.bAttributeList && !pc.bAttributeListValue) {
-        cout << "check for attribute " << endl;
+      string sKey = pc.sCapture;
+      std::transform(sKey.begin(), sKey.end(), sKey.begin(),
+                     [](unsigned char c) { return std::tolower(c); });
 
-        // convert to lower case, the attribute list is keyed on lower case
-        // names.
-        string sKey = pc.sCaptureString;
-        std::transform(sKey.begin(), sKey.end(), sKey.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
-
+      if (pc.bToken) {
         // store iterator to the function
         auto it = attributeFactory.find(sKey);
-        if (attributeFactory.find(sKey) != attributeFactory.end()) {
-          cout << "-----> is attribtue " << endl;
-          pc.parsedData.emplace_back(attribute, it->second);
-          pc.bAttributeListValue = true;
-          pc.sCaptureString = "";
-        }
+        if (it != attributeFactory.end())
+
+          // if the attribute is a series of two tokens
+          if (get<0>(it->second)) {
+            pc.parsedData.emplace_back(attribute, false, get<1>(it->second));
+            pc.bAttributeListValue = true; // value is expected to follow.
+
+          } else {
+            pc.parsedData.emplace_back(attributeSimple, false,
+                                       get<1>(it->second));
+            pc.bAttributeListValue = false;
+          }
+        pc.sCapture = "";
+        pc.bQuery = false;
 
       } else if (pc.bAttributeList && pc.bAttributeListValue) {
-        cout << "attribute value " << endl;
-        pc.parsedData.emplace_back(attributeValue, pc.sCaptureString);
-        pc.bAttributeListValue = false;
-        pc.sCaptureString = "";
+        pc.parsedData.emplace_back(attributeValue, false, pc.sCapture);
+        pc.sCapture = "";
+        pc.bQuery = false;
+
+        if (!pc.bSignal) {
+          pc.bAttributeList = false;
+          pc.bAttributeListValue = false;
+        }
 
       } else {
-        string sKey = pc.sCaptureString;
-        std::transform(sKey.begin(), sKey.end(), sKey.begin(),
-                       [](unsigned char c) { return std::toupper(c); });
-
-        cout << "check is object element (" << sKey << ")" << endl;
 
         auto it = objectFactoryMap.find(sKey);
         if (it != objectFactoryMap.end()) {
-          cout << "----->  is element " << endl;
 
           if (pc.bTerminal) {
-            cout << "pc.bTerminal " << endl;
-
-            pc.parsedData.emplace_back(elementTerminal, "");
+            pc.parsedData.emplace_back(elementTerminal, false, "");
+            pc.bToken = false;
             pc.bTerminal = false;
             pc.bAttributeList = false;
             pc.bAttributeListValue = false;
 
-            pc.sCaptureString = "";
           } else {
             // store lambda for the element factory
-            pc.parsedData.emplace_back(element, it->second);
+            pc.parsedData.emplace_back(element, false, it->second);
+            pc.bToken = true;
             pc.bAttributeList = true;
             pc.bAttributeListValue = false;
-            pc.sCaptureString = "";
           }
+
+          pc.sCapture = "";
+          pc.bQuery = false;
 
         } else {
-          cout << "check to see if it is a color  " << sKey << endl;
           // store the color object within the parser payload
-          auto it = colorNF::colorIndex(pc.sCaptureString);
+          auto it = colorNF::colorIndex(sKey);
           if (it != colorNF::colorFactory.end()) {
-            cout << "----->  is color " << endl;
-            pc.parsedData.emplace_back(color, colorNF(it));
-            pc.sCaptureString = "";
+            pc.parsedData.emplace_back(color, false, colorNF(it));
           }
+
+          // illegal match found, pipe contents into ?
+          pc.bQuery = false;
         }
       }
-
-      pc.bQuery = false;
     }
 
-    if (!pc.bSignal && !pc.bSkip)
-      pc.sBackflow += *p;
+    if (!pc.bSkip)
+      if (pc.bSignal)
+        pc.sCapture += *p;
+      else
+        pc.sText += *p;
 
-    if (pc.bSignal && !pc.bSkip) {
-      pc.sCaptureString += *p;
-      cout << "pc.sCaptureString " << pc.sCaptureString << endl;
-
-    } else {
-
-      pc.bSkip = false;
-    }
+    pc.bSkip = false;
 
     // goto next character
     p++;
   }
 
-  cout << "==============================" << endl;
-  auto itemdbg = pc.parsedData.begin();
-  while (itemdbg != pc.parsedData.end()) {
-    switch (itemdbg->first) {
-    case element: {
-      cout << "element" << endl;
-    } break;
-
-    case elementTerminal: {
-      cout << "element terminate" << endl;
-    } break;
-
-    // the attribute and value are handled here together
-    case attribute: {
-      cout << "attribute" << endl;
-
-    } break;
-    case attributeValue: {
-      cout << "attributeValue" << get<string>(itemdbg->second) << endl;
-    } break;
-
-    case color: {
-      cout << "color" << endl;
-    } break;
-
-    case stringData:
-      cout << "stringData" << get<string>(itemdbg->second) << endl;
-      break;
-    }
-
-    itemdbg++;
+  if (pc.sText.size() != 0) {
+    pc.parsedData.emplace_back(textData, false, pc.sText);
+    pc.sText = "";
   }
-  cout << "==============================" << endl;
 
   // second phase, iterate over the parsed context and develop the elements,
-  // color text nodes, and set attributes for the items on the stack. once items
-  // are processed, they are removed from the stack using the delete range
-  // operator, For a complet etag to exist, the end tab must also exist.
+  // color text nodes, and set attributes for the items on the stack. once
+  // items are processed, they are removed from the stack using the delete
+  // range operator, For a complet etag to exist, the end tab must also exist.
   auto item = pc.parsedData.begin();
   while (item != pc.parsedData.end()) {
-    switch (item->first) {
-    case element: {
-      Element &e = get<factoryLambda>(item->second)({});
-      pc.elementStack.back().get().appendChild(e);
-      pc.elementStack.push_back(e);
-    } break;
 
-    case elementTerminal: {
-      pc.elementStack.pop_back();
-    } break;
+    if (!get<1>(*item)) {
+      switch (get<0>(*item)) {
+      case element: {
+        Element &e = get<factoryLambda>(get<2>(*item))({});
+        pc.elementStack.back().get().appendChild(e);
+        pc.elementStack.push_back(e);
+        get<1>(*item) = true;
+      } break;
 
-    // the attribute and value are handled here together
-    case attribute: {
-      auto itAttributeValue = std::next(item, 1);
-      if (itAttributeValue != pc.parsedData.end() &&
-          itAttributeValue->first == attributeValue) {
-        get<attributeLambda>(item->second)(
-            pc.elementStack.back(), get<string>(itAttributeValue->second));
-        item++;
+      case elementTerminal: {
+        pc.elementStack.pop_back();
+        get<1>(*item) = true;
+      } break;
+
+      // the attribute and value are handled here together
+      case attribute: {
+        get<1>(*item) = true;
+
+        auto itAttributeValue = std::next(item, 1);
+        if (itAttributeValue != pc.parsedData.end() &&
+            get<0>(*itAttributeValue) == attributeValue) {
+          get<attributeLambda>(get<2>(*item))(
+              pc.elementStack.back(), get<string>(get<2>(*itAttributeValue)));
+          get<1>(*itAttributeValue) = true;
+          item++;
+        }
+
+      } break;
+
+      case color: {
+        auto &e = pc.elementStack.back().get().appendChild<textNode>(
+            textColor{get<colorNF>(get<2>(*item))});
+        pc.elementStack.push_back(e);
+        get<1>(*item) = true;
+      } break;
+
+      case textData:
+        pc.elementStack.back().get().data().push_back(
+            get<string>(get<2>(*item)));
+        get<1>(*item) = true;
+        break;
       }
-
-    } break;
-
-    case color: {
-      auto &e = pc.elementStack.back().get().appendChild<textNode>(
-          textColor{get<colorNF>(item->second)});
-      pc.elementStack.push_back(e);
-    } break;
-
-    case stringData:
-      pc.elementStack.back().get().data().push_back(get<string>(item->second));
-      break;
     }
 
     // goto next item
@@ -1797,10 +2099,12 @@ Element &viewManager::Element::ingestMarkup(Element &node,
   return eRet;
 }
 
-/***************************************************************************
-Visualizer module
-***************************************************************************/
+/**
+\internal
+\var nodes contains a list of the elements and their coordinates.
+*/
 std::unordered_map<std::size_t, std::reference_wrapper<Element>> nodes;
+
 std::size_t viewManager::Visualizer::allocate(Element &e) {
   static std::size_t token = 0;
   std::size_t ret = token;
@@ -1811,17 +2115,52 @@ std::size_t viewManager::Visualizer::allocate(Element &e) {
 void viewManager::Visualizer::deallocate(const std::size_t &token) {}
 void viewManager::Visualizer::openWindow(Element &e) {}
 void viewManager::Visualizer::closeWindow(Element &e) {}
-/***************************************************************************
-Visualizer Platform module
-***************************************************************************/
+
+/**
+  \brief constructor for the platform object. The platform object is coded such
+  that each of the operating systems supported is encapsolated within
+  preprocessor blocks.
+
+  \param eventHandler evtDispatcher the dispatcher routine which connects the
+  platform to the object model system.
+  \param unsigned short width - window size.
+  \param unsigned short height - window size.
+*/
 viewManager::Visualizer::platform::platform(eventHandler evtDispatcher,
                                             unsigned short width,
                                             unsigned short height) {
   dispatchEvent = evtDispatcher;
+  _w = width;
+  _h = height;
 
-#if defined(CONSOLE)
+// initialize private members
+#if defined(__linux__)
+    m_connection=nullptr;
+    m_screen=nullptr;
+    m_window=0;
+    m_offScreen=0;
+    m_syms=nullptr;
+    m_foreground=0;
 
-#elif defined(__linux__)
+#elif defined(__WIN64)
+
+  #elseif defined
+  m_hwnd = 0x00;
+  m_pDirect2dFactory = nullptr;
+  m_pRenderTarget = nullptr;
+  m_pOffscreen = nullptr;
+  m_offScreenBitmap = nullptr;
+
+#endif
+}
+
+/**
+  \brief opens a window on the target os
+
+
+*/
+void viewManager::Visualizer::platform::openWindow(void) {
+#if defined(__linux__)
   /* Open the connection to the X server */
   m_connection = xcb_connect(nullptr, nullptr);
   /* Get the first screen */
@@ -1842,7 +2181,7 @@ viewManager::Visualizer::platform::platform(eventHandler evtDispatcher,
               XCB_EVENT_MASK_BUTTON_MOTION | XCB_EVENT_MASK_BUTTON_PRESS |
               XCB_EVENT_MASK_BUTTON_RELEASE;
   xcb_create_window(m_connection, XCB_COPY_FROM_PARENT, m_window,
-                    m_screen->root, 0, 0, m_clientWidth, m_clientHeight, 10,
+                    m_screen->root, 0, 0, static_cast<unsigned short>(_w), static_cast<unsigned short>(_h), 10,
                     XCB_WINDOW_CLASS_INPUT_OUTPUT, m_screen->root_visual, mask,
                     values);
   /* Map the window on the screen and flush*/
@@ -1850,17 +2189,21 @@ viewManager::Visualizer::platform::platform(eventHandler evtDispatcher,
   xcb_flush(m_connection);
 
   return;
+
 #elif defined(_WIN64)
   HRESULT hr;
+  /*
   // Create a Direct2D factory.
   hr =
       D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &m_pDirect2dFactory);
   if (FAILED(hr))
     return;
+  */
+
   // Register the window class.
   WNDCLASSEX wcex = {sizeof(WNDCLASSEX)};
   wcex.style = CS_HREDRAW | CS_VREDRAW;
-  // ******** wcex.lpfnWndProc = &Visualizer::platform::WndProc;
+  wcex.lpfnWndProc = &Visualizer::platform::WndProc;
   wcex.cbClsExtra = 0;
   wcex.cbWndExtra = sizeof(LONG_PTR);
   wcex.hInstance = HINST_THISCOMPONENT;
@@ -1872,14 +2215,23 @@ viewManager::Visualizer::platform::platform(eventHandler evtDispatcher,
   // Create the window.
   m_hwnd = CreateWindow("viewManagerApp", "viewManager Application",
                         WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
-                        static_cast<UINT>(width), static_cast<UINT>(height),
-                        NULL, NULL, HINST_THISCOMPONENT, 0L);
+                        static_cast<UINT>(_w), static_cast<UINT>(_h), NULL,
+                        NULL, HINST_THISCOMPONENT, 0L);
   hr = m_hwnd ? S_OK : E_FAIL;
   if (FAILED(hr))
     return;
+
+  // Adding a ListBox.
+  m_hListBox = CreateWindowExW(WS_EX_CLIENTEDGE
+      , L"LISTBOX", NULL
+      , WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_AUTOVSCROLL
+      , 0, 0, static_cast<UINT>(_w), static_cast<UINT>(_h)
+      , m_hwnd, NULL, HINST_THISCOMPONENT, NULL);
+
   SetWindowLongPtr(m_hwnd, GWLP_USERDATA, (long long)this);
   ShowWindow(m_hwnd, SW_SHOWNORMAL);
   UpdateWindow(m_hwnd);
+  /*
   RECT rc;
   GetClientRect(m_hwnd, &rc);
   // Create a Direct2D render target
@@ -1890,12 +2242,25 @@ viewManager::Visualizer::platform::platform(eventHandler evtDispatcher,
       &m_pRenderTarget);
   if (FAILED(hr))
     return;
+  */
 #endif
 }
+
+/**
+  \brief closes a window on the target os
+
+
+*/
+void viewManager::Visualizer::platform::closeWindow(void) {}
+
 #if defined(_WIN64)
-///< summary>The default window message procesor for the application.
-/// This is the version ofr the Microsoft Windows operating system.
-///</summary>
+
+/**
+\internal
+\brief The default window message procesor for the application.
+This is the version ofr the Microsoft Windows operating system.
+
+*/
 LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
                                                             UINT message,
                                                             WPARAM wParam,
@@ -1982,12 +2347,19 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
     result = 0;
     handled = true;
     break;
-  case WM_PAINT:
+  case WM_PAINT: {
+    PAINTSTRUCT ps;
+    HDC hdc = BeginPaint(hwnd, &ps);
+    
+    FillRect(hdc, &ps.rcPaint, (HBRUSH) (COLOR_WINDOW+1));
+
     platformInstance->dispatchEvent(event{eventType::paint});
+    SetBkMode(hdc, OPAQUE);
+    EndPaint(hwnd, &ps);
     ValidateRect(hwnd, NULL);
     result = 0;
     handled = true;
-    break;
+  } break;
   case WM_DESTROY:
     PostQuitMessage(0);
     result = 1;
@@ -2003,9 +2375,7 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
 /// and frees resources.
 /// </summary>
 viewManager::Visualizer::platform::~platform() {
-#if defined(CONSOLE)
-
-#elif defined(__linux__)
+#if defined(__linux__)
   xcb_free_gc(m_connection, m_foreground);
   xcb_key_symbols_free(m_syms);
 #elif defined(_WIN64)
@@ -2016,38 +2386,38 @@ viewManager::Visualizer::platform::~platform() {
 #endif
 }
 void viewManager::Visualizer::platform::messageLoop(void) {
-#if defined(CONSOLE)
+#if defined(__linux__)
+  xcb_generic_event_t *xcbEvent;
 
-#elif defined(__linux__)
-  while ((event = xcb_wait_for_event(m_connection))) {
-    switch (event->response_type & ~0x80) {
+  while ((xcbEvent = xcb_wait_for_event(m_connection))) {
+    switch (xcbEvent->response_type & ~0x80) {
     case XCB_MOTION_NOTIFY: {
-      xcb_motion_notify_event_t *motion = (xcb_motion_notify_event_t *)event;
+      xcb_motion_notify_event_t *motion = (xcb_motion_notify_event_t *)xcbEvent;
       dispatchEvent(
           event{eventType::mousemove, motion->event_x, motion->event_y});
     } break;
     case XCB_BUTTON_PRESS: {
-      xcb_button_press_event_t *bp = (xcb_button_press_event_t *)event;
+      xcb_button_press_event_t *bp = (xcb_button_press_event_t *)xcbEvent;
       dispatchEvent(
-          event{eventType::mousedown, bp->event_x, event_y, bp->detail});
+          event{eventType::mousedown, bp->event_x, bp->event_y, bp->detail});
     } break;
     case XCB_BUTTON_RELEASE: {
-      xcb_button_release_event_t *br = (xcb_button_release_event_t *)event;
+      xcb_button_release_event_t *br = (xcb_button_release_event_t *)xcbEvent;
       dispatchEvent(
-          event{eventType::mouseup, bp->event_x, event_y, bp->detail});
+          event{eventType::mouseup, br->event_x, br->event_y, br->detail});
     } break;
     case XCB_KEY_PRESS: {
-      xcb_key_press_event_t *kp = (xcb_key_press_event_t *)event;
+      xcb_key_press_event_t *kp = (xcb_key_press_event_t *)xcbEvent;
       xcb_keysym_t sym = xcb_key_press_lookup_keysym(m_syms, kp, 0);
-      dispatchEvent(event{eventType::keydown, sym});
+      // dispatchEvent(event{eventType::keydown, sym});
     } break;
     case XCB_KEY_RELEASE: {
-      xcb_key_release_event_t *kr = (xcb_key_release_event_t *)event;
+      xcb_key_release_event_t *kr = (xcb_key_release_event_t *)xcbEvent;
       xcb_keysym_t sym = xcb_key_press_lookup_keysym(m_syms, kr, 0);
-      dispatchEvent(event{eventType::keyup, sym});
+      // dispatchEvent(event{eventType::keyup, sym});
     } break;
     }
-    free(event);
+    free(xcbEvent);
   }
 #elif defined(_WIN64)
   MSG msg;
@@ -2057,4 +2427,62 @@ void viewManager::Visualizer::platform::messageLoop(void) {
   }
 #endif
 }
+
+
+#if defined(_WIN64)
+// Returns the last Win32 error, in string format. Returns an empty string if
+// there is no error.
+std::string GetLastErrorAsString() {
+  // Get the error message, if any.
+  DWORD errorMessageID = ::GetLastError();
+  if (errorMessageID == 0)
+    return std::string(); // No error message has been recorded
+
+  LPSTR messageBuffer = nullptr;
+  size_t size = FormatMessageA(
+      FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+          FORMAT_MESSAGE_IGNORE_INSERTS,
+      NULL, errorMessageID, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+      (LPSTR)&messageBuffer, 0, NULL);
+
+  std::string message(messageBuffer, size);
+
+  // Free the buffer.
+  LocalFree(messageBuffer);
+
+  return message;
+}
+#endif
+
+void viewManager::Visualizer::platform::clearText(void) {
+#if defined(__linux__)
+
+#elif defined(_WIN64)
+    int pos = (int)SendMessage(m_hListBox, LB_RESETCONTENT, 0, 
+    (LPARAM) 0);
+#endif
+}
+
+void viewManager::Visualizer::platform::drawText(std::string s) {
+#if defined(__linux__)
+
+#elif defined(_WIN64)
+  RECT rect;
+  HDC wdc = GetWindowDC(m_hwnd);
+  GetClientRect(m_hwnd, &rect);
+  SetTextColor(wdc, 0x00000000);
+  SetBkMode(wdc, TRANSPARENT);
+  rect.left = 100;
+  rect.top = 100;
+  // std::wstring stemp = std::wstring(s.begin(), s.end());
+  // LPCWSTR sw = stemp.c_str();
+  //DrawText(wdc, s.c_str(), -1, &rect, DT_NOCLIP);
+  
+  int pos = (int)SendMessage(m_hListBox, LB_ADDSTRING, 0, 
+    (LPARAM) s.c_str());
+
+  DeleteDC(wdc);
+#endif
+}
+
 void viewManager::Visualizer::platform::flip() {}

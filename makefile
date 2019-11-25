@@ -1,5 +1,5 @@
-#CC=clang-10
-CC=g++
+CC=clang
+#CC=g++
 CFLAGS=-std=c++17 -Os
 INCLUDES=-I/projects/guidom
 LFLAGS=
@@ -12,7 +12,7 @@ release: guidom.out
 
 
 guidom.out: main.o viewManager.o
-	$(CC) $(INCLUDES) $(LFLAGS) -o guidom.out main.o viewManager.o -lstdc++ -lm
+	$(CC) $(INCLUDES) $(LFLAGS) -o guidom.out main.o viewManager.o -lstdc++ -lm -lxcb -lxcb-keysyms
 
 main.o: main.cpp viewManager.hpp
 	$(CC) $(CFLAGS) $(INCLUDES) -c main.cpp -o main.o

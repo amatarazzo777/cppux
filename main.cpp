@@ -39,7 +39,7 @@ void testStart(string_view sFunc) {
 int main(int argc, char **argv) {
   // handle command line here...
 #elif defined(_WIN64)
-int WINAPI WinMain(HINSTANCE /* hInstance */, HINSTANCE /* hPrevInstance */,
+int WINAPI WinMain(HINSTANCE hInstance , HINSTANCE /* hPrevInstance */,
                    LPSTR lpCmdLine, int /* nCmdShow */) {
   // command line
 #endif
@@ -48,23 +48,25 @@ int WINAPI WinMain(HINSTANCE /* hInstance */, HINSTANCE /* hPrevInstance */,
   // The main browsing window. It is an element as well.
   cout << "start viewer create" << endl;
   auto &vm = createElement<Viewer>(
-      objectTop{10_pct}, objectLeft{10_pct}, objectHeight{80_pct},
-      objectWidth{80_pct}, textFace{"arial"}, textSize{16_pt}, textWeight{400},
+      objectTop{10_pct}, objectLeft{10_pct}, objectHeight{640_px},
+      objectWidth{800_px}, textFace{"arial"}, textSize{16_pt}, textWeight{400},
       textIndent{2_em}, lineHeight::normal, textAlignment::left,
       position::relative, paddingTop{5_pt}, paddingLeft{5_pt},
       paddingBottom{5_pt}, paddingRight{5_pt}, marginTop{5_pt},
       marginLeft{5_pt}, marginBottom{5_pt}, marginRight{5_pt});
-  cout << "viewer created." << endl;
+
+  test0(vm);
 
   test0c(vm);
   vm.clear();
 
-#if 0
+  test8(vm);
+  vm.clear();
+
+
   test0b(vm);
   vm.clear();
 
-  test0(vm);
-  vm.clear();
 
   test1(vm);
   vm.clear();
@@ -107,7 +109,8 @@ int WINAPI WinMain(HINSTANCE /* hInstance */, HINSTANCE /* hPrevInstance */,
 
   test10(vm);
   vm.clear();
-#endif
+  vm.processEvents();
+
 }
 
 string randomString(int nChars);
@@ -118,10 +121,10 @@ void randomAttributeSettings(Element &e);
 ************************************************************************/
 void test0(Viewer &vm) {
   vm << "Hello World\n";
-  vm.render();
+
+  
   vm << "<h1>Hello World</h1>";
   vm << "<blue>Got to be a pretty day.</blue>";
-  vm.render();
 }
 /************************************************************************
 ************************************************************************/
@@ -143,8 +146,8 @@ void test0b(Viewer &vm) {
   vm.appendChild<PARAGRAPH>(indexBy{"content"},
                             "The information must add two children");
   e.data() = {"This is replaced as a data node"};
-  cout << "before parser" << endl;
-  vm.appendChild("<div id=testAdd/>");
+
+  vm.appendChild("<div id=testAdd></div>");
 
   getElement("testAdd").appendChild("<ul>"
                                     "<li>test item 1</li>"
@@ -153,7 +156,6 @@ void test0b(Viewer &vm) {
                                     "<li>test item 4</li>"
                                     "<li>test item 5</li></ul>");
 
-  vm.render();
 }
 /************************************************************************
 ************************************************************************/
@@ -166,7 +168,7 @@ void test0c(Viewer &vm) {
                  "satisfaction of a working system. While a solution is a "
                  "compromise, value is found within the description.</div>");
 
-#if 0
+
   getElement("testAdd").ingestStream=true;
   getElement("testAdd").appendChild("<ul>"
                         "<li>test item 1</li>"
@@ -175,9 +177,8 @@ void test0c(Viewer &vm) {
                         "<li>test item 4</li>"
                         "<li>test item 5</li></ul>");
 
-#endif
+  getElement("testAdd") << "This is information that is appended.";
 
-  vm.render();
 }
 //! [test0]
 /************************************************************************
@@ -206,12 +207,12 @@ void test1(Viewer &vm) {
   }
   getElement("title").clear().data() = {
       "A new copy is never created when appending happens., just std::move"};
-  vm.render();
+
   for (auto n : query("*")) {
   }
   getElement("title").data() = {
       "It uses the reference to the created object createElement."};
-  vm.render();
+
   getElement("title").appendChild<H2>(indexBy{"subtitle2"}, objectTop{20_px},
                                       textAlignment{textAlignment::center},
                                       "by Anthony Matarazzo");
@@ -227,7 +228,7 @@ void test1(Viewer &vm) {
           "the ImageMagick library had been tuned, works with SSE "
           "in 64bit floating point format, I thought to myself, "
           "should be fast. ");
-  vm.render();
+
   getElement("mainArea").setAttribute(textColor{70, 70, 70});
   getElement("mainArea").setAttribute(objectLeft{100_px});
   getElement("title")
@@ -235,26 +236,24 @@ void test1(Viewer &vm) {
       .data() = {"Mini App Title"};
   getElement("bodyText").setAttribute(indexBy{"bodyInformation"}).data() = {
       "The new text information is not quite as long"};
-  vm.render();
+
   auto &statusText =
       createElement<H3>(indexBy{"statusText"}, "Status Line Updated:");
   mainArea.insertBefore(statusText, getElement("bodyInformation"));
-  vm.render();
+
   mainArea.insertAfter(
       createElement<H1>(indexBy{"titleText2"}, "A app built with gui tags."),
       getElement("bodyInformation"));
   mainArea.removeChild(getElement("bodyInformation"));
-  vm.render();
+
   getElement("mainArea")
       .appendChild<PARAGRAPH>(indexBy{"bodyText"}, textColor{"orange"},
                               "Re added and updated. Scatered coverered "
                               "diced and smashed.");
-  vm.render();
   mainArea.replaceChild(
       createElement<paragraph>(indexBy{"bodyTextNew"}, textColor{"green"},
                                "And now, for a limited time. the all new ... "),
       getElement("bodyText"));
-  vm.render();
   // attributes and references
   /* to quickly change attribute values wihin the dom
 you can
@@ -289,14 +288,12 @@ marginTop
   auto d2 = mainArea.getAttribute<objectLeft>();
   d2.option = numericFormat::percent;
   d2.value = 50;
-  vm.render();
   // styles and CSS
   auto boldTexts = createStyle(
       indexBy{"boldText"}, textColor{"green"}, background{100, 200, 200},
       textFace{"FiraMono-Regular"}, textSize{20_pt}, textWeight{800});
   mainArea.styles.push_back(boldTexts);
   appSubTitle.styles.push_back(boldTexts);
-  vm.render();
 }
 //! [test1]
 //! [test1a]
@@ -333,7 +330,6 @@ void test1a(Viewer &vm) {
   auto &booklet = createElement<dblock>(indexBy{"booklet3"});
   vm.appendChild(booklet);
   booklet.appendChild(chapter);
-  vm.render();
 }
 //! [test1a]
 /************************************************************************
@@ -357,7 +353,6 @@ void test2(Viewer &vm) {
     for (auto n : query("*"))
       randomAttributeSettings(n);
   }
-  vm.render();
 }
 //! [test2]
 /************************************************************************
@@ -376,7 +371,6 @@ void test3(Viewer &vm) {
   auto &booklet = createElement<DIV>(indexBy{"booklet3"});
   vm.appendChild(booklet);
   booklet.appendChild(chapter);
-  vm.render();
 }
 //! [test3]
 //! [test4]
@@ -388,7 +382,6 @@ void test4(Viewer &vm) {
   for (int i = 0; i < m; i++)
     eBooklet.appendChild<PARAGRAPH>(
         indexBy{"rndTEST4BookletParagraph_" + to_string(i)}, randomString(200));
-  vm.render();
 }
 //! [test4]
 //! [test5]
@@ -410,7 +403,6 @@ void test5(Viewer &vm) {
   }
   cout << "document building finished" << endl;
   vm.appendChild<DIV>(indexBy{"booklet5"}).appendChild(chapter);
-  vm.render();
 }
 //! [test5]
 /************************************************************************
@@ -450,7 +442,6 @@ void test6(Viewer &vm) {
 
   vm.appendChild<DIV>(indexBy{"booklet5"}).appendChild(chapter);
 
-  vm.render();
 }
 //! [test6]
 /************************************************************************
@@ -483,7 +474,6 @@ void test7(Viewer &vm) {
       .appendChild<SPAN>(indexBy{"timeOfDay"})
       .append<SPAN>(indexBy{"currentDate"});
   vm.append("<ul><li>Hello added to the end</li></ul>");
-  vm.render();
 }
 //! [test7]
 //! [test7a]
@@ -506,8 +496,7 @@ void test7a(Viewer &vm) {
       .append("<li>test2</li>")
       .append("<li>test3</li>")
       .append("<li>test4</li>")
-      .append("<li indexBy=ttt/>");
-  vm.render();
+      .append("<li indexBy=ttt></li>");
 }
 //! [test7a]
 //! [test7b]
@@ -527,12 +516,11 @@ void test7b(Viewer &vm) {
   // the append and appendChild with texts.
   // notice that you can appendChild to an element expressed by text.
   // The complete object and terminal must be given in one line.
-  divTest.appendChild("<ul/>")
+  divTest.appendChild("<ul></ul>")
       .appendChild("<li>test1</li>")
       .append("<li>test2</li>")
       .append("<li>test3</li>")
       .append("<li>test4</li>");
-  vm.render();
 }
 //! [test7b]
 //! [test7c]
@@ -548,7 +536,6 @@ void test7c(Viewer &vm) {
       .append("<li>test4</li>");
   divTest.append("<ul><li>Hello added to the end</li></ul>");
   divTest.appendChild("<p>Just adhoc dom building.</p>");
-  vm.render();
 }
 //! [test7d]
 void test7d(Viewer &vm) {
@@ -583,7 +570,6 @@ void test7e(Viewer &view) {
                 {"Candy", "4/16/12", "12.75", "4464.76", "35017.2 +"},
                 {"Alvin", "1/1/65", "4.75", "125.16", "2634.9 +"}});
   /// tblCost.edit(1,4);
-  view.render();
 }
 // complex form - most common in applications because of the layout and
 // summary information used to visualize.
@@ -924,7 +910,6 @@ can be described in the form :*/
  {"Alien Spacecraft R+", 97.1},
  {"Jupiter Time Shift R", 64.3}}}};
 #endif
-  view.render();
 }
 /*
  The string form of the transform may be expanded further to increase
@@ -1062,7 +1047,7 @@ void test8a(Viewer &vm) {
     dBook.printf("<li>Chapter List %i</li>", i);
   dBook.printf("</ul>");
   dBook.printf("</div>");
-  vm.render();
+
 }
 //! [test8a]
 /*******************************************************************
@@ -1073,7 +1058,7 @@ void test8(Viewer &vm) {
 
   int m = randomInt(5);
   auto dBook = vm.appendChild<DIV>(indexBy{"booklet5"});
-  vm.render();
+
   // std::reference_wrapper<PARAGRAPH> Booklet;
   for (int i = 0; i < m; i++) {
     // this line is like putting :
@@ -1091,7 +1076,6 @@ void test8(Viewer &vm) {
     dBook.printf("</p>");
     // Booklet.setAttribute(textColor{"red"});
   }
-  vm.render();
 }
 //! [test8]
 //! [test10]
@@ -1100,10 +1084,10 @@ void test10(Viewer &vm) {
 
   int m = randomInt(5);
   auto dBook = vm.appendChild<DIV>(indexBy{"booklet5"});
-  vm.render();
 
   for (int i = 0; i < m; i++) {
-    dBook << "<p id=BookletParagraph_" << i << ">"
+    string sID= "BookletParagraph_" + i;
+    dBook << "<p id=" << sID << ">"
           << "The paragraph content is here."
           << " <ul id=notes_" << i << ">text content ul"
           << "<ul id=guestSpeaker_" << i << ">"
@@ -1118,12 +1102,10 @@ void test10(Viewer &vm) {
        /* rather than mixing the use of pointer withi nthe syntax, the stringPointTag syntax might offer complexity.
          document for the user of the library a query facility that implements the functionality.
          */
-    auto Booklet = query("id=
-
-    ->setAttribute(textColor{"red"});
+    auto Booklet = query("id=" + sID);
+    Booklet->setAttribute(textColor{"red"});
 #endif
   }
-  vm.render();
 }
 //! [test10]
 /************************************************************************
@@ -1190,6 +1172,6 @@ void randomAttributeSettings(Element &e) {
     e.getAttribute<borderWidth>().value = randomDouble(0.0, 50.0);
     e.getAttribute<borderRadius>().value = randomDouble(0.0, 10.5);
   } catch (const std::exception &e) {
-    std::cout << " Exception: " << e.what() << "\n";
+    //std::cout << " Exception: " << e.what() << "\n";
   }
 }
