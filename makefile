@@ -1,5 +1,5 @@
-CC=clang
-#CC=g++
+#CC=clang
+CC=g++
 CFLAGS=-std=c++17 -Os
 INCLUDES=-I/projects/guidom
 LFLAGS=

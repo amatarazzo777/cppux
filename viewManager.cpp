@@ -1,10 +1,111 @@
 /**
+\mainpage cppUX documentation
+
+\paragraph The cppUX library is a self contained rendering system that work precisely with the 
+c++ standard library. The library is written as a templated interface. The interface syntax of 
+the library while using templates makes the source code of a c++ GUI application very readible.
+Because of the templated syntax, document elements that are derrived from standard W3C names
+can appear within the <> template parameters. The library depends on the c++ 17 and greater format.
+
+To include the library within your project, you simply have to include the viewManager.hpp header file.
+This header file encapsolates all of the necessary api declarations to utilize the rendering system.
+While the rendering system is much like a web browser, that is using a document object model, the base
+system does not depend on a full web browser but includes its own rendering and font system.
+
+Some examples of how to write complete gui applications are listed below. The
+following example is a gui program that can be compiled for multiple platforms
+that displays the message "Hello World" within a window.
+
+\code Hello World
+#include <viewManager.hpp>
+/****************************************************************************************************
+***************************************************************************************************/
+#if defined(__linux__)
+int main(int argc, char **argv) {
+  // handle command line here...
+#elif defined(_WIN64)
+int WINAPI WinMain(HINSTANCE hInstance , HINSTANCE /* hPrevInstance */,
+                   LPSTR lpCmdLine, int /* nCmdShow */) {
+  // command line
+#endif
+
+  // create the main window area. This may this is called a Viewer object.
+  // The main browsing window. It is an element as well.
+  auto &vm = createElement<Viewer>(
+      objectTop{10_pct}, objectLeft{10_pct}, objectHeight{640_px},
+      objectWidth{800_px}, textFace{"arial"}, textSize{16_pt});
+
+  vm << "Hello World\n";
+  vm.processEvents();
+}
+
+\endcode
+
+The viewManager renderer depends on the main Viewer object being created. This object
+supplies the connection with the target operating system and provides the 
+root of the document object model. The attributes set here, as well as the tree,
+heirarcy dependency, create the inheirited attributes when used for rendering. 
+
+Document elements can be easily added using the API commands described within the 
+documentation. Each document entity created is derrived from the main Element base 
+class. This class provides the stream operator <<, append, appendChild, 
+ingestMarkup, print and printf. By default, the stream operators such as printf, <<,
+and print insert the supplied text directly into the textual data of the referenced element.
+However, markup that is simular to HTML can lso be parsed. By setting the 
+boolean flag element.ingestMarkup = true, information within the given string
+passed to these stream routine will parsde the information for markup. This makes
+adding elements much easier, but requires a two phase parse.
+
+\code
+#include <viewManager.hpp>
+/****************************************************************************************************
+***************************************************************************************************/
+#if defined(__linux__)
+int main(int argc, char **argv) {
+  // handle command line here...
+#elif defined(_WIN64)
+int WINAPI WinMain(HINSTANCE hInstance , HINSTANCE /* hPrevInstance */,
+                   LPSTR lpCmdLine, int /* nCmdShow */) {
+  // command line
+#endif
+
+  // create the main window area. This may this is called a Viewer object.
+  // The main browsing window. It is an element as well.
+  auto &vm = createElement<Viewer>(
+      objectTop{10_pct}, objectLeft{10_pct}, objectHeight{640_px},
+      objectWidth{800_px}, textFace{"arial"}, textSize{16_pt});
+  
+  vm.ingestMarkup = true;
+  vm << "Hello World<br>";
+  vm << "<ul>" <<
+      "<li>United States, Hi</li>" <<
+      "<li>Mexico, Hey dudes</li>" <<
+      "<li>Canada, Hows it going?</li>" <<
+      "</ul>";
+
+  vm.processEvents();
+}
+
+\endcode
+
+The parsing document format is much simplier that HTML but supports the same
+basic functionality. The parser is a fast one in that it is specifically coded 
+for the format. A great feature is that it supports a parser context so that
+entity tags can be listed on separate inputs of the stream. This makes the 
+process of string building much easier as complete tags do not have to be included
+into one call. Tht is the input can be broken apart and on separate lines for 
+ease of maintenance.
+
+
 \author Anthony Matarazzo
+
 \file viewManager.cpp
 \date 11/19/19
 \version 1.0
 \brief class that implements that main creation interface.
  The file contains initialization, termination.
+
+
 */
 
 #include "viewManager.hpp"
@@ -18,13 +119,17 @@ using namespace viewManager;
 
 \brief These namespace specific data structures hold the system
 level document elements. The tracking of them is done using a
-smart pointer. The elements are indexed using the indexBy attribute
+smart pointer. The elements in the main allocation of the system
+are indexed by the numeric pointer address. When elements are removed
+from the system, they should be done so through the element unordered_map.
+This underorder map tracks them by the numerical pointer id.
+Elements may also be indexed using the indexBy attribute
 and the map contains a reference wrapper to the element. These items
 are not normally accessed by the developer. They are accessed using the
 API. The create, append, and getElement functions provide the searching and
 creation of the objects.
 */
-std::vector<std::unique_ptr<Element>> viewManager::elements;
+std::unordered_map<std::size_t, std::unique_ptr<Element>> viewManager::elements;
 std::unordered_map<std::string, std::reference_wrapper<Element>>
     viewManager::indexedElements;
 std::vector<std::unique_ptr<StyleClass>> viewManager::styles;
@@ -845,7 +950,7 @@ viewManager::Viewer::~Viewer() {}
 the recursive process.
 */
 void viewManager::Viewer::streamRender(std::stringstream &ss, Element &e, int iLevel) {
- int iWidth = iLevel * 4;
+  int iWidth = iLevel * 4;
   
   for(int i=0;i<iLevel*iWidth;i++)
     ss << " ";
@@ -1097,16 +1202,16 @@ auto viewManager::query(const std::string &queryString) -> ElementList {
   ElementList results;
   if (queryString == "*") {
     for (const auto &n : elements) {
-      results.push_back(std::ref(*(n.get())));
+      results.push_back(std::ref(*(n.second.get())));
     }
   } else {
     std::regex matchExpression(queryString.data(),
                                std::regex_constants::ECMAScript |
                                    std::regex_constants::icase);
     for (const auto &n : elements) {
-      if (std::regex_match(n->getAttribute<indexBy>().value.data(),
+      if (std::regex_match(n.second->getAttribute<indexBy>().value.data(),
                            matchExpression))
-        results.push_back(std::ref(*(n.get())));
+        results.push_back(std::ref(*(n.second.get())));
     }
   }
   return results;
@@ -1121,8 +1226,8 @@ The function is expected to return a true or false value.
 auto viewManager::query(const ElementQuery &queryFunction) -> ElementList {
   ElementList results;
   for (const auto &n : elements) {
-    if (queryFunction(std::ref(*(n.get()))))
-      results.push_back(std::ref(*(n.get())));
+    if (queryFunction(std::ref(*(n.second.get()))))
+      results.push_back(std::ref(*(n.second.get())));
   }
   return results;
 }
@@ -1138,6 +1243,13 @@ bool viewManager::hasElement(const std::string &key) {
 }
 /** @}*/
 
+/**
+    \addtogroup Element
+    \brief This is the main Element API. All document entities have this interface.
+    @{
+
+    
+*/
 /**
 \internal
 \brief copy constructor
@@ -1576,21 +1688,59 @@ auto viewManager::Element::insertBefore(Element &newChild,
 */
 auto viewManager::Element::insertAfter(Element &newChild,
                                        Element &existingElement) -> Element & {
+
+  // maintain tree structure
+  newChild.m_parent = existingElement.m_parent;
+  newChild.m_nextSibling = existingElement.m_previousSibling;
+  newChild.m_previousSibling = existingElement.m_self;
+  if(existingElement.m_nextSibling)
+    existingElement.m_nextSibling->m_previousSibling = newChild.m_self;
+
+  existingElement.m_nextSibling = newChild.m_self;
+
+  // case where insert is at the end
+  if (existingElement.m_self == m_lastChild) {
+    m_lastChild = newChild.m_self;
+  }
+  m_childCount++;
   return newChild;
 }
 
-/**
-\brief removes a child element from the list.
-*/
-auto viewManager::Element::removeChild(Element &oldChild) -> Element & {
-  return *this;
-}
 
 /**
 \brief replaces the child with the new one specified.
 */
 auto viewManager::Element::replaceChild(Element &newChild, Element &oldChild)
     -> Element & {
+
+  // unattach the old one and insert the new one
+  if(oldChild.m_parent->m_firstChild == oldChild.m_self)
+    oldChild.m_parent->m_firstChild = newChild.m_self;
+
+  if(oldChild.m_parent->m_lastChild == oldChild.m_self)
+    oldChild.m_parent->m_lastChild = newChild.m_self;
+
+  if(oldChild.m_previousSibling)
+    oldChild.m_previousSibling->m_nextSibling = newChild.m_self;
+
+  if(oldChild.m_nextSibling)
+    oldChild.m_nextSibling->m_previousSibling = newChild.m_self;
+
+  newChild.m_parent = oldChild.m_parent;
+
+  // remove reference from string id indexed list
+  try {
+    indexedElements.erase(oldChild.getAttribute<indexBy>().value);
+
+  } catch (const std::exception &e) {
+    //std::cout << " Exception: " << e.what() << "\n";
+  }
+
+  // remove the element smart pointer
+  auto it = elements.find((std::size_t)oldChild.m_self);
+  if(it!=elements.end())
+    elements.erase(it);
+
   return *this;
 }
 
@@ -1615,13 +1765,131 @@ auto viewManager::Element::resize(const double w, const double h) -> Element & {
 /**
 \brief removes the element from the document.
 */
-void viewManager::Element::remove(void) { return; }
+void viewManager::Element::remove(void) { 
+  // recursively remove all children
+  removeChildren();
+
+  // update tree linkage
+  if(m_parent && m_parent->m_firstChild == m_self)
+    m_parent->m_firstChild = m_nextSibling;
+
+  if(m_parent && m_parent->m_lastChild == m_self)
+    m_parent->m_lastChild = m_previousSibling;
+
+  if(m_nextSibling)
+    m_nextSibling->m_previousSibling = m_previousSibling;
+
+  if(m_previousSibling)
+    m_previousSibling->m_nextSibling = m_nextSibling;
+
+  // remove reference from string id indexed list
+  try {
+    indexedElements.erase(getAttribute<indexBy>().value);
+
+  } catch (const std::exception &e) {
+    //std::cout << " Exception: " << e.what() << "\n";
+  }
+
+  // free smart pointer
+  auto it = elements.find((std::size_t)m_self);
+  if(it!=elements.end())
+    elements.erase(it);
+
+  return; 
+}
+
+/**
+\brief removes a child element from the list.
+*/
+auto viewManager::Element::removeChild(Element &oldChild) -> Element & {
+  // recursively remove children
+  auto pItem = oldChild.m_firstChild;
+  while(pItem) {
+    pItem->removeChild(*pItem);
+    pItem = pItem->m_nextSibling;
+  }
+
+  // modify tree linkage
+  if(m_firstChild == oldChild.m_self) {
+    m_firstChild=oldChild.m_nextSibling;
+  } 
+  
+  if(m_lastChild == oldChild.m_self) { 
+    m_lastChild = oldChild.m_previousSibling;
+  }
+
+  if(oldChild.m_previousSibling)
+    oldChild.m_previousSibling->m_nextSibling = oldChild.m_nextSibling;
+
+  if(oldChild.m_nextSibling)
+    oldChild.m_nextSibling->m_previousSibling = oldChild.m_previousSibling;
+  
+  // update string index list
+  try {
+    indexedElements.erase(oldChild.getAttribute<indexBy>().value);
+
+  } catch (const std::exception &e) {
+    //std::cout << " Exception: " << e.what() << "\n";
+  }
+
+  // free memory
+  auto it = elements.find((std::size_t)oldChild.m_self);
+  if(it!=elements.end())
+    elements.erase(it);
+
+  m_childCount--;
+  return *this;
+}
 
 /**
 \brief removes all children from the list.
 */
-auto viewManager::Element::removeChildren(Element &e) -> Element & {
+auto viewManager::Element::removeChildren(void) -> Element & {
+
+  auto pItem=m_firstChild;
+  while(pItem) {
+    std::size_t storageKey = (std::size_t)pItem;
+    if(pItem->m_childCount)
+        pItem->removeChildren();
+
+      // update string index list
+      try {
+        indexedElements.erase(pItem->getAttribute<indexBy>().value);
+
+      } catch (const std::exception &e) {
+        //std::cout << " Exception: " << e.what() << "\n";
+      }
+
+
+    pItem=pItem->m_nextSibling;
+    auto it = elements.find(storageKey);
+    if(it!=elements.end())
+      elements.erase(it);
+    
+  }
+
+  // update linkage
+  m_firstChild=nullptr;
+  m_lastChild=nullptr;
+  m_childCount=0;
+
   return *this;
+}
+
+/**
+\brief The function removes all children and data from the
+the element.
+
+*/
+auto viewManager::Element::clear(void) -> Element & { 
+  // delete all items in the dat vector
+  auto n=m_usageAdaptorMap.begin();
+  while(n !=m_usageAdaptorMap.end())
+    n=m_usageAdaptorMap.erase(n);
+
+  removeChildren();
+  return *this; 
+
 }
 
 /**
@@ -1698,12 +1966,6 @@ auto viewManager::Element::removeListener(eventType evtType,
   return *this;
 }
 
-/**
-\brief The function removes all children and data from the
-the element.
-
-*/
-auto viewManager::Element::clear(void) -> Element & { return *this; }
 
 /**
 \brief This is the main function which invokes drawing of the item and
@@ -2098,6 +2360,8 @@ Element &viewManager::Element::ingestMarkup(Element &node,
 
   return eRet;
 }
+
+/** @} */
 
 /**
 \internal

@@ -117,7 +117,7 @@ namespace viewManager {
   \brief Contains all elements allocated using the system api. They are
   contained here as smart pointers and are automatically memory managed.
   */
-  extern std::vector<std::unique_ptr<Element>> elements;
+  extern std::unordered_map<std::size_t, std::unique_ptr<Element>> elements;
 
   /**
   \internal
@@ -530,11 +530,13 @@ enumerated constant
 
   public:
     template <typename... Args> StyleClass(const Args &... args) : self(this) {
-      //((void)setValue(std::forward<Args>(args)), ...);
+      setValue({args...});
     }
-    template <typename T> void setValue(const T &attr) {
-      std::type_index ti = std::type_index(typeid(attr));
-      attributes[ti] = attr;
+    void setValue(const std::vector<std::any> &attrs) {
+      for(auto &n : attrs) {
+        std::type_index ti = std::type_index(n.type());
+        attributes[ti] = n;
+      }
     }
   };
   /**
@@ -611,6 +613,12 @@ enumerated constant
   template <typename TYPE>
   auto &_createElement(const std::vector<std::any> &attr);
 
+  /**
+    \addtogroup Element
+    \brief This is the main Element API. All document entities have this interface.
+    @{
+
+  */
   class Element {
   public:
     std::string_view softName;
@@ -905,7 +913,9 @@ enumerated constant
     auto appendChild(const std::string &sMarkup) -> Element &;
     auto appendChild(Element &newChild) -> Element &;
     auto appendChild(const ElementList &elementCollection) -> Element &;
-    /** \brief the templated function accepts a element type within the template
+    /** 
+     \fn appendChild
+     \brief the templated function accepts a element type within the template
      parameter and attributes within the parameter. The created element is 
      appended as a child.
      \tparam ATTR... param pack of attribute objects.
@@ -921,7 +931,9 @@ enumerated constant
     auto append(const std::string &sMarkup) -> Element &;
     auto append(Element &sibling) -> Element &;
     auto append(ElementList &elementCollection) -> Element &;
-    /** \brief the templated function accepts a element type within the template
+    /** 
+     \fn append
+     \brief the templated function accepts a element type within the template
      parameter and attributes within the parameter. The created element is appended 
      as a sibling of the referenced element.
      \tparam ATTR... param pack of attribute objects.
@@ -972,9 +984,6 @@ enumerated constant
     }
 
   public:
-    auto clear(void) -> Element &;
-
-  public:
     std::vector<eventHandler> onfocus;
     std::vector<eventHandler> onblur;
     std::vector<eventHandler> onresize;
@@ -1006,7 +1015,8 @@ enumerated constant
     auto insertAfter(Element &newChild, Element &existingElement) -> Element &;
     void remove(void);
     auto removeChild(Element &childElement) -> Element &;
-    auto removeChildren(Element &e) -> Element &;
+    auto removeChildren(void) -> Element &;
+    auto clear(void) -> Element &;
     auto replaceChild(Element &newChild, Element &oldChild) -> Element &;
 
 #if defined(__clang__)
@@ -1020,6 +1030,10 @@ enumerated constant
   private:
     void updateIndexBy(const indexBy &setting);
   }; // class Element
+
+  /** @}*/
+
+
   //
   auto operator""_pt(unsigned long long int value)->doubleNF;
   auto operator""_pt(long double value)->doubleNF;
@@ -1252,8 +1266,10 @@ enumerated constant
   template <typename TYPE>
   auto &_createElement(const std::vector<std::any> &attrs) {
     std::unique_ptr<TYPE> e = std::make_unique<TYPE>(attrs);
-    elements.push_back(std::move(e));
-    return static_cast<TYPE &>(*elements.back().get());
+    std::size_t storageKey = (std::size_t)e.get();
+    elements[storageKey]=std::move(e);
+    auto it = elements.find(storageKey);
+    return static_cast<TYPE &>(*(it->second.get()));
   }
 
   /**

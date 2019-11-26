@@ -30,6 +30,8 @@ void test10(Viewer &vm);
 void testStart(string_view sFunc) {
 #if defined(CONSOLE)
   cout << sFunc << endl;
+#elif defined(_WIN64)
+
 #endif
 }
 
@@ -46,7 +48,6 @@ int WINAPI WinMain(HINSTANCE hInstance , HINSTANCE /* hPrevInstance */,
 
   // create the main window area. This may this is called a Viewer object.
   // The main browsing window. It is an element as well.
-  cout << "start viewer create" << endl;
   auto &vm = createElement<Viewer>(
       objectTop{10_pct}, objectLeft{10_pct}, objectHeight{640_px},
       objectWidth{800_px}, textFace{"arial"}, textSize{16_pt}, textWeight{400},
@@ -55,60 +56,25 @@ int WINAPI WinMain(HINSTANCE hInstance , HINSTANCE /* hPrevInstance */,
       paddingBottom{5_pt}, paddingRight{5_pt}, marginTop{5_pt},
       marginLeft{5_pt}, marginBottom{5_pt}, marginRight{5_pt});
 
+
   test0(vm);
-
   test0c(vm);
-  vm.clear();
-
-  test8(vm);
-  vm.clear();
-
-
   test0b(vm);
-  vm.clear();
-
-
   test1(vm);
-  vm.clear();
-
   test1a(vm);
-  vm.clear();
-
   test2(vm);
-  vm.clear();
-
   test3(vm);
-  vm.clear();
-
   test4(vm);
-  vm.clear();
-
   test5(vm);
-  vm.clear();
-
   test6(vm);
-  vm.clear();
-
   test7(vm);
-  vm.clear();
-
   test7a(vm);
-  vm.clear();
-
   test7b(vm);
-  vm.clear();
-
   test7c(vm);
-  vm.clear();
-
   test8(vm);
-  vm.clear();
-
   test8a(vm);
-  vm.clear();
-
   test10(vm);
-  vm.clear();
+  vm.render();
   vm.processEvents();
 
 }
@@ -254,6 +220,10 @@ void test1(Viewer &vm) {
       createElement<paragraph>(indexBy{"bodyTextNew"}, textColor{"green"},
                                "And now, for a limited time. the all new ... "),
       getElement("bodyText"));
+  mainArea.insertAfter(createElement<paragraph>(indexBy{
+    "afterInsert"}, textColor{
+    "red"}, "new item added after the child"), getElement("bodyTextNew"));
+
   // attributes and references
   /* to quickly change attribute values wihin the dom
 you can
@@ -273,14 +243,14 @@ marginTop
     mainArea.data() = {"Hey attached to another container."};
   // walk children
   auto n = mainArea.firstChild();
-  while (n != std::nullopt) {
-    n = mainArea.nextChild();
+  while (n) {
+    n = n->get().nextSibling();
   }
-  for (auto n = mainArea.firstChild(); n != std::nullopt;
-       n = mainArea.nextChild()) {
+  for (auto n = mainArea.firstChild(); n ;
+       n = n->get().nextSibling()) {
   }
   auto [idRefText] = mainArea.getAttribute<indexBy>();
-  idRefText = "idView";
+  idRefText = "mainAreaidView";
   // must use set to invoke indexing of elementById
   mainArea.setAttribute(indexBy{idRefText});
   auto [d, opt] = mainArea.getAttribute<objectLeft>();
