@@ -1,4 +1,16 @@
 /**
+\file viewManager.cpp
+
+\author Anthony Matarazzo
+
+\date 11/19/19
+\version 1.0
+*/
+
+/**
+\brief class that implements that main creation interface.
+ The file contains initialization, termination.
+
 \mainpage cppUX documentation
 
 \paragraph The cppUX library is a self contained rendering system that work precisely with the 
@@ -16,30 +28,9 @@ Some examples of how to write complete gui applications are listed below. The
 following example is a gui program that can be compiled for multiple platforms
 that displays the message "Hello World" within a window.
 
-\code Hello World
-#include <viewManager.hpp>
-/****************************************************************************************************
-***************************************************************************************************/
-#if defined(__linux__)
-int main(int argc, char **argv) {
-  // handle command line here...
-#elif defined(_WIN64)
-int WINAPI WinMain(HINSTANCE hInstance , HINSTANCE /* hPrevInstance */,
-                   LPSTR lpCmdLine, int /* nCmdShow */) {
-  // command line
-#endif
-
-  // create the main window area. This may this is called a Viewer object.
-  // The main browsing window. It is an element as well.
-  auto &vm = createElement<Viewer>(
-      objectTop{10_pct}, objectLeft{10_pct}, objectHeight{640_px},
-      objectWidth{800_px}, textFace{"arial"}, textSize{16_pt});
-
-  vm << "Hello World\n";
-  vm.processEvents();
-}
-
-\endcode
+Hello World
+===========
+\snippet examples.cpp Hello World
 
 The viewManager renderer depends on the main Viewer object being created. This object
 supplies the connection with the target operating system and provides the 
@@ -56,37 +47,9 @@ boolean flag element.ingestMarkup = true, information within the given string
 passed to these stream routine will parsde the information for markup. This makes
 adding elements much easier, but requires a two phase parse.
 
-\code
-#include <viewManager.hpp>
-/****************************************************************************************************
-***************************************************************************************************/
-#if defined(__linux__)
-int main(int argc, char **argv) {
-  // handle command line here...
-#elif defined(_WIN64)
-int WINAPI WinMain(HINSTANCE hInstance , HINSTANCE /* hPrevInstance */,
-                   LPSTR lpCmdLine, int /* nCmdShow */) {
-  // command line
-#endif
-
-  // create the main window area. This may this is called a Viewer object.
-  // The main browsing window. It is an element as well.
-  auto &vm = createElement<Viewer>(
-      objectTop{10_pct}, objectLeft{10_pct}, objectHeight{640_px},
-      objectWidth{800_px}, textFace{"arial"}, textSize{16_pt});
-  
-  vm.ingestMarkup = true;
-  vm << "Hello World<br>";
-  vm << "<ul>" <<
-      "<li>United States, Hi</li>" <<
-      "<li>Mexico, Hey dudes</li>" <<
-      "<li>Canada, Hows it going?</li>" <<
-      "</ul>";
-
-  vm.processEvents();
-}
-
-\endcode
+Markup Example
+==============
+\snippet examples.cpp Markup
 
 The parsing document format is much simplier that HTML but supports the same
 basic functionality. The parser is a fast one in that it is specifically coded 
@@ -95,16 +58,6 @@ entity tags can be listed on separate inputs of the stream. This makes the
 process of string building much easier as complete tags do not have to be included
 into one call. Tht is the input can be broken apart and on separate lines for 
 ease of maintenance.
-
-
-\author Anthony Matarazzo
-
-\file viewManager.cpp
-\date 11/19/19
-\version 1.0
-\brief class that implements that main creation interface.
- The file contains initialization, termination.
-
 
 */
 
@@ -837,6 +790,7 @@ tuple<double, u_int8_t> viewManager::strToNumericAndEnum(
 }
 
 /**
+\internal
 \brief display(string sOption)
 transforms the textual input into the display options
 */
@@ -848,6 +802,7 @@ viewManager::display::display(const string &sOption) {
 }
 
 /**
+\internal
 \brief position(string sOption)
 transforms the textual input into the position options
 */
@@ -859,6 +814,7 @@ viewManager::position::position(const string &sOption) {
 }
 
 /**
+\internal
 \brief textAlignment(string sOption)
  transforms the textual input into the textAlignment options
  */
@@ -872,6 +828,7 @@ viewManager::textAlignment::textAlignment(const string &sOption) {
 }
 
 /**
+\internal
 \brief lineHeight(string sOption)
 transforms the textual input into the lineHeight options
 */
@@ -897,6 +854,7 @@ viewManager::borderStyle::borderStyle(const string &sOption) {
 }
 
 /**
+\internal
 \brief listStyleType
 transforms the string input to the list of options
 \param const string &_sOption is the option to translate
@@ -911,6 +869,7 @@ viewManager::listStyleType::listStyleType(const string &sOption) {
 }
 
 /**
+\internal
 \class Viewer
 \brief
 This is the viewing aparatus of the document object model. Within the
@@ -977,6 +936,11 @@ void viewManager::Viewer::streamRender(std::stringstream &ss, Element &e, int iL
   }
 }
 
+/**
+\internal
+\brief main entry point for the rendering subsystem. The head of
+the recursive process.
+*/
 void viewManager::Viewer::render(void) { 
   stringstream ss;
 
@@ -1244,13 +1208,6 @@ bool viewManager::hasElement(const std::string &key) {
 /** @}*/
 
 /**
-    \addtogroup Element
-    \brief This is the main Element API. All document entities have this interface.
-    @{
-
-    
-*/
-/**
 \internal
 \brief copy constructor
 */
@@ -1341,7 +1298,7 @@ is invoked.
 
 \param sMarkup a std::string containing the markup.
 \return Element& returns the referenced element for continuation syntax.
-
+\snippet examples.epp appendChild_markup
 */
 auto viewManager::Element::appendChild(const std::string &sMarkup)
     -> Element & {
@@ -1355,6 +1312,9 @@ the parameter as a child.
 \param newChild a new child element that was previously created.
 \return Element& returns the referenced element for continuation syntax.
 
+Example
+-------
+\snippet examples.cpp appendChild_element
 */
 auto viewManager::Element::appendChild(Element &newChild) -> Element & {
   newChild.m_parent = this;
@@ -1381,6 +1341,9 @@ previously created.
 
 \return Element& returns the referenced element for continuation syntax.
 
+Example
+-------
+\snippet examples.cpp appendChild_elementlist
 */
 auto viewManager::Element::appendChild(const ElementList &elementCollection)
     -> Element & {
@@ -1435,6 +1398,9 @@ previously created.
 
 \return Element& returns the referenced element for continuation syntax.
 
+Example
+-------
+\snippet examples.cpp append_elementlist
 */
 auto viewManager::Element::append(ElementList &elementCollection) -> Element & {
   for (auto &e : elementCollection)
@@ -1465,6 +1431,10 @@ The following are supported filtered types:
 - std::vector<std::vector<std::string>>
 - std::vector<std::vector<std::pair<int, std::string>>>
 - std::vector<std::vector<std::pair<int, std::string>>>
+
+Example
+-------
+\snippet examples.cpp setAttribute_base
 
 */
 Element &viewManager::Element::setAttribute(const std::any &setting) {
@@ -1656,6 +1626,9 @@ void viewManager::Element::updateIndexBy(const indexBy &setting) {
 
 \param Element &existingElement
 
+Example
+-------
+\example examples.cpp insertBefore
 */
 auto viewManager::Element::insertBefore(Element &newChild,
                                         Element &existingElement) -> Element & {
@@ -1685,6 +1658,9 @@ auto viewManager::Element::insertBefore(Element &newChild,
 
 \param Element &existingElement
 
+Example
+-------
+\snippet examples.cpp insertAfter
 */
 auto viewManager::Element::insertAfter(Element &newChild,
                                        Element &existingElement) -> Element & {
@@ -1709,6 +1685,14 @@ auto viewManager::Element::insertAfter(Element &newChild,
 
 /**
 \brief replaces the child with the new one specified.
+\details The function replaces the reference child with the new one selected.
+The ne child should be within the first parameter while the second parameter should contain
+an existing child. When the oldChild is replaced, it is removed from the indexBy list and 
+its memory is freed.
+
+\param Element& newChild a newly created child.
+\param Element& oldChild an existing child that is to be replaced.
+\snippet examples replaceChild
 */
 auto viewManager::Element::replaceChild(Element &newChild, Element &oldChild)
     -> Element & {
@@ -1746,6 +1730,14 @@ auto viewManager::Element::replaceChild(Element &newChild, Element &oldChild)
 
 /**
 \brief moves the element to the specified location.
+\details The method provides a shortened call to move both coordinates 
+at the same time. The objectTop and objectLeft are set. The method accepts 
+numerical values and only sets the value of the attribute. It does not change
+the numerical format of the underlying attribute values.
+
+Example
+-------
+\snippet examples.cpp move
 */
 auto viewManager::Element::move(const double t, const double l) -> Element & {
   getAttribute<objectTop>().value = t;
@@ -1755,6 +1747,14 @@ auto viewManager::Element::move(const double t, const double l) -> Element & {
 
 /**
 \brief resizes the element
+\details The method provides a shortened call to resize an element. 
+The objectWidth and objectHeight are set at the same time. The method accepts 
+numerical values and only sets the value of the attribute. It does not change
+the numerical format of the underlying attribute values.
+
+Example
+-------
+\snippet examples.cpp resize
 */
 auto viewManager::Element::resize(const double w, const double h) -> Element & {
   getAttribute<objectWidth>().value = w;
@@ -1763,7 +1763,15 @@ auto viewManager::Element::resize(const double w, const double h) -> Element & {
 }
 
 /**
-\brief removes the element from the document.
+\brief removes the element from the document tree and free the memory associated.
+\details The remove method provides an easy method to delete an object from the 
+document heirarchy. The method does not provide continuation syntax as 
+after the call is complete, all memory associated with the object will be freed. 
+The indexBy list is also modified to update the change.
+
+Example
+-------
+\snippet examples remove
 */
 void viewManager::Element::remove(void) { 
   // recursively remove all children
@@ -1799,7 +1807,14 @@ void viewManager::Element::remove(void) {
 }
 
 /**
-\brief removes a child element from the list.
+\brief removes a child element from the list and free the associated memory.
+\param Element& oldChild is an existing child of the referenced element to remove.
+
+\details The removeChild destroys an existing child element of a document tree.
+After the function completes, all associated reference within the system will be
+discontinued. This includes the smart pointer and the indexBy list.
+
+\snippet examples.cpp removeChild
 */
 auto viewManager::Element::removeChild(Element &oldChild) -> Element & {
   // recursively remove children
@@ -1842,7 +1857,16 @@ auto viewManager::Element::removeChild(Element &oldChild) -> Element & {
 }
 
 /**
-\brief removes all children from the list.
+\brief removes all children from the document tree associated with the given
+element and free the memory.
+\details The removeChild is a bulk operation function in which all 
+child document elements of the referenced element is freed. After the function
+completes, all associated references will not longer be tracked within the system.
+
+Example
+-------
+\snippet examples.cpp removeChildren
+
 */
 auto viewManager::Element::removeChildren(void) -> Element & {
 
@@ -1860,11 +1884,11 @@ auto viewManager::Element::removeChildren(void) -> Element & {
         //std::cout << " Exception: " << e.what() << "\n";
       }
 
-
+    // free memory
     pItem=pItem->m_nextSibling;
     auto it = elements.find(storageKey);
     if(it!=elements.end())
-      elements.erase(it);
+       elements.erase(it);
     
   }
 
@@ -1878,8 +1902,15 @@ auto viewManager::Element::removeChildren(void) -> Element & {
 
 /**
 \brief The function removes all children and data from the
-the element.
+the element. All memory for each of the elements is freed.
+\details The clear method is a bulk operation that removes
+all associated data within the public data members as well as 
+all manually document elements. It should be noted that 
+all of the data() adapators are erased.
 
+Example
+-------
+\snippet examples.cpp clear
 */
 auto viewManager::Element::clear(void) -> Element & { 
   // delete all items in the dat vector
@@ -1921,6 +1952,7 @@ vector<eventHandler> &viewManager::Element::getEventVector(eventType evtType) {
   return it->second;
 }
 /**
+\internal
 \brief
 The function will return the address of a std::function for the purposes
 of equality testing. Function from
@@ -1936,6 +1968,22 @@ size_t getAddress(std::function<T(U...)> f) {
 
 /**
 \brief adds a new event handler to the element.
+\param eventType - the type of event to associate the handler with.
+\param eventHandler - the std::function to invoke when the event occurs within
+the system.
+
+\details The addListener function provides an method for attaching
+an event handler with a event of the referenced element. The 
+method accepts a function as its eventHandler. This is a std::function 
+which may be a lambda, or a function pointer. The following events
+are accepted:
+
+\copydetails eventType
+
+Example
+-------
+\snippet examples.cpp addListener
+
 */
 auto viewManager::Element::addListener(eventType evtType,
                                        eventHandler evtHandler) -> Element & {
@@ -1987,9 +2035,9 @@ void viewManager::Element::streamRender(stringstream &ss) {
 parameters with the format string. Inserts the named
 elements within the markup into the document.</summary>
 
-  \param fmt is a printf format string. It should be a literal
-  string.
-  \param ...  is a variable argument parameter passed to the standard
+\param fmt is a printf format string. It should be a literal
+string.
+\param ...  is a variable argument parameter passed to the standard
   printf function.
 
   <code>
@@ -2071,7 +2119,7 @@ void viewManager::Element::printf(const char *fmt, ...) {
 simular to HTML. The format is more restrictive in that the parser is not as
 forgiving for errors.
 
-\description
+\details
 The routine is called by the functions that apply a string markup for parsing.
 This routine uses the object factrory and color map to query the
 contents of the maps. The parser applied is a simplified parser for
@@ -2096,9 +2144,9 @@ code from this markup.
 Notation is supported on numeric parameters with a format:
   coordinates {10% 10% 80% 80%}
 
-
+\code
        <h1>The title is</h1>
-       <h2>The information</h3> <!-- not an element -->
+       <h2>The information</h2> 
 
       <div id=divtest background=blue center relative>
          This is the text inside the block.
@@ -2112,6 +2160,7 @@ Notation is supported on numeric parameters with a format:
       <blue>When the text is set this way, the color continues until another
 color is selected. <green>This changes the color of the foreground and creates
 textNodes within the current element context.
+\endcode
 
 */
 Element &viewManager::Element::ingestMarkup(Element &node,
@@ -2361,8 +2410,6 @@ Element &viewManager::Element::ingestMarkup(Element &node,
   return eRet;
 }
 
-/** @} */
-
 /**
 \internal
 \var nodes contains a list of the elements and their coordinates.
@@ -2381,6 +2428,7 @@ void viewManager::Visualizer::openWindow(Element &e) {}
 void viewManager::Visualizer::closeWindow(Element &e) {}
 
 /**
+  \internal
   \brief constructor for the platform object. The platform object is coded such
   that each of the operating systems supported is encapsolated within
   preprocessor blocks.
@@ -2419,6 +2467,7 @@ viewManager::Visualizer::platform::platform(eventHandler evtDispatcher,
 }
 
 /**
+  \internal
   \brief opens a window on the target os
 
 
@@ -2511,6 +2560,7 @@ void viewManager::Visualizer::platform::openWindow(void) {
 }
 
 /**
+  \internal
   \brief closes a window on the target os
 
 
@@ -2635,10 +2685,12 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
   return result;
 }
 #endif
-/// <summary>terminates the xserver connection
-/// and frees resources.
-/// </summary>
-viewManager::Visualizer::platform::~platform() {
+/**
+  \internal
+  \brief terminates the xserver connection
+  and frees resources.
+*/
+  viewManager::Visualizer::platform::~platform() {
 #if defined(__linux__)
   xcb_free_gc(m_connection, m_foreground);
   xcb_key_symbols_free(m_syms);
@@ -2649,6 +2701,12 @@ viewManager::Visualizer::platform::~platform() {
   m_offScreenBitmap->Release();
 #endif
 }
+
+/**
+  \internal
+  \brief the routine handles the message processing for the specific
+  operating system. 
+*/
 void viewManager::Visualizer::platform::messageLoop(void) {
 #if defined(__linux__)
   xcb_generic_event_t *xcbEvent;

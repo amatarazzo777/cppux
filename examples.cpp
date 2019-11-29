@@ -1,96 +1,143 @@
+//! [Hello World]
 #include "viewManager.hpp"
 
 using namespace std;
 using namespace viewManager;
 
-void test0(Viewer &vm);
-void test0b(Viewer &vm);
-void test0c(Viewer &vm);
-void test1(Viewer &vm);
-void test1a(Viewer &vm);
-void test2(Viewer &vm);
-void test3(Viewer &vm);
-void test4(Viewer &vm);
-void test5(Viewer &vm);
-void test6(Viewer &vm);
-void test7(Viewer &vm);
-void test7a(Viewer &vm);
-void test7b(Viewer &vm);
-void test7c(Viewer &vm);
-void test7d(Viewer &vm);
-void test7e(Viewer &vm);
-void test7f(Viewer &vm);
-void test7g(Viewer &vm);
-void test7h(Viewer &vm);
-void test7i(Viewer &view);
-void test8a(Viewer &vm);
-void test8(Viewer &vm);
-void test10(Viewer &vm);
-
-void testStart(string_view sFunc) {
-#if defined(CONSOLE)
-  cout << sFunc << endl;
+#if defined(__linux__)
+int main(int argc, char **argv) {
 #elif defined(_WIN64)
-
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR lpCmdLine, int) {
 #endif
-}
 
-/****************************************************************************************************
-***************************************************************************************************/
+  // create the main window area. This may this is called a Viewer object.
+  // The main browsing window. It is an element as well. It can be considered
+  // the document root. The object is a specialized object in that it creates
+  // a window and estables the message loop.
+  auto &vm = createElement<Viewer>(objectTop{10_pct}, objectLeft{10_pct},
+                                   objectHeight{640_px}, objectWidth{800_px},
+                                   textFace{"arial"}, textSize{16_pt});
+
+  vm << "Hello World\n";
+  vm.processEvents();
+}
+//! [Hello World]
+
+//! [Markup]
+#include <viewManager.hpp>
+
 #if defined(__linux__)
 int main(int argc, char **argv) {
   // handle command line here...
 #elif defined(_WIN64)
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
-                   LPSTR lpCmdLine, int /* nCmdShow */) {
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR lpCmdLine, int) {
   // command line
 #endif
 
   // create the main window area. This may this is called a Viewer object.
   // The main browsing window. It is an element as well.
-  auto &vm = createElement<Viewer>(
-      objectTop{10_pct}, objectLeft{10_pct}, objectHeight{640_px},
-      objectWidth{800_px}, textFace{"arial"}, textSize{16_pt}, textWeight{400},
-      textIndent{2_em}, lineHeight::normal, textAlignment::left,
-      position::relative, paddingTop{5_pt}, paddingLeft{5_pt},
-      paddingBottom{5_pt}, paddingRight{5_pt}, marginTop{5_pt},
-      marginLeft{5_pt}, marginBottom{5_pt}, marginRight{5_pt});
+  auto &vm = createElement<Viewer>(objectTop{10_pct}, objectLeft{10_pct},
+                                   objectHeight{640_px}, objectWidth{800_px},
+                                   textFace{"arial"}, textSize{16_pt});
 
-  test0(vm);
-  test0c(vm);
-  test0b(vm);
-  test1(vm);
-  test1a(vm);
-  test2(vm);
-  test3(vm);
-  test4(vm);
-  test5(vm);
-  test6(vm);
-  test7(vm);
-  test7a(vm);
-  test7b(vm);
-  test7c(vm);
-  test8(vm);
-  test8a(vm);
-  test10(vm);
-  vm.render();
+  vm.ingestMarkup = true;
+  vm << "Hello World<br>";
+  vm << "<ul>"
+     << "<li>United States, Hi</li>"
+     << "<li>Mexico, Hey dudes</li>"
+     << "<li>Canada, Hows it going?</li>"
+     << "</ul>";
+
   vm.processEvents();
 }
+//! [Markup]
 
-string randomString(int nChars);
-double randomDouble(double a, double b);
-int randomInt(int a);
-void randomAttributeSettings(Element &e);
-/************************************************************************
-************************************************************************/
-void test0(Viewer &vm) {
-  vm << "Hello World\n";
+//! [createElement]
 
-  vm << "<h1>Hello World</h1>";
-  vm << "<blue>Got to be a pretty day.</blue>";
+auto &appTitle = createElement<H1>("Type XCB");
+vm.append(appTitle);
+
+//! [createElement]
+
+//! [parent]
+auto &oParent = getElement("subMenu").parent().get();
+oParent.setAttribute(textSize{2_em});
+//! [parent]
+
+//! [firstChild]
+//! [firstChild]
+
+//! [lastChild]
+//! [lastChild]
+
+//! [nextChild]
+//! [nextChild]
+
+//! [previousChild]
+//! [previousChild]
+
+//! [previousSibling]
+//! [previousSibling]
+
+//! [nextSibling]
+//! [nextSibling]
+
+//! [children]
+auto style = createStyle(indexBy{"areaColor"}, textSize{1.5_em});
+for (auto n : getElement("mainArea").children()) {
+  n.styles.push_back(style);
 }
-/************************************************************************
-************************************************************************/
+//! [children]
+
+//! [childCount]
+size_t iCount = getElement("idULtemp").childCount();
+if (iCount) {
+  stringstream ss;
+  ss << "The total number in the list is <red>" << iCount;
+  getElement("idTotal") << ss.str();
+}
+
+//! [childCount]
+
+//! [styles]
+auto &styleTitle = createStyle(indexBy{"title"}, background{"orange"},
+                               textSize{2_em}, textColor{"white"});
+getElement("documentTitle").styles.push_back(styleTitle);
+
+//! [styles]
+
+//! [appendChild_element]
+//! [appendChild_elementlist]
+//! [appendChild_markup]
+//! [appendChild_parampack]
+
+//! [append_element]
+//! [append_elementlist]
+//! [append_markup]
+//! [append_parampack]
+//! [insertBefore]
+//! [insertAfter]
+//! [replaceChild]
+//! [move]
+//! [resize]
+//! [remove]
+//! [removeChild]
+//! [removeChildren]
+//! [clear]
+
+//! [getAttribute]
+
+//! [setAttribute_base]
+//! [setAttribute_parampack]
+
+//! [H1]
+//! [H2]
+//! [H3]
+//! [SPAN]
+//! [DIV]
+//! [UL]
+//! [OL]
+
 //! [test0]
 void test0b(Viewer &vm) {
   testStart(__FUNCTION__);
@@ -236,20 +283,13 @@ marginTop
 */
   if (mainArea.parent())
     mainArea.data() = {"Hey attached to another container."};
-
   // walk children
   auto n = mainArea.firstChild();
   while (n) {
     n = n->get().nextSibling();
   }
-
   for (auto n = mainArea.firstChild(); n; n = n->get().nextSibling()) {
   }
-
-  for (auto n : mainArea.children()) {
-
-  }
-
   auto [idRefText] = mainArea.getAttribute<indexBy>();
   idRefText = "mainAreaidView";
   // must use set to invoke indexing of elementById
@@ -852,33 +892,34 @@ https://en.wikipedia.org/wiki/Polymer_(library)
   /* a record type such as this, containing dynamic children
 can be described in the form :*/
   using tagInfo = std::tuple<int, std::string, float, std::string,
-                             std::vector<std::pair<std::string, float>>>;
+                             std::vector<std::tuple<std::string, float>>>;
   auto o = view.appendChild<ul>(indexBy{"music"});
   o.dataTransform<li, tagInfo>(
       R"( (t) :
-      <li>{t[0],%0xd}
-	      <ul>
-	      <li>{t[1],:20}</li>
-	      <li>{t[2]}</li>
-	      <li>{t[3]}</li>
-	      <li><table>
-		      <{t[4]...v, odd-even} tr>
-		      <td>{v[0], titlecap}</td>
-		      <td>{v[1], Currency}</td>
-		      </tr>
-		      </table></li>
-	      </ul>
-      </li>
-      )");
-
-  view.appendChild<ul>().data<tagInfo>() = {{0,
-                                             "Anthony",
-                                             134.5,
-                                             "Horror films, science fiction",
-                                             {{"Planet Crack Core", 7.0},
-                                              {"Nachzehrer Fires PG", 43.4},
-                                              {"Alien Spacecraft R+", 97.1},
-                                              {"Jupiter Time Shift R", 64.3}}}};
+<li>{t[0],%0xd}
+	<ul>
+	<li>{t[1],:20}</li>
+	<li>{t[2]}</li>
+	<li>{t[3]}</li>
+	<li><table>
+		<{t[4]...v, odd-even} tr>
+		<td>{v[0], titlecap}</td>
+		<td>{v[1], Currency}</td>
+		</tr>
+		</table></li>
+	</ul>
+</li>
+)");
+#if 0
+ view.appendChild<ul>().data<tagInfo>() = {{0,
+ "Anthony",
+ 134.5,
+ "Horror films, science fiction",
+ {{"Planet Crack Core", 7.0},
+ {"Nachzehrer Fires PG", 43.4},
+ {"Alien Spacecraft R+", 97.1},
+ {"Jupiter Time Shift R", 64.3}}}};
+#endif
 }
 /*
  The string form of the transform may be expanded further to increase
@@ -928,29 +969,29 @@ may share with internal and exteral communication.
       {0, "color", 2.9, "unknown not found error"},
       {2, "magnetism", 8.3, "perhaps but much after quantium decays"},
       {1, "alertness", 3.7, "can monitor laughter pinches"}};
-  auto &o = getElement("corp");
-  #if 0
-  o.dataTransform<0, processList>(
-      {{0,
-        [](processList &r) {
-          return createElement<li>(textColor{"red"}, get<1>(r), get<2>(r),
-                                   get<3>(r));
-        }},
-       {1,
-        [](processList &r) {
-          return createElement<li>(textColor{"green"}, get<1>(r), get<2>(r),
-                                   get<3>(r));
-        }},
-       {2,
-        [](processList &r) {
-          return createElement<li>(textColor{"blue"}, get<1>(r), get<2>(r),
-                                   get<3>(r));
-        }},
-       {3, [](processList &r) {
-          return createElement<li>(textColor{"plum"}, get<1>(r), get<2>(r),
-                                   get<3>(r));
-        }}});
-  #endif
+  auto o = getElement("corp");
+#if 0
+ o.dataTransform<0, processList>(
+ {{0,
+ [](processList &r) {
+ return createElement<li>(
+ textColor{"red"}, get<1>(r), get<2>(r), get<3>(r));
+ }},
+ {1,
+ [](processList &r) {
+ return createElement<li>(
+ textColor{"green"}, get<1>(r), get<2>(r), get<3>(r));
+ }},
+ {2,
+ [](processList &r) {
+ return createElement<li>(
+ textColor{"blue"}, get<1>(r), get<2>(r), get<3>(r));
+ }},
+ {3, [](processList &r) {
+ return createElement<li>(
+ textColor{"plum"}, get<1>(r), get<2>(r), get<3>(r));
+ }}});
+#endif
 }
 /*******************************************************************
 My next thoughtre of a very nice ordered approach to classical

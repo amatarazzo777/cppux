@@ -608,16 +608,17 @@ enumerated constant
   }; // class platform
   }; // namespace Visualizer
 
-  /// \brief Internal function to create elements. The function
-  /// accepts an array where as the main interface version is varidic
+  /**
+    \internal
+    \brief Internal function to create elements. The function
+    accepts an array where as the main interface version is varidic
+  */
   template <typename TYPE>
   auto &_createElement(const std::vector<std::any> &attr);
 
   /**
-    \addtogroup Element
+    \class Element
     \brief This is the main Element API. All document entities have this interface.
-    @{
-
   */
   class Element {
   public:
@@ -734,7 +735,9 @@ enumerated constant
             std::any_cast<usageAdaptor<T> &>(m_usageAdaptorMap[tIndex]);
       }
     }
-    /*
+    /**
+    \brief This data transform uses the named value of the numerical column.
+    \details
     This data transform uses the named value of the numerical column.
     While being a constant, this reliance is that of an itm within a tuple
     column. This tuple column is used as a index into the natural long list
@@ -756,6 +759,11 @@ enumerated constant
                        std::function<Element &(T &)>> &_transformList) {}
     /**
       \brief data access interface for element based data storage.
+        Elements can store vectors of the named type. This method provides
+        an easy way to insert children into the element. As well by using the dataTransform
+        in conjuction with the data() templated member, child elements may be build and formated
+        to the developer's spcification. 
+      \tparam T defaulted to a std::string
     */
     template <typename T = std::string> auto &data(void) {
       auto tIndex = std::type_index(typeid(std::vector<T>));
@@ -796,6 +804,7 @@ enumerated constant
     }
 
     /**
+    \var ingestStream
     \brief The ingestStream boolean value is a setting which determines
     if the stream comming into the system is first interpreted as markup
     content. Two functions both check this value. The stream input operator and
@@ -807,7 +816,10 @@ enumerated constant
     /**
     \brief overload of the stream insertion operator.
     Simply puts the data into the stream. It should be
-    noted that flush should be called.
+    noted that flush should be called. By default the contents 
+    of the stream are directly inserted into the data<std::string>() vector.
+    When the ingestStream flag is set to true, the stream is parsed for markup
+    and appended to the named element.
     */
     template <typename T> Element &operator<<(const T &data) {
       std::ostringstream s;
@@ -827,6 +839,86 @@ enumerated constant
     auto query(const std::string &queryString) -> ElementList{};
     auto query(const ElementQuery &queryFunction) -> ElementList{};
 
+ 
+    // iterator class for the child traversal 
+    class Iterator 
+    { 
+    public: 
+    /**
+    \internal
+    \brief An iterator class that traverses the tree
+    */
+    Iterator(Element* pNode) noexcept : 
+        m_pCurrentNode (pNode) { } 
+  
+        Iterator& operator=(Element* pNode) 
+        { 
+            this->m_pCurrentNode = pNode; 
+            return *this; 
+        } 
+  
+        // Prefix ++ overload 
+        Iterator& operator++() 
+        { 
+            if (m_pCurrentNode) 
+                m_pCurrentNode = m_pCurrentNode->m_nextSibling; 
+            return *this; 
+        } 
+  
+
+        // Postfix ++ overload 
+        Iterator operator++(int) 
+        { 
+            Iterator iterator = *this; 
+            ++*this; 
+            return iterator; 
+        } 
+
+        // Prefix ++ overload 
+        Iterator& operator--() 
+        { 
+            if (m_pCurrentNode) 
+                m_pCurrentNode = m_pCurrentNode->m_previousSibling; 
+            return *this; 
+        } 
+
+        bool operator!=(const Iterator& iterator) 
+        { 
+            return m_pCurrentNode != iterator.m_pCurrentNode; 
+        } 
+  
+        Element& operator*() 
+        { 
+            return *m_pCurrentNode; 
+        } 
+
+        // Root of LinkedList wrapped in Iterator type 
+        Iterator begin() 
+        { 
+            return Iterator(m_pCurrentNode->m_firstChild); 
+        } 
+  
+        // End of LInkedList wrapped in Iterator type 
+        Iterator end() 
+        { 
+            return Iterator(nullptr); 
+        } 
+  
+    private: 
+        Element* m_pCurrentNode; 
+    };
+    /**
+    \fn children(void)
+    \brief The function provides a method to easily write range based for loops.
+    \details The children function provides a method that returns an Interator object.
+    This iterator object is an internally defined class that implements the 
+    c++ interface for iterators.
+
+    \snippet examples.cpp children
+
+    */
+    auto children(void) -> Iterator{return Iterator(this); };
+
   private:
     Element *m_self;
     Element *m_parent;
@@ -837,23 +929,40 @@ enumerated constant
     Element *m_nextSibling;
     Element *m_previousSibling;
     std::size_t m_childCount;
-    // interface access ponits for the interface
+    // interface access points for the interface
   public:
-#define _REF_INTERFACE(NAME, xNAME)                                            \
-  std::optional<std::reference_wrapper<Element>> NAME(void) {                  \
-    return (xNAME ? std::optional<std::reference_wrapper<Element>>{*xNAME}     \
-                  : std::nullopt);                                             \
-  }
+    /**
+      \internal
+      \def _REF_INTERFACE
+      \brief the macro creates a public interface for the named data member. 
+      The first macro parameter names the interface while the second parameter
+      names a member pointer. Noted that the interface will return a reference wrapper
+      or nullptr. This macro is used to declare and implement the document tree traveral
+      methods.
+    */
+    #define _REF_INTERFACE(NAME, xNAME)                                            \
+    std::optional<std::reference_wrapper<Element>> NAME(void) {                  \
+      return (xNAME ? std::optional<std::reference_wrapper<Element>>{*xNAME}     \
+              : std::nullopt);                                             \
+    }
     /**
      \fn parent
      \brief contains the parent element within the document traversal heirarchy
+
+     Example
+     -------  
+     \snippet examples.cpp parent
     */
     _REF_INTERFACE(parent, m_parent);
 
     /**
     \fn firstChild
     \brief contains the firstChild element within the document traversal
-    heirarchy
+     heirarchy
+
+     Example
+     -------  
+     \snippet examples.cpp firstChild
     */
     _REF_INTERFACE(firstChild, m_firstChild);
 
@@ -861,6 +970,10 @@ enumerated constant
       \fn lastChild
       \brief contains the lastChild element within the document traversal
       heirarchy
+
+      Example
+      -------  
+      \snippet examples.cpp lastChild
     */
     _REF_INTERFACE(lastChild, m_lastChild);
 
@@ -868,6 +981,10 @@ enumerated constant
       \fn nextChild
       \brief contains the nextChild element within the document traversal
       heirarchy
+
+      Example
+      -------  
+      \snippet examples.cpp nextChild
     */
     _REF_INTERFACE(nextChild, m_nextChild);
 
@@ -875,6 +992,10 @@ enumerated constant
       \fn previousChild
       \brief contains the previousChild element within the document traversal
       heirarchy
+
+      Example
+      -------  
+      \snippet examples.cpp previousChild
     */
     _REF_INTERFACE(previousChild, m_previousChild);
 
@@ -882,6 +1003,10 @@ enumerated constant
       \fn nextSibling
       \brief contains the nextSibling element within the document traversal
       heirarchy
+
+      Example
+      -------  
+      \snippet examples.cpp nextSibling
     */
     _REF_INTERFACE(nextSibling, m_nextSibling);
 
@@ -889,18 +1014,30 @@ enumerated constant
       \fn previousSibling
       \brief contains the previousSibling element within the document traversal
       heirarchy
+
+      Example
+      -------  
+      \snippet examples.cpp previousSibling
     */
     _REF_INTERFACE(previousSibling, m_previousSibling);
 
     /**
       \fn previousSibling
       \brief contains the number of children
+
+      Example
+      -------  
+      \snippet examples.cpp childCount
     */
     inline std::size_t &childCount(void) { return m_childCount; }
 
     /**
       \var styles
       \brief contains the style classes associated with the element
+
+      Example
+      -------  
+      \snippet examples.cpp styles
     */
     std::vector<std::reference_wrapper<StyleClass>> styles;
 
@@ -914,11 +1051,16 @@ enumerated constant
     auto appendChild(Element &newChild) -> Element &;
     auto appendChild(const ElementList &elementCollection) -> Element &;
     /** 
-     \fn appendChild
      \brief the templated function accepts a element type within the template
      parameter and attributes within the parameter. The created element is 
      appended as a child.
      \tparam ATTR... param pack of attribute objects.
+     \return Element& a reference to the newly appended child
+
+     Example
+     -------  
+     \snippet examples.cpp appendChild_parampack
+
     */
     template <typename TYPE, typename... ATTRS>
     auto appendChild(const ATTRS &... attrs) -> Element & {
@@ -932,11 +1074,18 @@ enumerated constant
     auto append(Element &sibling) -> Element &;
     auto append(ElementList &elementCollection) -> Element &;
     /** 
-     \fn append
-     \brief the templated function accepts a element type within the template
-     parameter and attributes within the parameter. The created element is appended 
-     as a sibling of the referenced element.
-     \tparam ATTR... param pack of attribute objects.
+    \fn append
+    \brief the templated function accepts a element type within the template
+    parameter and attributes within the parameter. The created element is appended 
+    as a sibling of the referenced element.
+    \tparam ATTR... param pack of attribute objects.
+
+    \return a reference to the appended object for continuation syntax.
+
+    Example
+    -------  
+    \snippet examples.cpp append_parampack
+
     */
     template <typename TYPE, typename... ATTRS>
     auto append(const ATTRS &... attrs) -> Element & {
@@ -954,6 +1103,10 @@ enumerated constant
     std::any.
     \tparam TYPES... a param pack of attributes
 
+    Example
+    -------  
+    \snippet examples.cpp setAttribute_parampack
+
     */
     template <typename... TYPES>
     Element &setAttribute(const TYPES... settings) {
@@ -964,9 +1117,16 @@ enumerated constant
   public:
     /**
       \brief the templated function returns specified attribute.
-      \tparam ATTR_TYPE a named attribute object.
+      \tparam ATTR_TYPE a named object.
       \return returns a reference to the attribute. An exception
       is raised if the attribute is currently not associated.
+      \exception std::invalid_argument When an element does not contain
+      an element, an exception is thrown. 
+
+      Example
+      -------  
+      \snippet examples.cpp getAttribute
+
     */
     template <typename ATTR_TYPE> ATTR_TYPE &getAttribute(void) {
       ATTR_TYPE *ret = nullptr;
@@ -1031,10 +1191,9 @@ enumerated constant
     void updateIndexBy(const indexBy &setting);
   }; // class Element
 
-  /** @}*/
 
 
-  //
+  // prototypes for the user defined literals
   auto operator""_pt(unsigned long long int value)->doubleNF;
   auto operator""_pt(long double value)->doubleNF;
   auto operator""_em(unsigned long long int value)->doubleNF;
@@ -1051,7 +1210,7 @@ enumerated constant
   auto operator""_numeric(long double value)->lineHeight;
 
   /**
-  \addtogroup Elements Document Entities
+  \addtogroup Entities Document Entities
 
   The document entities is a collection which is established in the
   base model. Typical character processing and basic flow layout are
@@ -1063,6 +1222,16 @@ enumerated constant
   /**
   \class BR
   \brief line break
+
+  \details When the BR element is present within the document
+  heirarchy, it is likened to the effects of a \n new line or return.
+  The next position of textual or document flow will go to the next line 
+  position.
+
+  Example
+  -------  
+  \snippet examples.cpp BR
+
   */
   using BR = class BR : public Element {
   public:
@@ -1073,6 +1242,22 @@ enumerated constant
   /**
   \class H1
   \brief heading level 1
+  \extends Element
+  \details The H1 element provides a heading of a level 1 within a document.
+  The element is useful for titles. The object is created with the following 
+  default styles.
+
+  - display::block
+  - marginTop{.67_em}
+  - marginLeft{.67_em}
+  - marginBottom{0_em}
+  - marginRight{0_em}
+  - textSize{2_em}
+  - textWeight{800}
+
+  Example
+  -------  
+  \snippet examples.cpp H1
   */
   using H1 = class H1 : public Element {
   public:
@@ -1086,6 +1271,22 @@ enumerated constant
   /**
   \class H2
   \brief heading level 2
+  \extends Element
+  \details The H2 element provides a heading of a level 2 within a document.
+  The element is useful for titles. The object is created with the following 
+  default styles.
+
+  - display::block
+  - marginTop{.83_em}
+  - marginLeft{.83_em}
+  - marginBottom{0_em}
+  - marginRight{0_em}
+  - textSize{1.5_em}
+  - textWeight{800}
+
+  Example
+  -------  
+  \snippet examples.cpp H2
   */
   using H2 = class H2 : public Element {
   public:
@@ -1099,6 +1300,22 @@ enumerated constant
   /**
   \class H3
   \brief heading level 3
+  \extends Element
+  \details The H2 element provides a heading of a level 2 within a document.
+  The element is useful for titles. The object is created with the following 
+  default styles.
+
+  - display::block
+  - marginTop{1_em}
+  - marginLeft{1_em}
+  - marginBottom{0_em}
+  - marginRight{0_em}
+  - textSize{1.17_em}
+  - textWeight{800}
+
+  Example
+  -------  
+  \snippet examples.cpp H3
   */
   using H3 = class H3 : public Element {
   public:
@@ -1112,6 +1329,20 @@ enumerated constant
   /**
   \class PARAGRAPH
   \brief a paragraph of text
+  \extends Element
+  \details The paragraph element allows for a flowing block of information that 
+  is considered to be a paragraph. The object is created with the following defaulted 
+  attributes:
+
+  - listStyleType::disc
+  - marginTop{1_em}
+  - marginLeft{1_em}
+  - marginBottom{0_em}
+  - marginRight{0_em}
+
+  Example
+  -------  
+  \snippet examples.cpp PARAGRAPH
   */
   using PARAGRAPH = class PARAGRAPH : public Element {
   public:
@@ -1125,6 +1356,17 @@ enumerated constant
   /**
   \class DIV
   \brief a divisor block
+  \extends Element
+  \details The DIV element provides a block level element. Within the 
+  box model, the information aligns top down. When additional blocks are added,
+  the items flow as if a carriage return were entered. The object is created with
+  the following default styles:
+
+  - display::block
+
+  Example
+  -------  
+  \snippet examples.cpp DIV
   */
   using DIV = class DIV : public Element {
   public:
@@ -1136,6 +1378,14 @@ enumerated constant
   /**
   \class SPAN
   \brief a span block
+  \extends Element
+  \descrciption The SPAN block provides a continued flowing element. The
+  object has no default styles associated.
+
+
+  Example
+  -------  
+  \snippet examples.cpp SPAN
   */
   using SPAN = class SPAN : public Element {
   public:
@@ -1146,6 +1396,22 @@ enumerated constant
   /**
   \class UL
   \brief an unordered list
+  \extends Element
+  \details The UL block provides an unordered list of items. Children
+  of the list can be added using the data() or by manually adding LI elements.
+  When created, the following dfault attributes are established:
+
+  - listStyleType::disc
+  - display::block
+  - marginTop{1_em}
+  - marginLeft{1_em}
+  - marginBottom{0_em}
+  - marginRight{0_em}
+  - paddingLeft{40_px}
+
+  Example
+  -------  
+  \snippet examples.cpp UL
   */
   using UL = class UL : public Element {
   public:
@@ -1159,6 +1425,24 @@ enumerated constant
   /**
   \class OL
   \brief an ordered list
+  \extends Element
+  \details The UL block provides an ordered list of items. When multiple
+  children exists, they are numerically numered automatically. The listStyleType
+  notes what for the numeric literals are shown as. Children
+  of the list can be added using the data() or by manually adding LI elements.
+  When created, the following default attributes are established:
+
+  - listStyleType::decimal
+  - display::block
+  - marginTop{1_em}
+  - marginLeft{1_em}
+  - marginBottom{0_em}
+  - marginRight{0_em}
+  - paddingLeft{40_px}
+
+  Example
+  -------  
+  \snippet examples.cpp OL
   */
   using OL = class OL : public Element {
   public:
@@ -1172,6 +1456,7 @@ enumerated constant
   /**
   \class LI
   \brief an list item, can be inserted into ol or ul
+  \extends Element
   */
   using LI = class LI : public Element {
   public:
@@ -1184,6 +1469,7 @@ enumerated constant
   /**
   \class TABLE
   \brief a table element to manage a grid of information
+  \extends Element
   */
   using TABLE = class TABLE : public Element {
   public:
@@ -1194,6 +1480,7 @@ enumerated constant
   /**
   \class MENU
   \brief a menu element for dropdown menus
+  \extends Element
   */
   using MENU = class MENU : public Element {
   public:
@@ -1204,6 +1491,7 @@ enumerated constant
   /**
   \class UX
   \brief user interface elements
+  \extends Element
   */
   using UX = class UX : public Element {
   public:
@@ -1214,6 +1502,7 @@ enumerated constant
   /**
   \class IMAGE
   \brief an image
+  \extends Element
   */
   using IMAGE = class IMAGE : public Element {
   public:
@@ -1224,6 +1513,7 @@ enumerated constant
   /**
   \class textNode
   \brief a node of textual information
+  \extends Element
   */
   class textNode : public Element {
   public:
@@ -1280,13 +1570,21 @@ enumerated constant
 
   /**
   \brief A templated factory implementation for reference based callee and
-  viewManager ownership of the object. The vector deconstructor will cause
-  proper deallocation.
+  viewManager ownership of the object. 
 
   \tparam TYPE is the object type to create. This class should be one that
   is derrived from the base element class.
 
   \tparam ATTRS... is a parameter pack of attributes.
+
+  \details The createElement templated function is the main way inwhich
+  top level elements are created. The function returns a reference object. 
+  Internally the function manufactures a smart pointer to the document entity
+  and object
+
+  Example
+  -------
+  \snippet examples.cpp createElement
 
   */
   template <class TYPE, typename... ATTRS>
