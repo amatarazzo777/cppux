@@ -157,6 +157,8 @@ void test1(Viewer &vm) {
       createElement<H2>(indexBy{"subtitle"}, objectTop{10_px},
                         textAlignment::center, "A starter testing Application");
   appTitle.setAttribute(objectTop{20_percent});
+
+  // setting the data property directly. 
   appTitle.data() = {"New Text in there."};
   appTitle.data() = {"data(). New Text in there."};
   appTitle.data() = {"But after we add it to the dom."};
@@ -219,21 +221,6 @@ void test1(Viewer &vm) {
                                "new item added after the child"),
       getElement("bodyTextNew"));
 
-  // attributes and references
-  /* to quickly change attribute values wihin the dom
-you can
-get a reference to the actual value stored within the tree. this is
-accomplished using the getAttribute function. The first parameter is
-the attribute name you wish to get. The second is the format of the
-characteristic. At most time, the first one is the one that is
-commonly used. However, most attributes contain a format specifier or
-other characteristics associated with the attribute. To provide
-efficient usage, the second parameter is the type of the
-characteristic. The type is is defaulted to double. That is, the
-common characteristic type is a double storage type. IE, objectLeft,
-marginTop
-...
-*/
   if (mainArea.parent())
     mainArea.data() = {"Hey attached to another container."};
 
@@ -246,25 +233,50 @@ marginTop
   for (auto n = mainArea.firstChild(); n; n = n->get().nextSibling()) {
   }
 
-  for (auto n : mainArea.children()) {
+  for (auto &n : mainArea.children()) {
 
   }
 
-  auto [idRefText] = mainArea.getAttribute<indexBy>();
-  idRefText = "mainAreaidView";
+
+/**
+Attributes and References
+-------------------------
+
+to quickly change attribute values wihin the dom
+you can get a reference to the actual value stored within the tree. this is
+accomplished using the getAttribute function. You must specify the reference operator. 
+The first parameter is the attribute name you wish to get. The second is the format of the
+characteristic. At most time, the first one is the one that is
+commonly used. However, most attributes contain a format specifier or
+other characteristics associated with the attribute. To provide
+efficient usage, the second parameter is the type of the
+characteristic. The type is is defaulted to double. That is, the
+common characteristic type is a double storage type. IE, objectLeft,
+marginTop
+
+*/
+
   // must use set to invoke indexing of elementById
+  auto& [idRefText] = mainArea.getAttribute<indexBy>();
+  idRefText = "mainAreaidView";
   mainArea.setAttribute(indexBy{idRefText});
-  auto [d, opt] = mainArea.getAttribute<objectLeft>();
+
+  // get the actual reference of the memory
+  auto& [d, opt] = mainArea.getAttribute<objectLeft>();
   d = 900;
-  auto d2 = mainArea.getAttribute<objectLeft>();
+
+  auto& d2 = mainArea.getAttribute<objectLeft>();
   d2.option = numericFormat::percent;
   d2.value = 50;
+
   // styles and CSS
-  auto boldTexts = createStyle(
+  auto& boldTexts = createStyle(
       indexBy{"boldText"}, textColor{"green"}, background{100, 200, 200},
       textFace{"FiraMono-Regular"}, textSize{20_pt}, textWeight{800});
+
   mainArea.styles.push_back(boldTexts);
   appSubTitle.styles.push_back(boldTexts);
+
 }
 //! [test1]
 //! [test1a]

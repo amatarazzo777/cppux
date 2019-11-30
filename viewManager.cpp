@@ -13,16 +13,20 @@
 
 \mainpage cppUX documentation
 
-\paragraph The cppUX library is a self contained rendering system that work precisely with the 
-c++ standard library. The library is written as a templated interface. The interface syntax of 
-the library while using templates makes the source code of a c++ GUI application very readible.
-Because of the templated syntax, document elements that are derrived from standard W3C names
-can appear within the <> template parameters. The library depends on the c++ 17 and greater format.
+\paragraph The cppUX library is a self contained rendering system that work
+precisely with the c++ standard library. The library is written as a templated
+interface. The interface syntax of the library while using templates makes the
+source code of a c++ GUI application very readible. Because of the templated
+syntax, document elements that are derrived from standard W3C names can appear
+within the <> template parameters. The library depends on the c++ 17 and greater
+format.
 
-To include the library within your project, you simply have to include the viewManager.hpp header file.
-This header file encapsolates all of the necessary api declarations to utilize the rendering system.
-While the rendering system is much like a web browser, that is using a document object model, the base
-system does not depend on a full web browser but includes its own rendering and font system.
+To include the library within your project, you simply have to include the
+viewManager.hpp header file. This header file encapsolates all of the necessary
+api declarations to utilize the rendering system. While the rendering system is
+much like a web browser, that is using a document object model, the base system
+does not depend on a full web browser but includes its own rendering and font
+system.
 
 Some examples of how to write complete gui applications are listed below. The
 following example is a gui program that can be compiled for multiple platforms
@@ -32,32 +36,33 @@ Hello World
 ===========
 \snippet examples.cpp Hello World
 
-The viewManager renderer depends on the main Viewer object being created. This object
-supplies the connection with the target operating system and provides the 
+The viewManager renderer depends on the main Viewer object being created. This
+object supplies the connection with the target operating system and provides the
 root of the document object model. The attributes set here, as well as the tree,
-heirarcy dependency, create the inheirited attributes when used for rendering. 
+heirarcy dependency, create the inheirited attributes when used for rendering.
 
-Document elements can be easily added using the API commands described within the 
-documentation. Each document entity created is derrived from the main Element base 
-class. This class provides the stream operator <<, append, appendChild, 
-ingestMarkup, print and printf. By default, the stream operators such as printf, <<,
-and print insert the supplied text directly into the textual data of the referenced element.
-However, markup that is simular to HTML can lso be parsed. By setting the 
-boolean flag element.ingestMarkup = true, information within the given string
-passed to these stream routine will parsde the information for markup. This makes
-adding elements much easier, but requires a two phase parse.
+Document elements can be easily added using the API commands described within
+the documentation. Each document entity created is derrived from the main
+Element base class. This class provides the stream operator <<, append,
+appendChild, ingestMarkup, print and printf. By default, the stream operators
+such as printf, <<, and print insert the supplied text directly into the textual
+data of the referenced element. However, markup that is simular to HTML can lso
+be parsed. By setting the boolean flag element.ingestMarkup = true, information
+within the given string passed to these stream routine will parsde the
+information for markup. This makes adding elements much easier, but requires a
+two phase parse.
 
 Markup Example
 ==============
 \snippet examples.cpp Markup
 
 The parsing document format is much simplier that HTML but supports the same
-basic functionality. The parser is a fast one in that it is specifically coded 
+basic functionality. The parser is a fast one in that it is specifically coded
 for the format. A great feature is that it supports a parser context so that
-entity tags can be listed on separate inputs of the stream. This makes the 
-process of string building much easier as complete tags do not have to be included
-into one call. Tht is the input can be broken apart and on separate lines for 
-ease of maintenance.
+entity tags can be listed on separate inputs of the stream. This makes the
+process of string building much easier as complete tags do not have to be
+included into one call. Tht is the input can be broken apart and on separate
+lines for ease of maintenance.
 
 */
 
@@ -908,10 +913,11 @@ viewManager::Viewer::~Viewer() {}
 \brief main entry point for the rendering subsystem. The head of
 the recursive process.
 */
-void viewManager::Viewer::streamRender(std::stringstream &ss, Element &e, int iLevel) {
+void viewManager::Viewer::streamRender(std::stringstream &ss, Element &e,
+                                       int iLevel) {
   int iWidth = iLevel * 4;
-  
-  for(int i=0;i<iLevel*iWidth;i++)
+
+  for (int i = 0; i < iLevel * iWidth; i++)
     ss << " ";
 
   ss << iLevel << " " << e.softName << " ";
@@ -924,7 +930,8 @@ void viewManager::Viewer::streamRender(std::stringstream &ss, Element &e, int iL
     sID = "-noID-";
   }
 
-  ss << "(" << sID << ")" << "\n";
+  ss << "(" << sID << ")"
+     << "\n";
 
   e.streamRender(ss);
 
@@ -941,15 +948,14 @@ void viewManager::Viewer::streamRender(std::stringstream &ss, Element &e, int iL
 \brief main entry point for the rendering subsystem. The head of
 the recursive process.
 */
-void viewManager::Viewer::render(void) { 
+void viewManager::Viewer::render(void) {
   stringstream ss;
 
   streamRender(ss, *this, 0);
   string s;
   m_device->clearText();
-  while(getline(ss,s,'\n')) 
+  while (getline(ss, s, '\n'))
     m_device->drawText(s);
-
 }
 
 /**
@@ -1207,6 +1213,46 @@ bool viewManager::hasElement(const std::string &key) {
 }
 /** @}*/
 
+Element::iterator &Element::iterator::operator=(Element *pNode) {
+  this->m_pCurrentNode = pNode;
+  return *this;
+}
+
+// Prefix ++ overload
+Element::iterator &Element::iterator::operator++() {
+  if (m_pCurrentNode)
+    m_pCurrentNode = m_pCurrentNode->m_nextSibling;
+  return *this;
+}
+
+// Postfix ++ overload
+Element::iterator Element::iterator::operator++(int) {
+  iterator it = *this;
+  ++*this;
+  return it;
+}
+
+// Prefix ++ overload
+Element::iterator &Element::iterator::operator--() {
+  if (m_pCurrentNode)
+    m_pCurrentNode = m_pCurrentNode->m_previousSibling;
+  return *this;
+}
+
+bool Element::iterator::operator!=(const Element::iterator &it) {
+  return m_pCurrentNode != it.m_pCurrentNode;
+}
+
+Element &Element::iterator::operator*() { return *m_pCurrentNode; }
+
+Element::iterator Element::iterator::begin() {
+  return Element::iterator(m_pCurrentNode->m_firstChild);
+}
+
+Element::iterator Element::iterator::end() {
+  return Element::iterator(nullptr);
+}
+
 /**
 \internal
 \brief copy constructor
@@ -1291,14 +1337,17 @@ Element &viewManager::Element::operator=(Element &&other) noexcept {
 }
 
 /**
-\brief
-The function will parse the string as input searching for document tags.
-These elements are added as children of the element for which the function
-is invoked.
+  \brief
+  The function will parse the string as input searching for document tags.
+  These elements are added as children of the element for which the function
+  is invoked.
 
-\param sMarkup a std::string containing the markup.
-\return Element& returns the referenced element for continuation syntax.
-\snippet examples.epp appendChild_markup
+  \param sMarkup a std::string containing the markup.
+  \return Element& returns the referenced element for continuation syntax.
+
+  Example
+  -------
+  \snippet examples.epp appendChild_markup
 */
 auto viewManager::Element::appendChild(const std::string &sMarkup)
     -> Element & {
@@ -1306,15 +1355,15 @@ auto viewManager::Element::appendChild(const std::string &sMarkup)
 }
 
 /**
-\brief The function will append the given document element within
-the parameter as a child.
+  \brief The function will append the given document element within
+  the parameter as a child.
 
-\param newChild a new child element that was previously created.
-\return Element& returns the referenced element for continuation syntax.
+  \param newChild a new child element that was previously created.
+  \return Element& returns the referenced element for continuation syntax.
 
-Example
--------
-\snippet examples.cpp appendChild_element
+  Example
+  -------
+  \snippet examples.cpp appendChild_element
 */
 auto viewManager::Element::appendChild(Element &newChild) -> Element & {
   newChild.m_parent = this;
@@ -1333,17 +1382,17 @@ auto viewManager::Element::appendChild(Element &newChild) -> Element & {
 }
 
 /**
-\brief The function will append the given document elements within
-the ElementList parameter as children.
+  \brief The function will append the given document elements within
+  the ElementList parameter as children.
 
-\param elementCollection an ElementList of new child element that was
-previously created.
+  \param elementCollection an ElementList of new child element that was
+  previously created.
 
-\return Element& returns the referenced element for continuation syntax.
+  \return Element& returns the referenced element for continuation syntax.
 
-Example
--------
-\snippet examples.cpp appendChild_elementlist
+  Example
+  -------
+  \snippet examples.cpp appendChild_elementlist
 */
 auto viewManager::Element::appendChild(const ElementList &elementCollection)
     -> Element & {
@@ -1354,12 +1403,16 @@ auto viewManager::Element::appendChild(const ElementList &elementCollection)
 }
 
 /**
- \brief The function will append the given markup content as a sibling.
+  \brief The function will append the given markup content as a sibling.
 
- \param elementCollection an ElementList of new child element that was
- previously created.
+  \param elementCollection an ElementList of new child element that was
+  previously created.
 
- \return Element& returns the referenced element for continuation syntax.
+  \return Element& returns the referenced element for continuation syntax.
+
+  Example
+  -------
+  \snippet examples.cpp append_markup
 
 */
 auto viewManager::Element::append(const std::string &sMarkup) -> Element & {
@@ -1370,9 +1423,13 @@ auto viewManager::Element::append(const std::string &sMarkup) -> Element & {
 }
 
 /**
- \brief The function will append the given element as a sibling.
+  \brief The function will append the given element as a sibling.
 
- \return Element& returns the referenced element for continuation syntax.
+  \return Element& returns the referenced element for continuation syntax.
+
+  Example
+  -------
+  \snippet examples.cpp append_element
 
 */
 auto viewManager::Element::append(Element &sibling) -> Element & {
@@ -1390,17 +1447,17 @@ auto viewManager::Element::append(Element &sibling) -> Element & {
 }
 
 /**
-\brief The function will append the collection of elements as a
-siblings.
+  \brief The function will append the collection of elements as a
+  siblings.
 
-\param elementCollection an ElementList of new child element that was
-previously created.
+  \param elementCollection an ElementList of new child element that was
+  previously created.
 
-\return Element& returns the referenced element for continuation syntax.
+  \return Element& returns the referenced element for continuation syntax.
 
-Example
--------
-\snippet examples.cpp append_elementlist
+  Example
+  -------
+  \snippet examples.cpp append_elementlist
 */
 auto viewManager::Element::append(ElementList &elementCollection) -> Element & {
   for (auto &e : elementCollection)
@@ -1568,6 +1625,10 @@ Element &viewManager::Element::setAttribute(const std::any &setting) {
 
 /**
 \brief The attribute being set can be contained in an array of std::any
+
+Example
+-------
+\snippet examples.cpp setAttribute_any
 */
 Element &
 viewManager::Element::setAttribute(const std::vector<std::any> &attribs) {
@@ -1669,7 +1730,7 @@ auto viewManager::Element::insertAfter(Element &newChild,
   newChild.m_parent = existingElement.m_parent;
   newChild.m_nextSibling = existingElement.m_previousSibling;
   newChild.m_previousSibling = existingElement.m_self;
-  if(existingElement.m_nextSibling)
+  if (existingElement.m_nextSibling)
     existingElement.m_nextSibling->m_previousSibling = newChild.m_self;
 
   existingElement.m_nextSibling = newChild.m_self;
@@ -1682,32 +1743,34 @@ auto viewManager::Element::insertAfter(Element &newChild,
   return newChild;
 }
 
-
 /**
 \brief replaces the child with the new one specified.
 \details The function replaces the reference child with the new one selected.
-The ne child should be within the first parameter while the second parameter should contain
-an existing child. When the oldChild is replaced, it is removed from the indexBy list and 
-its memory is freed.
+The ne child should be within the first parameter while the second parameter
+should contain an existing child. When the oldChild is replaced, it is removed
+from the indexBy list and its memory is freed.
 
 \param Element& newChild a newly created child.
 \param Element& oldChild an existing child that is to be replaced.
+
+Example
+-------
 \snippet examples replaceChild
 */
 auto viewManager::Element::replaceChild(Element &newChild, Element &oldChild)
     -> Element & {
 
   // unattach the old one and insert the new one
-  if(oldChild.m_parent->m_firstChild == oldChild.m_self)
+  if (oldChild.m_parent->m_firstChild == oldChild.m_self)
     oldChild.m_parent->m_firstChild = newChild.m_self;
 
-  if(oldChild.m_parent->m_lastChild == oldChild.m_self)
+  if (oldChild.m_parent->m_lastChild == oldChild.m_self)
     oldChild.m_parent->m_lastChild = newChild.m_self;
 
-  if(oldChild.m_previousSibling)
+  if (oldChild.m_previousSibling)
     oldChild.m_previousSibling->m_nextSibling = newChild.m_self;
 
-  if(oldChild.m_nextSibling)
+  if (oldChild.m_nextSibling)
     oldChild.m_nextSibling->m_previousSibling = newChild.m_self;
 
   newChild.m_parent = oldChild.m_parent;
@@ -1717,12 +1780,12 @@ auto viewManager::Element::replaceChild(Element &newChild, Element &oldChild)
     indexedElements.erase(oldChild.getAttribute<indexBy>().value);
 
   } catch (const std::exception &e) {
-    //std::cout << " Exception: " << e.what() << "\n";
+    // std::cout << " Exception: " << e.what() << "\n";
   }
 
   // remove the element smart pointer
   auto it = elements.find((std::size_t)oldChild.m_self);
-  if(it!=elements.end())
+  if (it != elements.end())
     elements.erase(it);
 
   return *this;
@@ -1730,8 +1793,8 @@ auto viewManager::Element::replaceChild(Element &newChild, Element &oldChild)
 
 /**
 \brief moves the element to the specified location.
-\details The method provides a shortened call to move both coordinates 
-at the same time. The objectTop and objectLeft are set. The method accepts 
+\details The method provides a shortened call to move both coordinates
+at the same time. The objectTop and objectLeft are set. The method accepts
 numerical values and only sets the value of the attribute. It does not change
 the numerical format of the underlying attribute values.
 
@@ -1747,8 +1810,8 @@ auto viewManager::Element::move(const double t, const double l) -> Element & {
 
 /**
 \brief resizes the element
-\details The method provides a shortened call to resize an element. 
-The objectWidth and objectHeight are set at the same time. The method accepts 
+\details The method provides a shortened call to resize an element.
+The objectWidth and objectHeight are set at the same time. The method accepts
 numerical values and only sets the value of the attribute. It does not change
 the numerical format of the underlying attribute values.
 
@@ -1763,31 +1826,31 @@ auto viewManager::Element::resize(const double w, const double h) -> Element & {
 }
 
 /**
-\brief removes the element from the document tree and free the memory associated.
-\details The remove method provides an easy method to delete an object from the 
-document heirarchy. The method does not provide continuation syntax as 
-after the call is complete, all memory associated with the object will be freed. 
-The indexBy list is also modified to update the change.
+\brief removes the element from the document tree and free the memory
+associated. \details The remove method provides an easy method to delete an
+object from the document heirarchy. The method does not provide continuation
+syntax as after the call is complete, all memory associated with the object will
+be freed. The indexBy list is also modified to update the change.
 
 Example
 -------
 \snippet examples remove
 */
-void viewManager::Element::remove(void) { 
+void viewManager::Element::remove(void) {
   // recursively remove all children
   removeChildren();
 
   // update tree linkage
-  if(m_parent && m_parent->m_firstChild == m_self)
+  if (m_parent && m_parent->m_firstChild == m_self)
     m_parent->m_firstChild = m_nextSibling;
 
-  if(m_parent && m_parent->m_lastChild == m_self)
+  if (m_parent && m_parent->m_lastChild == m_self)
     m_parent->m_lastChild = m_previousSibling;
 
-  if(m_nextSibling)
+  if (m_nextSibling)
     m_nextSibling->m_previousSibling = m_previousSibling;
 
-  if(m_previousSibling)
+  if (m_previousSibling)
     m_previousSibling->m_nextSibling = m_nextSibling;
 
   // remove reference from string id indexed list
@@ -1795,61 +1858,64 @@ void viewManager::Element::remove(void) {
     indexedElements.erase(getAttribute<indexBy>().value);
 
   } catch (const std::exception &e) {
-    //std::cout << " Exception: " << e.what() << "\n";
+    // std::cout << " Exception: " << e.what() << "\n";
   }
 
   // free smart pointer
   auto it = elements.find((std::size_t)m_self);
-  if(it!=elements.end())
+  if (it != elements.end())
     elements.erase(it);
 
-  return; 
+  return;
 }
 
 /**
 \brief removes a child element from the list and free the associated memory.
-\param Element& oldChild is an existing child of the referenced element to remove.
+\param Element& oldChild is an existing child of the referenced element to
+remove.
 
 \details The removeChild destroys an existing child element of a document tree.
 After the function completes, all associated reference within the system will be
 discontinued. This includes the smart pointer and the indexBy list.
 
+Example
+-------
 \snippet examples.cpp removeChild
 */
 auto viewManager::Element::removeChild(Element &oldChild) -> Element & {
   // recursively remove children
   auto pItem = oldChild.m_firstChild;
-  while(pItem) {
+  while (pItem) {
     pItem->removeChild(*pItem);
     pItem = pItem->m_nextSibling;
   }
 
   // modify tree linkage
-  if(m_firstChild == oldChild.m_self) {
-    m_firstChild=oldChild.m_nextSibling;
-  } 
-  
-  if(m_lastChild == oldChild.m_self) { 
+  if (m_firstChild == oldChild.m_self) {
+    m_firstChild = oldChild.m_nextSibling;
+  }
+
+  if (m_lastChild == oldChild.m_self) {
     m_lastChild = oldChild.m_previousSibling;
   }
 
-  if(oldChild.m_previousSibling)
+  if (oldChild.m_previousSibling)
     oldChild.m_previousSibling->m_nextSibling = oldChild.m_nextSibling;
 
-  if(oldChild.m_nextSibling)
+  if (oldChild.m_nextSibling)
     oldChild.m_nextSibling->m_previousSibling = oldChild.m_previousSibling;
-  
+
   // update string index list
   try {
     indexedElements.erase(oldChild.getAttribute<indexBy>().value);
 
   } catch (const std::exception &e) {
-    //std::cout << " Exception: " << e.what() << "\n";
+    // std::cout << " Exception: " << e.what() << "\n";
   }
 
   // free memory
   auto it = elements.find((std::size_t)oldChild.m_self);
-  if(it!=elements.end())
+  if (it != elements.end())
     elements.erase(it);
 
   m_childCount--;
@@ -1859,9 +1925,10 @@ auto viewManager::Element::removeChild(Element &oldChild) -> Element & {
 /**
 \brief removes all children from the document tree associated with the given
 element and free the memory.
-\details The removeChild is a bulk operation function in which all 
+\details The removeChild is a bulk operation function in which all
 child document elements of the referenced element is freed. After the function
-completes, all associated references will not longer be tracked within the system.
+completes, all associated references will not longer be tracked within the
+system.
 
 Example
 -------
@@ -1870,32 +1937,31 @@ Example
 */
 auto viewManager::Element::removeChildren(void) -> Element & {
 
-  auto pItem=m_firstChild;
-  while(pItem) {
+  auto pItem = m_firstChild;
+  while (pItem) {
     std::size_t storageKey = (std::size_t)pItem;
-    if(pItem->m_childCount)
-        pItem->removeChildren();
+    if (pItem->m_childCount)
+      pItem->removeChildren();
 
-      // update string index list
-      try {
-        indexedElements.erase(pItem->getAttribute<indexBy>().value);
+    // update string index list
+    try {
+      indexedElements.erase(pItem->getAttribute<indexBy>().value);
 
-      } catch (const std::exception &e) {
-        //std::cout << " Exception: " << e.what() << "\n";
-      }
+    } catch (const std::exception &e) {
+      // std::cout << " Exception: " << e.what() << "\n";
+    }
 
     // free memory
-    pItem=pItem->m_nextSibling;
+    pItem = pItem->m_nextSibling;
     auto it = elements.find(storageKey);
-    if(it!=elements.end())
-       elements.erase(it);
-    
+    if (it != elements.end())
+      elements.erase(it);
   }
 
   // update linkage
-  m_firstChild=nullptr;
-  m_lastChild=nullptr;
-  m_childCount=0;
+  m_firstChild = nullptr;
+  m_lastChild = nullptr;
+  m_childCount = 0;
 
   return *this;
 }
@@ -1904,23 +1970,22 @@ auto viewManager::Element::removeChildren(void) -> Element & {
 \brief The function removes all children and data from the
 the element. All memory for each of the elements is freed.
 \details The clear method is a bulk operation that removes
-all associated data within the public data members as well as 
-all manually document elements. It should be noted that 
+all associated data within the public data members as well as
+all manually document elements. It should be noted that
 all of the data() adapators are erased.
 
 Example
 -------
 \snippet examples.cpp clear
 */
-auto viewManager::Element::clear(void) -> Element & { 
+auto viewManager::Element::clear(void) -> Element & {
   // delete all items in the dat vector
-  auto n=m_usageAdaptorMap.begin();
-  while(n !=m_usageAdaptorMap.end())
-    n=m_usageAdaptorMap.erase(n);
+  auto n = m_usageAdaptorMap.begin();
+  while (n != m_usageAdaptorMap.end())
+    n = m_usageAdaptorMap.erase(n);
 
   removeChildren();
-  return *this; 
-
+  return *this;
 }
 
 /**
@@ -1973,12 +2038,12 @@ size_t getAddress(std::function<T(U...)> f) {
 the system.
 
 \details The addListener function provides an method for attaching
-an event handler with a event of the referenced element. The 
-method accepts a function as its eventHandler. This is a std::function 
+an event handler with a event of the referenced element. The
+method accepts a function as its eventHandler. This is a std::function
 which may be a lambda, or a function pointer. The following events
 are accepted:
 
-\copydetails eventType
+\copydoc viewManager::eventType
 
 Example
 -------
@@ -1999,6 +2064,10 @@ events to receive messages.</summary>
 \param evtType is the type of event to remove.</param>
 \param evtHandler is the event to remove.?</param>
 
+Example
+-------
+\snippet examples.cpp removeListener
+
 */
 auto viewManager::Element::removeListener(eventType evtType,
                                           eventHandler evtHandler)
@@ -2014,7 +2083,6 @@ auto viewManager::Element::removeListener(eventType evtType,
   return *this;
 }
 
-
 /**
 \brief This is the main function which invokes drawing of the item and
 its children. It is called recursively when painting needs to occur.
@@ -2025,9 +2093,9 @@ work performed by this routine is accomplished using the surface image.
 void viewManager::Element::render(void) {}
 
 void viewManager::Element::streamRender(stringstream &ss) {
-  for(auto n : data()) {
+  for (auto n : data()) {
     ss << n << "\n";
-    }
+  }
 }
 
 /**
@@ -2146,7 +2214,7 @@ Notation is supported on numeric parameters with a format:
 
 \code
        <h1>The title is</h1>
-       <h2>The information</h2> 
+       <h2>The information</h2>
 
       <div id=divtest background=blue center relative>
          This is the text inside the block.
@@ -2447,16 +2515,16 @@ viewManager::Visualizer::platform::platform(eventHandler evtDispatcher,
 
 // initialize private members
 #if defined(__linux__)
-    m_connection=nullptr;
-    m_screen=nullptr;
-    m_window=0;
-    m_offScreen=0;
-    m_syms=nullptr;
-    m_foreground=0;
+  m_connection = nullptr;
+  m_screen = nullptr;
+  m_window = 0;
+  m_offScreen = 0;
+  m_syms = nullptr;
+  m_foreground = 0;
 
 #elif defined(__WIN64)
 
-  #elseif defined
+#elseif defined
   m_hwnd = 0x00;
   m_pDirect2dFactory = nullptr;
   m_pRenderTarget = nullptr;
@@ -2493,10 +2561,10 @@ void viewManager::Visualizer::platform::openWindow(void) {
               XCB_EVENT_MASK_KEY_RELEASE | XCB_EVENT_MASK_POINTER_MOTION |
               XCB_EVENT_MASK_BUTTON_MOTION | XCB_EVENT_MASK_BUTTON_PRESS |
               XCB_EVENT_MASK_BUTTON_RELEASE;
-  xcb_create_window(m_connection, XCB_COPY_FROM_PARENT, m_window,
-                    m_screen->root, 0, 0, static_cast<unsigned short>(_w), static_cast<unsigned short>(_h), 10,
-                    XCB_WINDOW_CLASS_INPUT_OUTPUT, m_screen->root_visual, mask,
-                    values);
+  xcb_create_window(
+      m_connection, XCB_COPY_FROM_PARENT, m_window, m_screen->root, 0, 0,
+      static_cast<unsigned short>(_w), static_cast<unsigned short>(_h), 10,
+      XCB_WINDOW_CLASS_INPUT_OUTPUT, m_screen->root_visual, mask, values);
   /* Map the window on the screen and flush*/
   xcb_map_window(m_connection, m_window);
   xcb_flush(m_connection);
@@ -2535,11 +2603,11 @@ void viewManager::Visualizer::platform::openWindow(void) {
     return;
 
   // Adding a ListBox.
-  m_hListBox = CreateWindowExW(WS_EX_CLIENTEDGE
-      , L"LISTBOX", NULL
-      , WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_AUTOVSCROLL
-      , 0, 0, static_cast<UINT>(_w), static_cast<UINT>(_h)
-      , m_hwnd, NULL, HINST_THISCOMPONENT, NULL);
+  m_hListBox = CreateWindowExW(
+      WS_EX_CLIENTEDGE, L"LISTBOX", NULL,
+      WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_AUTOVSCROLL, 0, 0,
+      static_cast<UINT>(_w), static_cast<UINT>(_h), m_hwnd, NULL,
+      HINST_THISCOMPONENT, NULL);
 
   SetWindowLongPtr(m_hwnd, GWLP_USERDATA, (long long)this);
   ShowWindow(m_hwnd, SW_SHOWNORMAL);
@@ -2664,8 +2732,8 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
   case WM_PAINT: {
     PAINTSTRUCT ps;
     HDC hdc = BeginPaint(hwnd, &ps);
-    
-    FillRect(hdc, &ps.rcPaint, (HBRUSH) (COLOR_WINDOW+1));
+
+    FillRect(hdc, &ps.rcPaint, (HBRUSH)(COLOR_WINDOW + 1));
 
     platformInstance->dispatchEvent(event{eventType::paint});
     SetBkMode(hdc, OPAQUE);
@@ -2690,7 +2758,7 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
   \brief terminates the xserver connection
   and frees resources.
 */
-  viewManager::Visualizer::platform::~platform() {
+viewManager::Visualizer::platform::~platform() {
 #if defined(__linux__)
   xcb_free_gc(m_connection, m_foreground);
   xcb_key_symbols_free(m_syms);
@@ -2705,7 +2773,7 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
 /**
   \internal
   \brief the routine handles the message processing for the specific
-  operating system. 
+  operating system.
 */
 void viewManager::Visualizer::platform::messageLoop(void) {
 #if defined(__linux__)
@@ -2750,7 +2818,6 @@ void viewManager::Visualizer::platform::messageLoop(void) {
 #endif
 }
 
-
 #if defined(_WIN64)
 // Returns the last Win32 error, in string format. Returns an empty string if
 // there is no error.
@@ -2780,8 +2847,7 @@ void viewManager::Visualizer::platform::clearText(void) {
 #if defined(__linux__)
 
 #elif defined(_WIN64)
-    int pos = (int)SendMessage(m_hListBox, LB_RESETCONTENT, 0, 
-    (LPARAM) 0);
+  int pos = (int)SendMessage(m_hListBox, LB_RESETCONTENT, 0, (LPARAM)0);
 #endif
 }
 
@@ -2798,10 +2864,9 @@ void viewManager::Visualizer::platform::drawText(std::string s) {
   rect.top = 100;
   // std::wstring stemp = std::wstring(s.begin(), s.end());
   // LPCWSTR sw = stemp.c_str();
-  //DrawText(wdc, s.c_str(), -1, &rect, DT_NOCLIP);
-  
-  int pos = (int)SendMessage(m_hListBox, LB_ADDSTRING, 0, 
-    (LPARAM) s.c_str());
+  // DrawText(wdc, s.c_str(), -1, &rect, DT_NOCLIP);
+
+  int pos = (int)SendMessage(m_hListBox, LB_ADDSTRING, 0, (LPARAM)s.c_str());
 
   DeleteDC(wdc);
 #endif
