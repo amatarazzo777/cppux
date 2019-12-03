@@ -3,7 +3,6 @@
   <!-- Navigation index tabs for HTML output -->
   <navindex>
     <tab type="mainpage" visible="yes" title=""/>
-    <tab type="pages" visible="yes" title="" intro=""/>
     <tab type="usergroup" visible="yes" title="Document Object Model">
 		<tab type="user" visible="yes" title="Document" url="@ref API"/>
 		<tab type="user" visible="yes" title="Element" url="@ref viewManager::Element"/>
@@ -12,6 +11,9 @@
 		<tab type="user" visible="yes" title="User Defined Literals" url="@ref udl"/>
 		
 	</tab>
+	<tab type="user" visible="yes" title="UX Interface Controls" url="@ref UXcontrols"/>
+    <tab type="pages" visible="yes" title="" intro=""/>
+	
     <tab type="namespaces" visible="yes" title="">
       <tab type="namespacelist" visible="yes" title="" intro=""/>
       <tab type="namespacemembers" visible="yes" title="" intro=""/>

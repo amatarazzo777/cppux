@@ -3,18 +3,17 @@
 \file viewManager.hpp
 \date 11/19/19
 \version 1.0
-\brief Header file that implements the documennt object model interface.
+\brief Header file that implements the document object model interface.
 The attributes, Element base class, and document entities are defined within
-the file. The enumeriation values for object options as well as the event class
+the file. The enumeration values for object options as well as the event class
 are defined here. Within this file, several preprocessor macros exist that
 simplify and document the code base. Based upon the environment of the compiler,
 several platform specific header files are included. However all of the
-platform os code is only coded within the platform object. The system exists
+platform OS code is only coded within the platform object. The system exists
 within the viewManager namespace.
 */
+#pragma once
 
-#ifndef VIEW_MANAGER_HPP_INCLUDED
-#define VIEW_MANAGER_HPP_INCLUDED
 #include <algorithm>
 #include <any>
 #include <array>
@@ -78,7 +77,7 @@ EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 \namespace viewManager
 
 \brief The viewManager namespace is the top level name where all of the
-api exists.
+API exists.
 
 */
 namespace viewManager {
@@ -96,9 +95,6 @@ typedef std::function<bool(const Element &)> ElementQuery;
 /// return values from all of the API work correctly in that the push_back
 /// method is used to add to the list.
 typedef std::vector<std::reference_wrapper<Element>> ElementList;
-
-/// \typedef the tableData alias is used by the TABLE element.
-using tableData = std::vector<std::vector<std::string>>;
 
 /**
   \brief the dataTransformMap provides a translation between a storage type
@@ -122,7 +118,7 @@ extern std::unordered_map<std::size_t, std::unique_ptr<Element>> elements;
 \internal
 \brief Contains a map of indexed elements by the name. The indexBy attributes
 specifies the string to use when placing items into the map. The name is case
-senseative.
+sensitive.
 */
 extern std::unordered_map<std::string, std::reference_wrapper<Element>>
     indexedElements;
@@ -265,8 +261,8 @@ typedef std::unordered_map<std::string, unsigned long> colorMap;
 
 /**
 \class colorNF
-\brief the colorNF class provides a color manulipation base class for
-data of this nature. There are several contrustor methods which can be used to
+\brief the colorNF class provides a color manipulation base class for
+data of this nature. There are several constructor methods which can be used to
 declare a color. Such as numerical value, string, a 24bit ulcolor.
 
 */
@@ -311,7 +307,7 @@ parseQuadCoordinates(const std::string _sOptions);
 \def _NUMERIC_ATTRIBUTE
 \brief INTERNEL MACROS to reduce code needed for these attribute storage
 implementations. These macros develop the storage class or
-inheiritance to implement a complex attribute. Within the system, the
+inheritance to implement a complex attribute. Within the system, the
 "using" provides an alias to name a specific type. Therefore, all classes
 declared using these macros will establish their storage space securely at
 its position within the attribute storage container. When a getAttribute
@@ -383,7 +379,7 @@ developed.
 \def _NUMERIC_WITH_ENUMERATED_ATTRIBUTE
 \param NAME The official name of the attribute class
 \param ... a define preprocessor param pack.
-\brief declares a attribute composed of a numerical value and an
+\brief declares an attribute composed of a numerical value and an
 enumerated constant
 */
 #define _NUMERIC_WITH_ENUMERATED_ATTRIBUTE(NAME, ...)                          \
@@ -475,9 +471,9 @@ _NUMERIC_ATTRIBUTE(textWeight);
 _COLOR_ATTRIBUTE(textColor);
 /// \class textAlignment controls text alignment
 _ENUMERATED_ATTRIBUTE(textAlignment, left, center, right, justified);
-/// \class textIndent controls the indentention spacing
+/// \class textIndent controls the indentation spacing
 _NUMERIC_WITH_FORMAT_ATTRIBUTE(textIndent);
-/// \class tabSize controls the indentention spacing
+/// \class tabSize controls the indentation spacing
 _NUMERIC_WITH_FORMAT_ATTRIBUTE(tabSize);
 /// \class lineHeight controls the height of a line when rendered.
 _NUMERIC_WITH_ENUMERATED_ATTRIBUTE(lineHeight, normal, numeric);
@@ -540,6 +536,7 @@ public:
   }
 };
 /**
+\internal
 \namespace Visualizer
 \brief The Visualizer namespace contains the code that draws and calculates
 position of elements upon the viewing device. It is noted that the namespace
@@ -548,6 +545,7 @@ operating system being used to render.
 */
 namespace Visualizer {
 /**
+\internal
 \typedef rectangle
 \brief holds the coordinates of the object within the calculates rendering
 output.
@@ -611,7 +609,7 @@ private:
 /**
   \internal
   \brief Internal function to create elements. The function
-  accepts an array where as the main interface version is varidic
+  accepts an array where as the main interface version is variodic
 */
 template <typename TYPE>
 auto &_createElement(const std::vector<std::any> &attr);
@@ -640,13 +638,9 @@ public:
   Element &operator=(const Element &other);
   Element &operator=(Element &&other) noexcept;
 
-  /**
-    \brief Data interface.
-    The data<> templated function provides a standard interface for data
-    projection and building for ease of interface communication.
-  */
 private:
   /**
+  \internal
   \typedef usageAdaptorState
   \brief the usageAdaptorState contains the state information used by the
   hinted rendered for finding dirty one screen information.
@@ -664,7 +658,7 @@ private:
   holds the data of a templated type within a vector.
   Noted that vectors have sequential memory for all of their elements.
   This property is used by the hinting system to deduce set inclusion.
-  They can be established just by the type leaveing
+  They can be established just by the type leaving
   data and fnTransform empty.
 
   When just the data is passed, and a default transform function
@@ -708,24 +702,89 @@ private:
   };
 
 public:
-  /** \brief dataTransform templated function provides the interface for
-  providing a transform function to go along with a data set. The transform
-  functionality is very simular to the xsl implementation. Yet in this module,
-  there are great stride to encapsolate the functionality within the language
-  itself. The following four templates provide the capacity to do so.
+  /**
+  \tparam R notes the type of element that is to be created
+  \tparam T notes the storage form of the associated data.
+  \param std::string& is a markup string which is parsed. The form
+  notes how the document fragment should be built and where the elements
+  inside the named format. Typically the item is a tuple or a struct.
+
+  \brief dataTransform templated function provides the interface for
+  providing a transform function to go along with a data set.
+
+  \details
+  The dataTransform functionality is very similar to the xsl implementation.
+  This version of the templated function provides the capability to have the
+  system build elements based upon a markup string while providing an
+  association with a data storage format.
+
+  Example
+  -------
+  \snippet examples.cpp dataTransform_markup_with_data
   */
   template <typename R, typename T>
   void dataTransform(const std::string &txtFn) {}
+
+  /**
+  \tparam R notes the type of element that is to be created
+  \tparam T notes the strage form of the associated data.
+  \param std::string& is a markup string which is parsed. The form
+  notes how the document fragment should be built and where the elements
+  inside the named format. Typically the item is a tuple or a struct.
+  \param std::function<bool(T &)>& provides a Boolean evaluation of the
+  data element. The provided function should return true or false based upon
+  the desired formatting. If true is return, the string is used to
+  format the object.
+
+  \brief dataTransform templated function provides the interface for
+  providing a transform function to go along with a data set.
+
+  \details
+  The dataTransform functionality is very similar to the xsl implementation.
+  This version of the templated function provides the capability to have the
+  system build elements based upon a markup string while providing an
+  association with a data storage format. In addition, the second parameter
+  is an evaluation function which is called for each element proposed for
+  display by the rendering system.
+
+  Example
+  -------
+  \snippet examples.cpp dataTransform_markup_with_data_boolean_func
+  */
   template <typename R, typename T>
   void dataTransform(const std::string &txtFn,
                      const std::function<bool(T &)> &_fn) {}
+
+  /**
+  \tparam R notes the type of element that is to be created
+  \tparam T notes the storage form of the associated data.
+  \param const std::function<R &(T &)>& The given parameter is a function
+  which is called directly when a particular data element should be displayed
+  according to visibility. The function should build the document
+  fragment using the createElement API and return the parent object
+  of the tree fragment.
+
+  \brief dataTransform templated function provides the interface for
+  providing a transform function to go along with a data set.
+
+  \details
+  The dataTransform functionality is very similar to the xsl implementation.
+  This version of the templated function provides the capability to have the
+  system build elements based upon the return of the given function. This
+  function is called directly with a reference to the data element that
+  will need display.
+
+  Example
+  -------
+  \snippet examples.cpp dataTransform_func
+  */
   template <typename R, typename T>
   void dataTransform(const std::function<R &(T &)> &_fn) {
     std::function<R &(T &)> fn = _fn;
     std::type_index tIndex = std::type_index(typeid(std::vector<T>));
     auto it = m_usageAdaptorMap.find(tIndex);
-    // if the requested data adaptor does not exist,
-    // create its position within the adaptor member vector
+    // if the requested data adapter does not exist,
+    // create its position within the adapter member vector
     // return this to the caller.
     if (it == m_usageAdaptorMap.end()) {
       // create a default data display for the type here.
@@ -736,36 +795,47 @@ public:
           std::any_cast<usageAdaptor<T> &>(m_usageAdaptorMap[tIndex]);
     }
   }
+
   /**
+  \tparam R notes the type of element that is to be created
+  \tparam T notes the storage form of the associated data.
+
   \brief This data transform uses the named value of the numerical column.
+
   \details
-  This data transform uses the named value of the numerical column.
-  While being a constant, this reliance is that of an itm within a tuple
-  column. This tuple column is used as a index into the natural long list
-  of vector data. AS well, the parameter essential is an unordered map
-  reference. Simply that the match index as the key and a std::function
-  as the found item. THe item is used to process a requested data element
-  based upon this match. So, in effect this allows the unordered may to
-  change, over time, and selectively modify traites or visual composition in
-  a strict binary fashion rather than css conteplated sheets. While both are
-  often necessary, this type of solid work code really becomes the marking
-  of complexity and specific layouts that may be dynamically loaded.
-  And also provide effective space for description. I find that simple
-  and complex may go together, yet for usage one must create the sceneros
-  that elvolve in delicate use of competent technology.
+  This data transform uses an unordered_map to reference a lambda by a
+  particular column within the tuple. So each record within the definition,
+  provides a layout capability that is coded by the key. This creates a
+  situation where maintenance of the layout is based editing the list.
+
+  Example
+  -------
+  \snippet examples.cpp dataTransform_unordered_map
   */
   template <std::size_t I, typename T>
   void dataTransform(
-      const std::unordered_map<const typename std::tuple_element<I, T>::type &,
+      const std::unordered_map<typename std::tuple_element<I, T>::type,
                                std::function<Element &(T &)>> &_transformList) {
   }
   /**
     \brief data access interface for element based data storage.
-      Elements can store vectors of the named type. This method provides
-      an easy way to insert children into the element. As well by using the
-    dataTransform in conjuction with the data() templated member, child elements
-    may be build and formated to the developer's spcification. \tparam T
-    defaulted to a std::string
+    Elements can store vectors of the named type. This method provides
+    an easy way to insert children into the element. As well by using the
+    dataTransform in conjunction with the data() templated member, child
+    elements may be build and formatted to the developer's specification. The
+    information when given should always be in the form of a vector initializer
+    list.
+
+    \tparam T defaulted to a std::string.
+
+    Example setting data
+    --------------------
+    \snippet examples.cpp data
+
+    Example pushing the vector
+    --------------------------
+    \snippet examples.cpp data_push
+
   */
   template <typename T = std::string> auto &data(void) {
     auto tIndex = std::type_index(typeid(std::vector<T>));
@@ -785,8 +855,8 @@ public:
   }
 
   /**
-  \brief the dataHint function provides the mechanism to inform the renderer
-  of changes to the underlying data within the buffers.
+  \brief the dataHint function provides the mechanism to inform the rendering
+  system of changes to the underlying data within the buffers.
 
   */
   template <typename T>
@@ -806,8 +876,8 @@ public:
 
   /**
   \var ingestStream
-  \brief The ingestStream boolean value is a setting which determines
-  if the stream comming into the system is first interpreted as markup
+  \brief The ingestStream Boolean value is a setting which determines
+  if the stream coming into the system is first interpreted as markup
   content. Two functions both check this value. The stream input operator and
   the printf function. If you desire that content should be parsed as a markup
   stream, this variable should be set to true.
@@ -816,11 +886,20 @@ public:
 
   /**
   \brief overload of the stream insertion operator.
+
+  \details
   Simply puts the data into the stream. It should be
   noted that flush should be called. By default the contents
   of the stream are directly inserted into the data<std::string>() vector.
   When the ingestStream flag is set to true, the stream is parsed for markup
   and appended to the named element.
+
+
+  Example
+  -------
+  \snippet examples.cpp stream_operator
+
+  \ref markupInputFormat
   */
   template <typename T> Element &operator<<(const T &data) {
     std::ostringstream s;
@@ -859,7 +938,7 @@ public:
   The first macro parameter names the interface while the second parameter
   names a member pointer. Noted that the interface will return a reference
   wrapper or nullptr. This macro is used to declare and implement the document
-  tree traveral methods.
+  tree traversal methods.
 */
 #define _REF_INTERFACE(NAME, xNAME)                                            \
   std::optional<std::reference_wrapper<Element>> NAME(void) {                  \
@@ -868,7 +947,7 @@ public:
   }
   /**
    \fn parent
-   \brief contains the parent element within the document traversal heirarchy
+   \brief contains the parent element within the document traversal hierarchy
 
    Example
    -------
@@ -879,7 +958,7 @@ public:
   /**
   \fn firstChild
   \brief contains the firstChild element within the document traversal
-   heirarchy
+   hierarchy
 
    Example
    -------
@@ -890,7 +969,7 @@ public:
   /**
     \fn lastChild
     \brief contains the lastChild element within the document traversal
-    heirarchy
+    hierarchy
 
     Example
     -------
@@ -901,7 +980,7 @@ public:
   /**
     \fn nextChild
     \brief contains the nextChild element within the document traversal
-    heirarchy
+    hierarchy
 
     Example
     -------
@@ -912,7 +991,7 @@ public:
   /**
     \fn previousChild
     \brief contains the previousChild element within the document traversal
-    heirarchy
+    hierarchy
 
     Example
     -------
@@ -923,7 +1002,7 @@ public:
   /**
     \fn nextSibling
     \brief contains the nextSibling element within the document traversal
-    heirarchy
+    hierarchy
 
     Example
     -------
@@ -934,7 +1013,7 @@ public:
   /**
     \fn previousSibling
     \brief contains the previousSibling element within the document traversal
-    heirarchy
+    hierarchy
 
     Example
     -------
@@ -943,7 +1022,7 @@ public:
   _REF_INTERFACE(previousSibling, m_previousSibling);
 
   /**
-    \fn previousSibling
+    \fn childCount
     \brief contains the number of children
 
     Example
@@ -976,7 +1055,7 @@ public:
   /**
   \fn children(void)
   \brief The function provides a method to easily write range based for loops.
-  \details The children function provides a method that returns an Interator
+  \details The children function provides a method that returns an iterator
   object. This iterator object is an internally defined class that implements
   the c++ interface for iterators.
 
@@ -984,7 +1063,6 @@ public:
 
   */
   auto children(void) -> iterator { return iterator(this); };
-
 
   /**
     \var styles
@@ -1006,7 +1084,7 @@ public:
   auto appendChild(Element &newChild) -> Element &;
   auto appendChild(const ElementList &elementCollection) -> Element &;
   /**
-   \brief the templated function accepts a element type within the template
+   \brief the templated function accepts an element type within the template
    parameter and attributes within the parameter. The created element is
    appended as a child.
    \tparam ATTR... param pack of attribute objects.
@@ -1029,11 +1107,11 @@ public:
   auto append(Element &sibling) -> Element &;
   auto append(ElementList &elementCollection) -> Element &;
   /**
-  \fn append
   \brief the templated function accepts a element type within the template
   parameter and attributes within the parameter. The created element is
-  appended as a sibling of the referenced element. \tparam ATTR... param pack
-  of attribute objects.
+  appended as a sibling of the referenced element.
+
+  \tparam ATTR... param pack of attribute objects.
 
   \return a reference to the appended object for continuation syntax.
 
@@ -1049,9 +1127,11 @@ public:
     return (e);
   }
 
+private:
+  Element &setAttribute(const std::vector<std::any> &attribs);
+
 public:
   Element &setAttribute(const std::any &setting);
-  Element &setAttribute(const std::vector<std::any> &attribs);
 
   /** \brief The setAttribute templated function provides a
   parameter pack version which expands the parameters into a vector of
@@ -1097,7 +1177,7 @@ public:
     return *ret;
   }
 
-public:
+private:
   std::vector<eventHandler> onfocus;
   std::vector<eventHandler> onblur;
   std::vector<eventHandler> onresize;
@@ -1125,12 +1205,16 @@ public:
   void render(void);
   void streamRender(std::stringstream &ss);
   auto insertBefore(Element &newChild, Element &existingElement) -> Element &;
+  auto insertBefore(Element &newChild, std::string &sID) -> Element &;
   auto insertAfter(Element &newChild, Element &existingElement) -> Element &;
+  auto insertAfter(Element &newChild, std::string &sID) -> Element &;
   void remove(void);
   auto removeChild(Element &childElement) -> Element &;
+  auto removeChild(std::string &sID) -> Element &;
   auto removeChildren(void) -> Element &;
   auto clear(void) -> Element &;
   auto replaceChild(Element &newChild, Element &oldChild) -> Element &;
+  auto replaceChild(Element &newChild, std::string &sID) -> Element &;
 
 #if defined(__clang__)
   void printf(const char *fmt, ...)
@@ -1138,9 +1222,9 @@ public:
 #else
   void printf(const char *fmt, ...);
 #endif
-  auto ingestMarkup(Element &node, const std::string &markup) -> Element &;
 
 private:
+  auto ingestMarkup(Element &node, const std::string &markup) -> Element &;
   void updateIndexBy(const indexBy &setting);
 }; // class Element
 
@@ -1173,9 +1257,10 @@ Element class as a base class.
 /**
 \class BR
 \brief line break
+\extends Element
 
 \details When the BR element is present within the document
-heirarchy, it is likened to the effects of a \n new line or return.
+hierarchy, it is likened to the effects of a \n new line or return.
 The next position of textual or document flow will go to the next line
 position.
 
@@ -1329,7 +1414,7 @@ public:
 \class SPAN
 \brief a span block
 \extends Element
-\descrciption The SPAN block provides a continued flowing element. The
+\details The SPAN block provides a continued flowing element. The
 object has no default styles associated.
 
 
@@ -1349,7 +1434,7 @@ public:
 \extends Element
 \details The UL block provides an unordered list of items. Children
 of the list can be added using the data() or by manually adding LI elements.
-When created, the following dfault attributes are established:
+When created, the following default attributes are established:
 
 - listStyleType::disc
 - display::block
@@ -1377,7 +1462,7 @@ public:
 \brief an ordered list
 \extends Element
 \details The UL block provides an ordered list of items. When multiple
-children exists, they are numerically numered automatically. The listStyleType
+children exists, they are numerically numbered automatically. The listStyleType
 notes what for the numeric literals are shown as. Children
 of the list can be added using the data() or by manually adding LI elements.
 When created, the following default attributes are established:
@@ -1407,6 +1492,14 @@ public:
 \class LI
 \brief an list item, can be inserted into ol or ul
 \extends Element
+\details The LI element is a list item. Its persistence is
+associated with the UL and OL elements. As a child, this
+object is usually in a series of items of these list items.
+
+Example
+-------
+\snippet examples.cpp LI
+
 */
 using LI = class LI : public Element {
 public:
@@ -1414,12 +1507,37 @@ public:
     setAttribute(attribs);
   }
 };
-//// self understood attribute communication
-_VECTOR_ATTRIBUTE(tableColumns);
+
+/**
+  \typedef tableColumns
+  \brief tableColumns is a two dimensional string vector named appropiately
+  for the TABLE element.
+  \see TABLE
+*/
+using tableColumns = std::vector<std::string>;
+
+/**
+\typedef tableData
+\brief The tableData alias is used by the TABLE element. It
+is useful when setting the data that is shown within the view.
+It is a two dimensional vector of std::string.
+  \see TABLE
+*/
+using tableData = std::vector<std::vector<std::string>>;
+
 /**
 \class TABLE
 \brief a table element to manage a grid of information
 \extends Element
+\details The TABLE element provides a grid layout of information.
+the child elements that are applied is the table data attribute.
+This attribute is a two dimensional vector composed of string
+values.
+
+Example
+-------
+\snippet examples.cpp TABLE
+
 */
 using TABLE = class TABLE : public Element {
 public:
@@ -1428,31 +1546,16 @@ public:
   }
 };
 /**
-\class MENU
-\brief a menu element for dropdown menus
-\extends Element
-*/
-using MENU = class MENU : public Element {
-public:
-  MENU(const std::vector<std::any> &attribs) : Element("menu") {
-    setAttribute(attribs);
-  }
-};
-/**
-\class UX
-\brief user interface elements
-\extends Element
-*/
-using UX = class UX : public Element {
-public:
-  UX(const std::vector<std::any> &attribs) : Element("ux") {
-    setAttribute(attribs);
-  }
-};
-/**
 \class IMAGE
 \brief an image
 \extends Element
+\details The IMAGE element display an image. The filename of the image
+should be given within the data property as a string.
+
+Example
+-------
+\snippet examples.cpp IMAGE
+
 */
 using IMAGE = class IMAGE : public Element {
 public:
@@ -1464,6 +1567,16 @@ public:
 \class textNode
 \brief a node of textual information
 \extends Element
+\details The textNode is a textual component that at times is necessary
+for children of other main document entities. When colors are modified
+mid stream for other document elements, the subsequent text along with
+the specified color is added as a textNode automatically by the parsing
+stream API.
+
+Example
+-------
+\snippet examples.cpp textNode
+
 */
 class textNode : public Element {
 public:
@@ -1492,8 +1605,6 @@ using span = SPAN;
 using ul = UL;
 using ol = OL;
 using li = LI;
-using menu = MENU;
-using ux = UX;
 using image = IMAGE;
 using textnode = textNode;
 #endif
@@ -1527,7 +1638,7 @@ is derrived from the base element class.
 
 \tparam ATTRS... is a parameter pack of attributes.
 
-\details The createElement templated function is the main way inwhich
+\details The createElement templated function is the main way in which
 top level elements are created. The function returns a reference object.
 Internally the function manufactures a smart pointer to the document entity
 and object
@@ -1566,9 +1677,18 @@ auto query(const ElementQuery &queryFunction) -> ElementList;
   element type can also be sought and returned.
 */
 template <class T = Element &> auto getElement(const std::string &key) -> T & {
+
   auto it = indexedElements.find(key);
-  T ret = it->second.get();
-  return ret;
+  if (it != indexedElements.end()) {
+    T &ret = it->second.get();
+    return ret;
+
+  } else {
+    std::string info = key;
+    info += " element not found by ID ";
+
+    throw std::invalid_argument(info);
+  }
 }
 
 bool hasElement(const std::string &key);
@@ -1649,5 +1769,4 @@ private:
   std::unique_ptr<Visualizer::platform> m_device;
 };
 
-};     // namespace viewManager
-#endif // VIEW_MANAGER_HPP_INCLUDED
+}; // namespace viewManager

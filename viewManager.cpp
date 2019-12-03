@@ -11,62 +11,20 @@
 \brief class that implements that main creation interface.
  The file contains initialization, termination.
 
-\mainpage cppUX documentation
-
-\paragraph The cppUX library is a self contained rendering system that work
-precisely with the c++ standard library. The library is written as a templated
-interface. The interface syntax of the library while using templates makes the
-source code of a c++ GUI application very readible. Because of the templated
-syntax, document elements that are derrived from standard W3C names can appear
-within the <> template parameters. The library depends on the c++ 17 and greater
-format.
-
-To include the library within your project, you simply have to include the
-viewManager.hpp header file. This header file encapsolates all of the necessary
-api declarations to utilize the rendering system. While the rendering system is
-much like a web browser, that is using a document object model, the base system
-does not depend on a full web browser but includes its own rendering and font
-system.
-
-Some examples of how to write complete gui applications are listed below. The
-following example is a gui program that can be compiled for multiple platforms
-that displays the message "Hello World" within a window.
-
-Hello World
-===========
-\snippet examples.cpp Hello World
-
-The viewManager renderer depends on the main Viewer object being created. This
-object supplies the connection with the target operating system and provides the
-root of the document object model. The attributes set here, as well as the tree,
-heirarcy dependency, create the inheirited attributes when used for rendering.
-
-Document elements can be easily added using the API commands described within
-the documentation. Each document entity created is derrived from the main
-Element base class. This class provides the stream operator <<, append,
-appendChild, ingestMarkup, print and printf. By default, the stream operators
-such as printf, <<, and print insert the supplied text directly into the textual
-data of the referenced element. However, markup that is simular to HTML can lso
-be parsed. By setting the boolean flag element.ingestMarkup = true, information
-within the given string passed to these stream routine will parsde the
-information for markup. This makes adding elements much easier, but requires a
-two phase parse.
-
-Markup Example
-==============
-\snippet examples.cpp Markup
-
-The parsing document format is much simplier that HTML but supports the same
-basic functionality. The parser is a fast one in that it is specifically coded
-for the format. A great feature is that it supports a parser context so that
-entity tags can be listed on separate inputs of the stream. This makes the
-process of string building much easier as complete tags do not have to be
-included into one call. Tht is the input can be broken apart and on separate
-lines for ease of maintenance.
-
 */
 
+/**
+  \def INCLUDE_UX
+  \brief
+  this definition provides the ability to utilize the UX namespace
+*/
+#define INCLUDE_UX
 #include "viewManager.hpp"
+
+#ifdef INCLUDE_UX
+#include "viewManagerUX.hpp"
+#endif
+
 #include <sys/types.h>
 
 using namespace std;
@@ -80,7 +38,7 @@ level document elements. The tracking of them is done using a
 smart pointer. The elements in the main allocation of the system
 are indexed by the numeric pointer address. When elements are removed
 from the system, they should be done so through the element unordered_map.
-This underorder map tracks them by the numerical pointer id.
+This unordered map tracks them by the numerical pointer id.
 Elements may also be indexed using the indexBy attribute
 and the map contains a reference wrapper to the element. These items
 are not normally accessed by the developer. They are accessed using the
@@ -96,14 +54,50 @@ std::vector<std::unique_ptr<StyleClass>> viewManager::styles;
 \internal
 
 \brief The objectFactoryMap provides an easy to maintain table of document
-entities. The syntax, for consilidation, uses the macros CREATE_OBJECT
+entities. The syntax, for consolidation, uses the macros CREATE_OBJECT
 and CREATE_OBJECT_ALIAS. These macros expand to a string and a lambda
-function which calls the createElement document api. The function
+function which calls the createElement document API. The function
 returns the newly created element. The table is used by the
-parser to instianiate document elements.
+parser to instantiate document elements.
 
 */
 const factoryMap viewManager::objectFactoryMap = {
+
+#ifdef INCLUDE_UX
+    CREATE_OBJECT(text, UX::text),
+    CREATE_OBJECT(password, UX::password),
+    CREATE_OBJECT(multiline, UX::multiline),
+    CREATE_OBJECT(number, UX::number),
+    CREATE_OBJECT(masked, UX::masked),
+    CREATE_OBJECT(pushbutton, UX::pushButton),
+    CREATE_OBJECT(button, UX::pushButton),
+    CREATE_OBJECT(radioButton, UX::radioButton),
+    CREATE_OBJECT(radio, UX::radioButton),
+    CREATE_OBJECT(hotimage, UX::hotImage),
+    CREATE_OBJECT(group, UX::group),
+    CREATE_OBJECT(checkbox, UX::checkBox),
+    CREATE_OBJECT(date, UX::date),
+    CREATE_OBJECT(datetime, UX::dateTime),
+    CREATE_OBJECT(week, UX::week),
+    CREATE_OBJECT(time, UX::time),
+    CREATE_OBJECT(file, UX::file),
+    CREATE_OBJECT(verticalscrollbar, UX::verticalScrollbar),
+    CREATE_OBJECT(horizontalscrollbar, UX::horizontalScrollbar),
+    CREATE_OBJECT(resizervertical, UX::resizerVertical),
+    CREATE_OBJECT(resizerhorizontal, UX::resizerHorizontal),
+    CREATE_OBJECT(listselector, UX::listSelector),
+    CREATE_OBJECT(list, UX::listSelector),
+    CREATE_OBJECT(menu, UX::menu),
+    CREATE_OBJECT(gridedit, UX::gridEdit),
+    CREATE_OBJECT(tabbedpanel, UX::tabbedPanel),
+    CREATE_OBJECT(sliderrange, UX::sliderRange),
+    CREATE_OBJECT(knobrange, UX::knobRange),
+    CREATE_OBJECT(knob, UX::knobRange),
+    CREATE_OBJECT(accordion, UX::accordion),
+    CREATE_OBJECT(progress, UX::progress),
+    CREATE_OBJECT(dialog, UX::dialog),
+#endif
+
     CREATE_OBJECT(br, BR),
     CREATE_OBJECT(h1, H1),
     CREATE_OBJECT(h2, H2),
@@ -115,9 +109,9 @@ const factoryMap viewManager::objectFactoryMap = {
     CREATE_OBJECT(ul, UL),
     CREATE_OBJECT(ol, OL),
     CREATE_OBJECT(li, LI),
-    CREATE_OBJECT(menu, MENU),
-    CREATE_OBJECT(ux, UX),
-    CREATE_OBJECT(image, IMAGE)};
+    CREATE_OBJECT(image, IMAGE)
+
+};
 
 // clang-format off
 
@@ -132,10 +126,10 @@ the base element for which to set the attribute on and
 the string value of the setting. It should be noted that the
 attribute objects themselves parse the input parameter where needed.
 
-the boolean value notes if the item is a compund or single word.
+The Boolean value notes if the item is a compound or single word.
 Items that are single words are shorthand for attributes that have enumeration values
 for example block instead of using display:block.
-This informs the context of the parser to advance and dexcept a secondary value or not.
+This informs the context of the parser to advance and except a secondary value or not.
 
 */
 const attributeStringMap
@@ -170,7 +164,7 @@ const attributeStringMap
         }}
     },
 
-    {"display",{false,
+    {"display",{true,
         [](Element &e, string s) {
             e.setAttribute(display{s});
         }}
@@ -570,7 +564,7 @@ viewManager::doubleNF::doubleNF(const string &sOption) {
       {"%", numericFormat::percent},
       {"autocalculate", numericFormat::autoCalculate},
       {"auto", numericFormat::autoCalculate}};
-  // defualt to auto calculate
+  // default to auto calculate
   option = numericFormat::autoCalculate;
   std::regex r("[\\s,_]+");
   std::string sTmp = std::regex_replace(sOption, r, "");
@@ -616,7 +610,7 @@ viewManager::parseQuadCoordinates(const string _sOptions) {
  within the color name spelling. the function transforms the name and removes
  the spaces. It returns an iterator to the colorMap. This saves a find
  operation on the map when checking for the validity of a color name within
- the colormap.
+ the colorMap.
 */
 colorMap::const_iterator colorNF::colorIndex(const std::string &_colorName) {
   std::regex r("\\s+");
@@ -647,7 +641,7 @@ viewManager::colorNF::colorNF(const string &_sOption) {
 }
 
 /**
-\brief A constructor for creating the color object from a colorname iterator.
+\brief A constructor for creating the color object from a color name iterator.
  at times when the parser looks up a color name, this uses the iterator
 which came from the name
 
@@ -726,7 +720,7 @@ void viewManager::colorNF::splitComplements(void) { /*hsl rotate 150 */
 
 /**
 \internal
-\brief strToEnum a function that accepts a unorder map of string and numeric
+\brief strToEnum a function that accepts a unordered map of string and numeric
 values. the function removes invalid characters and applies a toLower case
 transform
 
@@ -877,17 +871,17 @@ viewManager::listStyleType::listStyleType(const string &sOption) {
 \internal
 \class Viewer
 \brief
-This is the viewing aparatus of the document object model. Within the
+This is the viewing apparatus of the document object model. Within the
 codebase, the platform object is allocated once per viewer object. The
 platform object contains the implementation of the message queue present on
 most message based graphics interfaces. That is the entry point for windows
-message queue and the xwindows message polling routine. These routines simply
+message queue and the x windows message polling routine. These routines simply
 create event objects and dispatch them to the element that has applicable
 listeners attached.
 */
 
 /**
-\brief the viewer constructor opens an window and establishes a root document
+\brief the viewer constructor opens a window and establishes a root document
 object.
 */
 viewManager::Viewer::Viewer(const vector<any> &attrs)
@@ -968,7 +962,7 @@ are developed by this routine as needed. Each of these events, whether
 passed through as the same message, or developed is placed into the
 viewManager message queue. The background event dispatching fetches
 messages from this queue, and calls the element's event processor
-routines. The main thing to rememeber is that the information is
+routines. The main thing to remember is that the information is
 processed from a queue and using a background thread.
 */
 void viewManager::Viewer::dispatchEvent(const event &evt) {
@@ -993,7 +987,7 @@ void viewManager::Viewer::dispatchEvent(const event &evt) {
   case eventType::wheel:
     break;
   }
-/* these events do not come from the platfrom. However,
+/* these events do not come from the platform. However,
 they are spawned from conditions based upon the platform events.
 */
 #if 0
@@ -1009,9 +1003,9 @@ eventType::mouseleave
 /**
 \internal
 \brief The entry point that processes messages from the operating
-system application level services. Typically on linux this is a
+system application level services. Typically on Linux this is a
 coupling of xcb and keysyms library for keyboard. Previous
-incarnations of techology such as this typically used xserver.
+incarnations of technology such as this typically used xserver.
 However, XCB is the newer form. Primarily looking at the code of such
 programs as vlc, the routine simply places pixels into the memory
 buffer. while on windows the direct x library is used in combination
@@ -1347,7 +1341,10 @@ Element &viewManager::Element::operator=(Element &&other) noexcept {
 
   Example
   -------
-  \snippet examples.epp appendChild_markup
+  \snippet examples.cpp appendChild_markup
+
+  \ref markupInputFormat
+
 */
 auto viewManager::Element::appendChild(const std::string &sMarkup)
     -> Element & {
@@ -1414,6 +1411,9 @@ auto viewManager::Element::appendChild(const ElementList &elementCollection)
   -------
   \snippet examples.cpp append_markup
 
+  \ref markupInputFormat
+
+
 */
 auto viewManager::Element::append(const std::string &sMarkup) -> Element & {
   Element *base = this->m_parent;
@@ -1468,9 +1468,11 @@ auto viewManager::Element::append(ElementList &elementCollection) -> Element & {
 /**
 \brief The function sets the given attribute inside the elements indexed
 map. Settings are filtered on specific types to determine if it is a true
-attribute or one that is filtered to be a compound. Compoud attributes require
+attribute or one that is filtered to be a compound. Compound attributes require
 other operations such as data insertion into the data property or using an
-official attribute object where only an enumeration value is given. \param
+official attribute object where only an enumeration value is given. 
+
+\param
 setting an attribute.
 
 The following are supported filtered types:
@@ -1624,11 +1626,10 @@ Element &viewManager::Element::setAttribute(const std::any &setting) {
 }
 
 /**
+\internal
 \brief The attribute being set can be contained in an array of std::any
-
-Example
--------
-\snippet examples.cpp setAttribute_any
+Typically the caller does not use this function but relies on the 
+varodic template version.
 */
 Element &
 viewManager::Element::setAttribute(const std::vector<std::any> &attribs) {
@@ -1682,6 +1683,24 @@ void viewManager::Element::updateIndexBy(const indexBy &setting) {
 
 /**
 \brief inserts the given element before the named second parameter.
+The version of the function is useful when the element is indexed by a string
+and a reference to it does not exist.
+
+\param Element &newChild
+
+\param std::string sID
+
+Example
+-------
+\snippet examples.cpp insertBefore_string
+*/
+auto viewManager::Element::insertBefore(Element &newChild, std::string &sID)
+    -> Element & {
+  return insertBefore(newChild, getElement(sID));
+}
+
+/**
+\brief inserts the given element before the named second parameter.
 
 \param Element &newChild
 
@@ -1689,7 +1708,7 @@ void viewManager::Element::updateIndexBy(const indexBy &setting) {
 
 Example
 -------
-\example examples.cpp insertBefore
+\snippet examples.cpp insertBefore
 */
 auto viewManager::Element::insertBefore(Element &newChild,
                                         Element &existingElement) -> Element & {
@@ -1710,6 +1729,24 @@ auto viewManager::Element::insertBefore(Element &newChild,
   }
   m_childCount++;
   return child;
+}
+
+/**
+\brief inserts the given element after the named second parameter element.
+The version of the function is useful when the element is indexed by a string
+and a reference to it does not exist.
+
+\param Element &newChild
+
+\param std::string sID
+
+Example
+-------
+\snippet examples.cpp insertAfter_string
+*/
+auto viewManager::Element::insertAfter(Element &newChild, std::string &sID)
+    -> Element & {
+  return insertAfter(newChild, getElement(sID));
 }
 
 /**
@@ -1742,7 +1779,6 @@ auto viewManager::Element::insertAfter(Element &newChild,
   m_childCount++;
   return newChild;
 }
-
 /**
 \brief replaces the child with the new one specified.
 \details The function replaces the reference child with the new one selected.
@@ -1751,11 +1787,30 @@ should contain an existing child. When the oldChild is replaced, it is removed
 from the indexBy list and its memory is freed.
 
 \param Element& newChild a newly created child.
+\param std::string& sID an existing child that is to be replaced.
+
+Example
+-------
+\snippet examples.cpp replaceChild_string
+*/
+auto viewManager::Element::replaceChild(Element &newChild, std::string &sID)
+    -> Element & {
+  return replaceChild(newChild, getElement(sID));
+}
+
+/**
+\brief replaces the child with the new one specified.
+\details The function replaces the reference child with the new one selected.
+The new child should be within the first parameter while the second parameter
+should contain an existing child. When the oldChild is replaced, it is removed
+from the indexBy list and its memory is freed.
+
+\param Element& newChild a newly created child.
 \param Element& oldChild an existing child that is to be replaced.
 
 Example
 -------
-\snippet examples replaceChild
+\snippet examples.cpp replaceChild
 */
 auto viewManager::Element::replaceChild(Element &newChild, Element &oldChild)
     -> Element & {
@@ -1827,14 +1882,16 @@ auto viewManager::Element::resize(const double w, const double h) -> Element & {
 
 /**
 \brief removes the element from the document tree and free the memory
-associated. \details The remove method provides an easy method to delete an
-object from the document heirarchy. The method does not provide continuation
+associated.
+
+\details The remove method provides an easy method to delete an
+object from the document hierarchy. The method does not provide continuation
 syntax as after the call is complete, all memory associated with the object will
 be freed. The indexBy list is also modified to update the change.
 
 Example
 -------
-\snippet examples remove
+\snippet examples.cpp remove
 */
 void viewManager::Element::remove(void) {
   // recursively remove all children
@@ -1871,6 +1928,26 @@ void viewManager::Element::remove(void) {
 
 /**
 \brief removes a child element from the list and free the associated memory.
+\param std::string& isID is an existing child of the referenced element to
+remove.
+
+\details The removeChild destroys an existing child element of a document tree.
+After the function completes, all associated reference within the system will be
+discontinued. This includes the smart pointer and the indexBy list.
+
+\exception std::invalid_argument may be thrown if the element is not found by
+the given id or the referenced element is not a child.
+
+Example
+-------
+\snippet examples.cpp removeChild_string
+*/
+auto viewManager::Element::removeChild(std::string &sID) -> Element & {
+  return removeChild(getElement(sID));
+}
+
+/**
+\brief removes a child element from the list and free the associated memory.
 \param Element& oldChild is an existing child of the referenced element to
 remove.
 
@@ -1878,11 +1955,18 @@ remove.
 After the function completes, all associated reference within the system will be
 discontinued. This includes the smart pointer and the indexBy list.
 
+\exception std::invalid_argument may be thrown if the element is not a child.
 Example
 -------
 \snippet examples.cpp removeChild
 */
 auto viewManager::Element::removeChild(Element &oldChild) -> Element & {
+  // only remove children that are attached to the object
+  if (oldChild.m_parent != m_self) {
+    std::string info = "Referenced element is not a child.";
+    throw std::invalid_argument(info);
+  }
+
   // recursively remove children
   auto pItem = oldChild.m_firstChild;
   while (pItem) {
@@ -1972,7 +2056,7 @@ the element. All memory for each of the elements is freed.
 \details The clear method is a bulk operation that removes
 all associated data within the public data members as well as
 all manually document elements. It should be noted that
-all of the data() adapators are erased.
+all of the data() adapters are erased.
 
 Example
 -------
@@ -1991,7 +2075,7 @@ auto viewManager::Element::clear(void) -> Element & {
 /**
 \internal
 
-\brief The function mapps the event id to the appropiate vector.
+\brief The function maps the event id to the appropriate vector.
 This is kept statically here for resource management.
 
 \param eventType evtType
@@ -2084,6 +2168,7 @@ auto viewManager::Element::removeListener(eventType evtType,
 }
 
 /**
+\internal
 \brief This is the main function which invokes drawing of the item and
 its children. It is called recursively when painting needs to occur.
 This function is used internally and is not necessary to invoke. That
@@ -2092,6 +2177,11 @@ work performed by this routine is accomplished using the surface image.
 */
 void viewManager::Element::render(void) {}
 
+/**
+\internal
+\brief The function dumps the default string data member
+to the passed string stream. This is useful for debugging.
+*/
 void viewManager::Element::streamRender(stringstream &ss) {
   for (auto n : data()) {
     ss << n << "\n";
@@ -2099,22 +2189,24 @@ void viewManager::Element::streamRender(stringstream &ss) {
 }
 
 /**
-\brief Uses the vasprint standard function to format the given
-parameters with the format string. Inserts the named
-elements within the markup into the document.</summary>
+\brief Uses the standard printf function to format the given
+parameters with the format string. When the Boolean member
+ingestStream is set to true, the API inserts the named
+elements within the markup into the document along with any 
+text.
 
 \param fmt is a printf format string. It should be a literal
 string.
 \param ...  is a variable argument parameter passed to the standard
   printf function.
 
-  <code>
+\code
   vector<string> movies={"The Hulk",
                         "Super Action Hero",
                         "Star Invader Eclipse"};
 
   auto& e=createElement();
-
+  e.ingestStream=true;
   e.printf("The movie theatre is <blue>opened</blue> today for matinee.");
   e.printf("Here is a list of movies: <ul>");
 
@@ -2122,21 +2214,18 @@ string.
     e.prinf("<li>%s</li>",n.c_str());
   e.printf("</ul>");
 
-  </code>
+\endcode
 
-<note>
-<para>If a literal is not used for the first parameter, a warning will
+\note If a literal is not used for the first parameter, a warning will
 be issued. This warning is effective because at times, it reminds the
 developer that if the format string comes from a foreign source
-and is not controlled, the stack may be violated.</para>
+and is not controlled, the stack may be violated.
+\endnote
 
-<para>To prevent this, the function has a static attribute type check
-that is used during compile time. The actual parameter format
-is associated with the 2 parameter. That is
-this is actually in the 1 slot due to it being a
-class member. So when a literal is not used for the first
-parameter, a warning is issued.</para>
-</note>
+
+\ref markupInputFormat
+
+
 */
 void viewManager::Element::printf(const char *fmt, ...) {
 #if defined(__linux__)
@@ -2154,7 +2243,7 @@ void viewManager::Element::printf(const char *fmt, ...) {
 #pragma clang diagnostic warning "-Wformat-security"
 #pragma clang diagnostic warning "-Wformat-nonliteral"
 
-  // if stream ingestion is on, interprest the markup as it arrives.
+  // if stream ingestion is on, interprets the markup as it arrives.
   if (ingestStream)
     ingestMarkup(*this, buffer);
   else
@@ -2162,16 +2251,17 @@ void viewManager::Element::printf(const char *fmt, ...) {
 
   free(buffer);
   va_end(ap);
-#elif defined(__WIN64)
+#elif defined(_WIN64)
   va_list ap;
   va_start(ap, fmt);
   char *buffer = nullptr;
   int len;
-  len = _vscprintf(fmt, ap) + 1;
-  buffer = (char *)malloc(len * sizeof(char));
-  vsprintf(buffer, fmt, ap);
 
-  // if stream ingestion is on, interprest the markup as it arrives.
+  len = _vscprintf_l(fmt, NULL, ap) + 1;
+  buffer = (char *)malloc(len * sizeof(char));
+  len = vsprintf_s(buffer, len, fmt, ap);
+
+  // if stream ingestion is on, interprets the markup as it arrives.
   if (ingestStream)
     ingestMarkup(*this, buffer);
   else
@@ -2183,52 +2273,17 @@ void viewManager::Element::printf(const char *fmt, ...) {
 }
 
 /**
+\internal
 \brief The ingestMarkup function provides a method to parse markup that is
-simular to HTML. The format is more restrictive in that the parser is not as
+similar to HTML. The format is more restrictive in that the parser is not as
 forgiving for errors.
 
 \details
-The routine is called by the functions that apply a string markup for parsing.
-This routine uses the object factrory and color map to query the
-contents of the maps. The parser applied is a simplified parser for
-speed in that complete tags must exist within the given text. That does not
-apply to beginning and ending tags however. Attribtues may also be captured.
-The text within the enclosed portion is applied as a data item within the
-element.
+The routine is called by the functions that allow a markup string.
+This routine uses the object factory and color map to query the
+contents of the maps. 
 
-Comment blocks are supported as with the html notation <!-- and -->
-Several aliases exist to shorten the attribute list as well as quad versions
-of attributes such as coordinates(a,b,c,d) or margin(a,b,c,d). Options exist for
-the formatting of the string as it uses regular expressions to capture four
-parameters. You can use () {} [] for labling the group and separate the items
-with a space or a comma.
-
-In some regards, the parser is more strict in what can be applied to create
-elements, verses recoginitions of color markup. In general, these rules mark the
-implementation less code. Errors within the markup as implemented by the
-developer will be shown at runtime. There is a program that can generate c++
-code from this markup.
-
-Notation is supported on numeric parameters with a format:
-  coordinates {10% 10% 80% 80%}
-
-\code
-       <h1>The title is</h1>
-       <h2>The information</h2>
-
-      <div id=divtest background=blue center relative>
-         This is the text inside the block.
-         <ul>
-           <li>This is the first item</li>
-           <li>This is the second item</li>
-         </ul>
-      </div>
-
-
-      <blue>When the text is set this way, the color continues until another
-color is selected. <green>This changes the color of the foreground and creates
-textNodes within the current element context.
-\endcode
+\ref markupInputFormat
 
 */
 Element &viewManager::Element::ingestMarkup(Element &node,
@@ -2256,13 +2311,13 @@ Element &viewManager::Element::ingestMarkup(Element &node,
     textData
   };
 
-  // the varaint holds the payload from the parser
+  // the variant holds the payload from the parser
   typedef variant<string, factoryLambda, attributeLambda, colorNF>
       parserOperator;
 
   typedef struct {
     vector<tuple<itemType, bool, parserOperator>>
-        parsedData; // the elements parsed thus far tokenized
+        parsedData; // the elements parsed thus far token
     vector<reference_wrapper<Element>>
         elementStack; // stack holding the tree of elements
 
@@ -2277,13 +2332,14 @@ Element &viewManager::Element::ingestMarkup(Element &node,
     bool bQuery; // true when the information should be queried for a token
     const char *signalStart; // holds the position of the signal start
     string sCapture;         // the capturing of an element or token name
-    string sText; // text informatin that will be added to the elements data
+    string sText; // text information that will be added to the elements data
 
   } parserContext;
 
   static parserContext pc;
 
-  pc.elementStack.push_back(node);
+  if (pc.elementStack.size() == 0)
+    pc.elementStack.push_back(node);
 
   // pointer to the input buffer.
   const char *p = markup.data();
@@ -2419,7 +2475,7 @@ Element &viewManager::Element::ingestMarkup(Element &node,
   // second phase, iterate over the parsed context and develop the elements,
   // color text nodes, and set attributes for the items on the stack. once
   // items are processed, they are removed from the stack using the delete
-  // range operator, For a complet etag to exist, the end tab must also exist.
+  // range operator, For a complete tag to exist, the end tab must also exist.
   auto item = pc.parsedData.begin();
   while (item != pc.parsedData.end()) {
 
@@ -2471,9 +2527,9 @@ Element &viewManager::Element::ingestMarkup(Element &node,
     item++;
   }
 
-  // return the the item on the stack appropiate
+  // return the the item on the stack appropriate
   Element &eRet = pc.elementStack.back().get();
-  pc.elementStack.pop_back();
+  // pc.elementStack.pop_back();
 
   return eRet;
 }
@@ -2498,7 +2554,7 @@ void viewManager::Visualizer::closeWindow(Element &e) {}
 /**
   \internal
   \brief constructor for the platform object. The platform object is coded such
-  that each of the operating systems supported is encapsolated within
+  that each of the operating systems supported is encapsulated within
   preprocessor blocks.
 
   \param eventHandler evtDispatcher the dispatcher routine which connects the
@@ -2536,8 +2592,7 @@ viewManager::Visualizer::platform::platform(eventHandler evtDispatcher,
 
 /**
   \internal
-  \brief opens a window on the target os
-
+  \brief opens a window on the target OS
 
 */
 void viewManager::Visualizer::platform::openWindow(void) {
@@ -2629,7 +2684,7 @@ void viewManager::Visualizer::platform::openWindow(void) {
 
 /**
   \internal
-  \brief closes a window on the target os
+  \brief closes a window on the target OS
 
 
 */
@@ -2639,8 +2694,8 @@ void viewManager::Visualizer::platform::closeWindow(void) {}
 
 /**
 \internal
-\brief The default window message procesor for the application.
-This is the version ofr the Microsoft Windows operating system.
+\brief The default window message processor for the application.
+This is the version of the Microsoft Windows operating system.
 
 */
 LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
