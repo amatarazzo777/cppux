@@ -18,12 +18,7 @@
   \brief
   this definition provides the ability to utilize the UX namespace
 */
-#define INCLUDE_UX
 #include "viewManager.hpp"
-
-#ifdef INCLUDE_UX
-#include "viewManagerUX.hpp"
-#endif
 
 #include <sys/types.h>
 

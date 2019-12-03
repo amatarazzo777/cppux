@@ -1,5 +1,6 @@
+
+#define INCLUDE_UX
 #include "viewManager.hpp"
-#include "viewManagerUX.hpp"
 
 using namespace std;
 using namespace viewManager;

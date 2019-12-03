@@ -1127,10 +1127,8 @@ public:
     return (e);
   }
 
-private:
-  Element &setAttribute(const std::vector<std::any> &attribs);
-
 public:
+  Element &setAttribute(const std::vector<std::any> &attribs);
   Element &setAttribute(const std::any &setting);
 
   /** \brief The setAttribute templated function provides a
@@ -1770,3 +1768,7 @@ private:
 };
 
 }; // namespace viewManager
+
+#ifdef INCLUDE_UX
+#include "viewManagerUX.hpp"
+#endif
