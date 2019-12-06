@@ -655,9 +655,8 @@ private:
 
   unsigned short _w;
   unsigned short _h;
-  u_int8_t* m_offscreenBuffer;
-  unsigned int _bufferSize;
-
+  std::vector<u_int8_t> m_offscreenBuffer;
+  
 #ifdef USE_INLINE_RENDERER
   FT_Library m_freeType;
   FTC_Manager m_cacheManager;

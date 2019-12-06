@@ -2584,7 +2584,7 @@ viewManager::Visualizer::platform::platform(eventHandler evtDispatcher,
   m_pRenderTarget = nullptr;
   m_pOffscreen = nullptr;
   m_Bitmap = nullptr;
-  m_offscreenBuffer = nullptr;
+
   ptSize = 18;
   CoInitialize(NULL);
 
@@ -2759,9 +2759,6 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
   switch (message) {
   case WM_SIZE:
     platformInstance->resize(LOWORD(lParam), HIWORD(lParam));
-    //platformInstance->dispatchEvent(event{eventType::paint});
-    //platformInstance->flip();
-
     platformInstance->dispatchEvent(event{eventType::resize,
                                           static_cast<short>(LOWORD(lParam)),
                                           static_cast<short>(HIWORD(lParam))});
@@ -2841,7 +2838,7 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
         eventType::wheel, static_cast<short>(LOWORD(lParam)),
         static_cast<short>(HIWORD(lParam)), GET_WHEEL_DELTA_WPARAM(wParam)});
     platformInstance->clear();
-    platformInstance->ptSize+=GET_WHEEL_DELTA_WPARAM(wParam);
+    platformInstance->ptSize += GET_WHEEL_DELTA_WPARAM(wParam);
     platformInstance->dispatchEvent(event{eventType::paint});
     platformInstance->flip();
     break;
@@ -2921,30 +2918,6 @@ void viewManager::Visualizer::platform::messageLoop(void) {
 #endif
 }
 
-#if defined(_WIN64)
-// Returns the last Win32 error, in string format. Returns an empty string if
-// there is no error.
-std::string GetLastErrorAsString() {
-  // Get the error message, if any.
-  DWORD errorMessageID = ::GetLastError();
-  if (errorMessageID == 0)
-    return std::string(); // No error message has been recorded
-
-  LPSTR messageBuffer = nullptr;
-  size_t size = FormatMessageA(
-      FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-          FORMAT_MESSAGE_IGNORE_INSERTS,
-      NULL, errorMessageID, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-      (LPSTR)&messageBuffer, 0, NULL);
-
-  std::string message(messageBuffer, size);
-
-  // Free the buffer.
-  LocalFree(messageBuffer);
-
-  return message;
-}
-#endif
 
 /**
   \internal
@@ -2988,7 +2961,7 @@ void viewManager::Visualizer::platform::drawText(std::string s) {
   // and name of the font.
 
   if (m_faceCache.size() == 0) {
-    m_faceCache.push_back({"C:\\Windows\\Fonts\\georgia.ttf",
+    m_faceCache.push_back({"C:\\Windows\\Fonts\\arial.ttf",
                            static_cast<int>(m_faceCache.size())});
   }
 
@@ -3101,9 +3074,9 @@ void viewManager::Visualizer::platform::drawText(std::string s) {
 */
 
 void viewManager::Visualizer::platform::clear(void) {
-  memset(m_offscreenBuffer, 0xFF, _bufferSize);
-  m_xpos=0;
-  m_ypos=0;
+  fill(m_offscreenBuffer.begin(), m_offscreenBuffer.end(), 0xFF);
+  m_xpos = 0;
+  m_ypos = 0;
 }
 
 /**
@@ -3117,13 +3090,14 @@ void viewManager::Visualizer::platform::putPixel(int x, int y,
 
   // calculate offset
   unsigned int offset = x * 4 + y * 4 * _w;
-  if (offset > _bufferSize)
+  if (offset > m_offscreenBuffer.size())
     return;
 
   // get pointer to buffer ( rgba bytes)
-  u_int8_t *pOff = m_offscreenBuffer + offset;
-  unsigned int *p = reinterpret_cast<unsigned int *>(pOff);
-  *p = color;
+  m_offscreenBuffer[offset]=color>>16;
+  m_offscreenBuffer[offset+1]=color>>8;
+  m_offscreenBuffer[offset+2]=color;
+
 }
 /**
 \brief The function provides the reallocation of the offscreen buffer
@@ -3132,15 +3106,15 @@ void viewManager::Visualizer::platform::putPixel(int x, int y,
 void viewManager::Visualizer::platform::resize(int w, int h) {
   _w = w;
   _h = h;
-  _bufferSize = _w * _h * 4;
-  if (m_offscreenBuffer != nullptr)
-    free(m_offscreenBuffer);
 
-  m_offscreenBuffer = (uint8_t *)malloc(_bufferSize);
-  // realloc(m_offscreenBuffer, _bufferSize);
+  int _bufferSize = _w * _h * 4+4;
+  m_offscreenBuffer.resize(_bufferSize);
 
   // clear to white
-  memset(m_offscreenBuffer, 0xFF, _bufferSize);
+  clear();
+
+  if(m_pRenderTarget)
+      m_pRenderTarget->Release();
 
   RECT rc;
   GetClientRect(m_hwnd, &rc);
@@ -3179,17 +3153,8 @@ void viewManager::Visualizer::platform::flip() {
 
   D2D1_RECT_F rect = D2D1::RectF(0.0, 0.0, _w, _h);
   D2D1_SIZE_U size = D2D1::SizeU(_w, _h);
-  HRESULT hr = m_pRenderTarget->CreateBitmap(size, m_offscreenBuffer, _w * 4,
+  HRESULT hr = m_pRenderTarget->CreateBitmap(size, m_offscreenBuffer.data(), _w * 4,
                                              &bmpProperties, &m_Bitmap);
-#if 0
-  // copy pixel buffer to bitmap
-  D2D1_RECT_U crect;
-  crect.left = 0;
-  crect.top = 0;
-  crect.right = _w;
-  crect.bottom = _h;
-  m_Bitmap->CopyFromMemory(&crect, m_offscreenBuffer, _w * 4);
-#endif
 
   // render bitmap to screen
   D2D1_RECT_F rectf;
