@@ -21,10 +21,32 @@ within the viewManager namespace.
 options when compiling the source.
 @{
 */
-#define USE_INLINE_RENDERER
+
 /**
 \def USE_INLINE_RENDERER
 \brief The system will be configured to use an inline version of the rendered
+*/
+#define USE_INLINE_RENDERER
+
+/**
+\def USE_GREYSCALE_ANTIALIAS
+\brief Use the freetype greyscale rendering. The Option is only for use with the 
+inline render. Use this option or the USE_LCD_FILTER. One one should be defined.
+*/
+
+#define USE_GREYSCALE_ANTIALIAS
+
+/**
+\def USE_LCD_FILTER
+\brief The system must be configured to use the inline renderer. This uses the lcd
+filtering mode of the freetype glyph library. The option is exclusive against the
+USE_GREYSCALE_ANTIALIAS option. One one should be defined.
+*/
+//#define USE_LCD_FILTER
+
+/**
+\def USE_INLINE_RENDERER
+\brief The system will be configured to use the CEF framework
 */
 #define USE_CHROMIUM_EMBEDDED_FRAMEWORK
 
@@ -608,6 +630,8 @@ public:
   void messageLoop(void);
   void drawText(std::string s);
   inline void putPixel(int x, int y, unsigned int color);
+  inline unsigned int getPixel(int x, int y);
+
   void flip(void);
   void resize(int w, int h);
   void clear(void);
@@ -660,8 +684,15 @@ private:
 #ifdef USE_INLINE_RENDERER
   FT_Library m_freeType;
   FTC_Manager m_cacheManager;
+
+  #ifdef USE_LCD_FILTER
   FTC_ImageCache m_imageCache;
+  #endif
+
+  #ifdef USE_GREYSCALE_ANTIALIAS
   FTC_SBitCache m_bitCache;
+  #endif
+
   FTC_CMapCache m_cmapCache;
   std::vector<faceCacheStruct> m_faceCache;
 

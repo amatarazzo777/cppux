@@ -2612,15 +2612,19 @@ viewManager::Visualizer::platform::platform(eventHandler evtDispatcher,
   if (error)
     throw std::runtime_error(errText);
 
+#ifdef USE_GREYSCALE_ANTIALIAS
+  // initialize the bitmap cache
+  error = FTC_SBitCache_New(m_cacheManager, &m_bitCache);
+  if (error)
+    throw std::runtime_error(errText);
+
+#elif defined USE_LCD_FILTER
   // initialize the image cache
   error = FTC_ImageCache_New(m_cacheManager, &m_imageCache);
   if (error)
     throw std::runtime_error(errText);
 
-  // initialize the bitmap cache
-  error = FTC_SBitCache_New(m_cacheManager, &m_bitCache);
-  if (error)
-    throw std::runtime_error(errText);
+#endif
 
   error = FTC_CMapCache_New(m_cacheManager, &m_cmapCache);
   if (error)
@@ -2918,7 +2922,6 @@ void viewManager::Visualizer::platform::messageLoop(void) {
 #endif
 }
 
-
 /**
   \internal
   \brief the routine handles the message processing for the specific
@@ -2981,9 +2984,9 @@ void viewManager::Visualizer::platform::drawText(std::string s) {
   FT_Face face = sizeFace->face;
 
   // get the height of the font
-  int height = face->size->metrics.height >> 6;
-  if (m_ypos < height)
-    m_ypos = height + height / 2;
+  int faceHeight = face->size->metrics.height >> 6;
+  if (m_ypos < faceHeight)
+    m_ypos = faceHeight + faceHeight / 2;
   m_xpos = 10;
 
   for (auto &c : s) {
@@ -2992,7 +2995,7 @@ void viewManager::Visualizer::platform::drawText(std::string s) {
     // new line
     if (c == '\n') {
       m_xpos = 10;
-      m_ypos += height;
+      m_ypos += faceHeight;
 
       // tab
     } else if (c == '\t') {
@@ -3006,6 +3009,21 @@ void viewManager::Visualizer::platform::drawText(std::string s) {
     if (glyph_index == 0)
       continue;
 
+    /*
+    There are two distinct types of bimap structures that are in use, grey scale
+    or lcd filtered. The buffer format is unique for each, the grey lite one
+    being a value indicating grey luminence while the lcd filter is a rgb one.
+    These values provide the same functionality for the looping and drawing
+    routine. You will notice that within each block of code, after getting the
+    image, these values are set.
+    */
+    int storageSize, pitch, top, left, height, width, xadvance;
+    unsigned char *buffer;
+
+/***********************
+\brief use greyscale or color lcd filtering
+*/
+#ifdef USE_GREYSCALE_ANTIALIAS
     // get the image
     FTC_SBit bitmap;
     error = FTC_SBitCache_LookupScaler(m_bitCache, &scaler, FT_LOAD_DEFAULT,
@@ -3014,16 +3032,47 @@ void viewManager::Visualizer::platform::drawText(std::string s) {
     if (error)
       continue;
 
-    int storageSize = 1;
-#if 0
-    if (bitmap->format == FT_PIXEL_MODE_LCD) {
-      storageSize = 3;
-    }
+    // set the rendering values used for for grey
+    storageSize = 1;
+    pitch = bitmap->pitch;
+    top = bitmap->top;
+    left = bitmap->left;
+    height = bitmap->height;
+    width = bitmap->width;
+    buffer = bitmap->buffer;
+    xadvance = bitmap->xadvance;
+
+#elif defined USE_LCD_FILTER
+    FT_Glyph aglyph;
+    FT_BitmapGlyph bitmap;
+
+    // get the image, however this is just the outline
+    error = FTC_ImageCache_LookupScaler(m_imageCache, &scaler, FT_LOAD_DEFAULT,
+                                        glyph_index, &aglyph, NULL);
+    if (error)
+      continue;
+
+    //xadvance = (aglyph->advance.x + 0x8000) >> 16;
+    xadvance = aglyph->advance.x  >> 16;
+
+    // this converts the outline image to a rgb bitmap
+    error = FT_Glyph_To_Bitmap(&aglyph, FT_RENDER_MODE_LCD, 0, 0);
+    bitmap = reinterpret_cast<FT_BitmapGlyph>(aglyph);
+
+    // set the rendering values used for for grey
+    storageSize = 3;
+    pitch = bitmap->bitmap.pitch;
+    top = bitmap->top;
+    left = bitmap->left;
+    height = bitmap->bitmap.rows;
+    width = bitmap->bitmap.width;
+    buffer = bitmap->bitmap.buffer;
+
 #endif
 
     // calculate the maximum bounds
-    int xmax = m_xpos + ((bitmap->pitch + 1) / storageSize);
-    int ymax = m_ypos + height - bitmap->top + bitmap->height;
+    int xmax = m_xpos + ((pitch + 1) / storageSize);
+    int ymax = m_ypos + faceHeight - top + height;
 
     // the kerning of a font depends on the previous character
     // some proportional fonts provide tighter spacing which improves rendering
@@ -3037,35 +3086,49 @@ void viewManager::Visualizer::platform::drawText(std::string s) {
     }
 
     // loop through the pixels
-    for (int i = m_xpos + bitmap->left, p = 0; i < xmax;
-         i++, p += storageSize) {
-      for (int j = m_ypos + height - bitmap->top, q = 0; j < ymax; j++, q++) {
-        int bufferPosition = q * bitmap->pitch + p;
+    for (int i = m_xpos + left, p = 0; i < xmax; i++, p += storageSize) {
+      for (int j = m_ypos + faceHeight - top, q = 0; j < ymax; j++, q++) {
+        int bufferPosition = q * pitch + p;
 
-        // only plot active pixels
-        if (bitmap->buffer[bufferPosition]) {
-          // get the source color
-          if (bitmap->format == FT_PIXEL_MODE_LCD) {
-            unsigned char b = bitmap->buffer[bufferPosition];
-            unsigned char g = bitmap->buffer[bufferPosition + 1];
-            unsigned char r = bitmap->buffer[bufferPosition + 2];
-            color = ((255 - r) << 16) | ((255 - g) << 8) | ((255 - b));
-          } else {
-            unsigned c = bitmap->buffer[bufferPosition];
-            color = ((255 - c) << 16) | ((255 - c) << 8) | ((255 - c));
-          }
+        /* only plot active pixels, the term
+         luminance is used because it is not actually a color
+         but a brightness of the pixel. Zero being off for the
+         glyph bitmap. */
+        if (buffer[bufferPosition]) {
 
+#ifdef USE_GREYSCALE_ANTIALIAS
+          // luminance is expressed in greyscal using one byte
+          unsigned char c = buffer[bufferPosition];
+          color = ((255 - c) << 16) | ((255 - c) << 8) | ((255 - c));
+
+#elif defined USE_LCD_FILTER
+          // luminance is expressed within the LCD format as three bytes.
+          unsigned char r = buffer[bufferPosition];
+          unsigned char g = buffer[bufferPosition + 1];
+          unsigned char b = buffer[bufferPosition + 2];
+          color = ((255 - r) << 16) | ((255 - g) << 8) | ((255 - b));
+#endif
+          // place the computed color into pixel buffer
           putPixel(i, j, color);
         }
       }
+
     }
+
+#ifdef USE_LCD_FILTER
+    // delete the bitmap data
+    FT_Done_Glyph((FT_Glyph)bitmap);
+    
+#endif
+
+
     // move after render
-    m_xpos += bitmap->xadvance;
+    m_xpos += xadvance;
     bProcessedOnce = true;
     previous_index = glyph_index;
   }
   // goto next line
-  m_ypos += height;
+  m_ypos += faceHeight;
 
 #endif
 }
@@ -3081,6 +3144,11 @@ void viewManager::Visualizer::platform::clear(void) {
 
 /**
 \brief The function places a color into the offscreen pixel buffer.
+    Coordinate start at 0,0, upper left.
+\param x - the left point of the pixel
+\param y - the top point of the pixel
+\param unsigned int color - the bgra color value
+
 */
 void viewManager::Visualizer::platform::putPixel(int x, int y,
                                                  unsigned int color) {
@@ -3093,28 +3161,51 @@ void viewManager::Visualizer::platform::putPixel(int x, int y,
   if (offset > m_offscreenBuffer.size())
     return;
 
-  // get pointer to buffer ( rgba bytes)
-  m_offscreenBuffer[offset]=color>>16;
-  m_offscreenBuffer[offset+1]=color>>8;
-  m_offscreenBuffer[offset+2]=color;
-
+  // put rgba color
+  unsigned int *p =
+      reinterpret_cast<unsigned int *>(&m_offscreenBuffer[offset]);
+  *p = color;
 }
+
+/**
+\brief The function returns the color at the pixel space. Coordinate start at
+0,0, upper left. \param x - the left point of the pixel \param y - the top
+point of the pixel \param unsigned int color - the bgra color value
+
+*/
+unsigned int viewManager::Visualizer::platform::getPixel(int x, int y) {
+  // clip coordinates
+  if (x > _w || y > _h)
+    return 0;
+
+  // calculate offset
+  unsigned int offset = x * 4 + y * 4 * _w;
+  if (offset > m_offscreenBuffer.size())
+    return 0;
+
+  // put rgba color
+  unsigned int *p =
+      reinterpret_cast<unsigned int *>(&m_offscreenBuffer[offset]);
+  return *p;
+}
+
 /**
 \brief The function provides the reallocation of the offscreen buffer
 
 */
 void viewManager::Visualizer::platform::resize(int w, int h) {
+  // resize the pixel memory
   _w = w;
   _h = h;
-
-  int _bufferSize = _w * _h * 4+4;
+  int _bufferSize = _w * _h * 4 + 4;
   m_offscreenBuffer.resize(_bufferSize);
 
   // clear to white
   clear();
 
-  if(m_pRenderTarget)
-      m_pRenderTarget->Release();
+  // free existing resources
+  if (m_pRenderTarget)
+    m_pRenderTarget->Release();
 
   RECT rc;
   GetClientRect(m_hwnd, &rc);
@@ -3153,8 +3244,8 @@ void viewManager::Visualizer::platform::flip() {
 
   D2D1_RECT_F rect = D2D1::RectF(0.0, 0.0, _w, _h);
   D2D1_SIZE_U size = D2D1::SizeU(_w, _h);
-  HRESULT hr = m_pRenderTarget->CreateBitmap(size, m_offscreenBuffer.data(), _w * 4,
-                                             &bmpProperties, &m_Bitmap);
+  HRESULT hr = m_pRenderTarget->CreateBitmap(size, m_offscreenBuffer.data(),
+                                             _w * 4, &bmpProperties, &m_Bitmap);
 
   // render bitmap to screen
   D2D1_RECT_F rectf;
