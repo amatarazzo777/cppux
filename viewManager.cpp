@@ -942,7 +942,7 @@ void viewManager::Viewer::render(void) {
 
   streamRender(ss, *this, 0);
   string s;
-  m_device->clearText();
+
   while (getline(ss, s, '\n'))
     m_device->drawText(s);
 }
@@ -1006,7 +1006,11 @@ programs as vlc, the routine simply places pixels into the memory
 buffer. while on windows the direct x library is used in combination
 with windows message queue processing.
 */
-void viewManager::Viewer::processEvents(void) { m_device->messageLoop(); }
+void viewManager::Viewer::processEvents(void) {
+  render();
+  m_device->flip();
+  m_device->messageLoop();
+}
 
 /**
 \addtogroup udl User Defined Literals
@@ -1465,7 +1469,7 @@ auto viewManager::Element::append(ElementList &elementCollection) -> Element & {
 map. Settings are filtered on specific types to determine if it is a true
 attribute or one that is filtered to be a compound. Compound attributes require
 other operations such as data insertion into the data property or using an
-official attribute object where only an enumeration value is given. 
+official attribute object where only an enumeration value is given.
 
 \param
 setting an attribute.
@@ -1623,7 +1627,7 @@ Element &viewManager::Element::setAttribute(const std::any &setting) {
 /**
 \internal
 \brief The attribute being set can be contained in an array of std::any
-Typically the caller does not use this function but relies on the 
+Typically the caller does not use this function but relies on the
 varodic template version.
 */
 Element &
@@ -2187,7 +2191,7 @@ void viewManager::Element::streamRender(stringstream &ss) {
 \brief Uses the standard printf function to format the given
 parameters with the format string. When the Boolean member
 ingestStream is set to true, the API inserts the named
-elements within the markup into the document along with any 
+elements within the markup into the document along with any
 text.
 
 \param fmt is a printf format string. It should be a literal
@@ -2276,7 +2280,7 @@ forgiving for errors.
 \details
 The routine is called by the functions that allow a markup string.
 This routine uses the object factory and color map to query the
-contents of the maps. 
+contents of the maps.
 
 \ref markupInputFormat
 
@@ -2573,18 +2577,75 @@ viewManager::Visualizer::platform::platform(eventHandler evtDispatcher,
   m_syms = nullptr;
   m_foreground = 0;
 
-#elif defined(__WIN64)
+#elif defined(_WIN64)
 
-#elseif defined
   m_hwnd = 0x00;
   m_pDirect2dFactory = nullptr;
   m_pRenderTarget = nullptr;
   m_pOffscreen = nullptr;
-  m_offScreenBitmap = nullptr;
+  m_Bitmap = nullptr;
+  m_offscreenBuffer = nullptr;
+  ptSize = 18;
+  CoInitialize(NULL);
+
+#endif
+
+#ifdef USE_INLINE_RENDERER
+  const char *errText = "The freetype library could not be initialized.";
+
+  FT_Error error;
+
+  // init the freetype library
+  error = FT_Init_FreeType(&m_freeType);
+  if (error)
+    throw std::runtime_error(errText);
+
+#if 0
+  error = FT_Library_SetLcdFilter(m_freeType, FT_LCD_FILTER_DEFAULT);
+  if (error)
+    throw std::runtime_error(errText);
+#endif
+
+  // initalize the freetype cache
+  error = FTC_Manager_New(m_freeType, 0, 0, 0, &faceRequestor, NULL,
+                          &m_cacheManager);
+  if (error)
+    throw std::runtime_error(errText);
+
+  // initialize the image cache
+  error = FTC_ImageCache_New(m_cacheManager, &m_imageCache);
+  if (error)
+    throw std::runtime_error(errText);
+
+  // initialize the bitmap cache
+  error = FTC_SBitCache_New(m_cacheManager, &m_bitCache);
+  if (error)
+    throw std::runtime_error(errText);
+
+  error = FTC_CMapCache_New(m_cacheManager, &m_cmapCache);
+  if (error)
+    throw std::runtime_error(errText);
 
 #endif
 }
+/**
+  \internal
+  \brief terminates the xserver connection
+  and frees resources.
+*/
+viewManager::Visualizer::platform::~platform() {
+#if defined(__linux__)
+  xcb_free_gc(m_connection, m_foreground);
+  xcb_key_symbols_free(m_syms);
+#elif defined(_WIN64)
+#endif
 
+#ifdef USE_INLINE_RENDERER
+  FTC_Manager_Done(m_cacheManager);
+  FT_Done_FreeType(m_freeType);
+  CoUninitialize();
+#endif
+}
 /**
   \internal
   \brief opens a window on the target OS
@@ -2623,13 +2684,12 @@ void viewManager::Visualizer::platform::openWindow(void) {
 
 #elif defined(_WIN64)
   HRESULT hr;
-  /*
+
   // Create a Direct2D factory.
   hr =
       D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &m_pDirect2dFactory);
   if (FAILED(hr))
     return;
-  */
 
   // Register the window class.
   WNDCLASSEX wcex = {sizeof(WNDCLASSEX)};
@@ -2650,30 +2710,16 @@ void viewManager::Visualizer::platform::openWindow(void) {
                         NULL, HINST_THISCOMPONENT, 0L);
   hr = m_hwnd ? S_OK : E_FAIL;
   if (FAILED(hr))
-    return;
-
-  // Adding a ListBox.
-  m_hListBox = CreateWindowExW(
-      WS_EX_CLIENTEDGE, L"LISTBOX", NULL,
-      WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_AUTOVSCROLL, 0, 0,
-      static_cast<UINT>(_w), static_cast<UINT>(_h), m_hwnd, NULL,
-      HINST_THISCOMPONENT, NULL);
+    throw std::runtime_error("Could not create window.");
 
   SetWindowLongPtr(m_hwnd, GWLP_USERDATA, (long long)this);
+
+  // create offscreen bitmap
+  resize(_w, _h);
+
   ShowWindow(m_hwnd, SW_SHOWNORMAL);
   UpdateWindow(m_hwnd);
-  /*
-  RECT rc;
-  GetClientRect(m_hwnd, &rc);
-  // Create a Direct2D render target
-  hr = m_pDirect2dFactory->CreateHwndRenderTarget(
-      D2D1::RenderTargetProperties(),
-      D2D1::HwndRenderTargetProperties(
-          m_hwnd, D2D1::SizeU(rc.right - rc.left, rc.bottom - rc.top)),
-      &m_pRenderTarget);
-  if (FAILED(hr))
-    return;
-  */
+
 #endif
 }
 
@@ -2683,7 +2729,16 @@ void viewManager::Visualizer::platform::openWindow(void) {
 
 
 */
-void viewManager::Visualizer::platform::closeWindow(void) {}
+void viewManager::Visualizer::platform::closeWindow(void) {
+#if defined(_WIN64)
+  m_pDirect2dFactory->Release();
+  m_pRenderTarget->Release();
+  /*
+  m_pOffscreen->Release();
+  m_offScreenBitmap->Release();
+  */
+#endif
+}
 
 #if defined(_WIN64)
 
@@ -2703,6 +2758,10 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
   platform *platformInstance = (platform *)lpUserData;
   switch (message) {
   case WM_SIZE:
+    platformInstance->resize(LOWORD(lParam), HIWORD(lParam));
+    //platformInstance->dispatchEvent(event{eventType::paint});
+    //platformInstance->flip();
+
     platformInstance->dispatchEvent(event{eventType::resize,
                                           static_cast<short>(LOWORD(lParam)),
                                           static_cast<short>(HIWORD(lParam))});
@@ -2741,6 +2800,10 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
     platformInstance->dispatchEvent(
         event{eventType::mouseup, static_cast<short>(LOWORD(lParam)),
               static_cast<short>(HIWORD(lParam)), 1});
+    platformInstance->clear();
+    platformInstance->ptSize++;
+    platformInstance->dispatchEvent(event{eventType::paint});
+    platformInstance->flip();
     break;
   case WM_MBUTTONDOWN:
     platformInstance->dispatchEvent(
@@ -2761,6 +2824,10 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
     platformInstance->dispatchEvent(
         event{eventType::mouseup, static_cast<short>(LOWORD(lParam)),
               static_cast<short>(HIWORD(lParam)), 3});
+    platformInstance->clear();
+    platformInstance->ptSize--;
+    platformInstance->dispatchEvent(event{eventType::paint});
+    platformInstance->flip();
     break;
   case WM_MOUSEMOVE:
     platformInstance->dispatchEvent(event{eventType::mousemove,
@@ -2773,6 +2840,10 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
     platformInstance->dispatchEvent(event{
         eventType::wheel, static_cast<short>(LOWORD(lParam)),
         static_cast<short>(HIWORD(lParam)), GET_WHEEL_DELTA_WPARAM(wParam)});
+    platformInstance->clear();
+    platformInstance->ptSize+=GET_WHEEL_DELTA_WPARAM(wParam);
+    platformInstance->dispatchEvent(event{eventType::paint});
+    platformInstance->flip();
     break;
   case WM_DISPLAYCHANGE:
     InvalidateRect(hwnd, NULL, FALSE);
@@ -2782,11 +2853,9 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
   case WM_PAINT: {
     PAINTSTRUCT ps;
     HDC hdc = BeginPaint(hwnd, &ps);
-
-    FillRect(hdc, &ps.rcPaint, (HBRUSH)(COLOR_WINDOW + 1));
-
+    platformInstance->clear();
     platformInstance->dispatchEvent(event{eventType::paint});
-    SetBkMode(hdc, OPAQUE);
+    platformInstance->flip();
     EndPaint(hwnd, &ps);
     ValidateRect(hwnd, NULL);
     result = 0;
@@ -2803,22 +2872,6 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
   return result;
 }
 #endif
-/**
-  \internal
-  \brief terminates the xserver connection
-  and frees resources.
-*/
-viewManager::Visualizer::platform::~platform() {
-#if defined(__linux__)
-  xcb_free_gc(m_connection, m_foreground);
-  xcb_key_symbols_free(m_syms);
-#elif defined(_WIN64)
-  m_pDirect2dFactory->Release();
-  m_pRenderTarget->Release();
-  m_pOffscreen->Release();
-  m_offScreenBitmap->Release();
-#endif
-}
 
 /**
   \internal
@@ -2893,33 +2946,261 @@ std::string GetLastErrorAsString() {
 }
 #endif
 
-void viewManager::Visualizer::platform::clearText(void) {
-#if defined(__linux__)
+/**
+  \internal
+  \brief the routine handles the message processing for the specific
+  operating system.
+*/
 
-#elif defined(_WIN64)
-  int pos = (int)SendMessage(m_hListBox, LB_RESETCONTENT, 0, (LPARAM)0);
-#endif
+/**
+\internal
+\brief The faceRequestor is a callback routine that provides
+creation of a face object. The parameter face_id is a pointer
+that is named as user information by the cache system.
+
+*/
+FT_Error viewManager::Visualizer::platform::faceRequestor(
+    FTC_FaceID face_id, FT_Library library, FT_Pointer request_data,
+    FT_Face *aface) {
+
+  faceCacheStruct *fID = static_cast<faceCacheStruct *>(face_id);
+  return FT_New_Face(library, fID->filePath, fID->index, aface);
 }
 
+/**
+\internal
+\brief The drawText function provides textual character rendering.
+*/
 void viewManager::Visualizer::platform::drawText(std::string s) {
 #if defined(__linux__)
 
 #elif defined(_WIN64)
-  RECT rect;
-  HDC wdc = GetWindowDC(m_hwnd);
-  GetClientRect(m_hwnd, &rect);
-  SetTextColor(wdc, 0x00000000);
-  SetBkMode(wdc, TRANSPARENT);
-  rect.left = 100;
-  rect.top = 100;
-  // std::wstring stemp = std::wstring(s.begin(), s.end());
-  // LPCWSTR sw = stemp.c_str();
-  // DrawText(wdc, s.c_str(), -1, &rect, DT_NOCLIP);
+  unsigned int color = 0x00;
+  int x, y;
+  bool bProcessedOnce = false;
+  FT_Error error;
+  FTC_ScalerRec scaler;
+  FT_Size sizeFace;
+  FT_UInt glyph_index = 0;
+  FT_UInt previous_index = 0;
 
-  int pos = (int)SendMessage(m_hListBox, LB_ADDSTRING, 0, (LPARAM)s.c_str());
+  // logically this user structure holds information about the size
+  // and name of the font.
 
-  DeleteDC(wdc);
+  if (m_faceCache.size() == 0) {
+    m_faceCache.push_back({"C:\\Windows\\Fonts\\georgia.ttf",
+                           static_cast<int>(m_faceCache.size())});
+  }
+
+  // having this as a local variable
+  scaler.face_id = static_cast<FTC_FaceID>(&m_faceCache.back());
+  scaler.pixel = false;
+  scaler.height = ptSize * 64;
+  scaler.width = ptSize * 64;
+
+  scaler.x_res = 72;
+  scaler.y_res = 72;
+
+  // get the face
+  error = FTC_Manager_LookupSize(m_cacheManager, &scaler, &sizeFace);
+  if (error)
+    throw std::runtime_error("Could not retrieve font face.");
+  FT_Face face = sizeFace->face;
+
+  // get the height of the font
+  int height = face->size->metrics.height >> 6;
+  if (m_ypos < height)
+    m_ypos = height + height / 2;
+  m_xpos = 10;
+
+  for (auto &c : s) {
+
+    // handle special characters
+    // new line
+    if (c == '\n') {
+      m_xpos = 10;
+      m_ypos += height;
+
+      // tab
+    } else if (c == '\t') {
+      m_xpos += 50;
+    }
+
+    // get the index of the glyph
+    glyph_index = FTC_CMapCache_Lookup(
+        m_cmapCache, static_cast<FTC_FaceID>(&m_faceCache.back()), 0, c);
+
+    if (glyph_index == 0)
+      continue;
+
+    // get the image
+    FTC_SBit bitmap;
+    error = FTC_SBitCache_LookupScaler(m_bitCache, &scaler, FT_LOAD_DEFAULT,
+                                       glyph_index, &bitmap, nullptr);
+
+    if (error)
+      continue;
+
+    int storageSize = 1;
+#if 0
+    if (bitmap->format == FT_PIXEL_MODE_LCD) {
+      storageSize = 3;
+    }
+#endif
+
+    // calculate the maximum bounds
+    int xmax = m_xpos + ((bitmap->pitch + 1) / storageSize);
+    int ymax = m_ypos + height - bitmap->top + bitmap->height;
+
+    // the kerning of a font depends on the previous character
+    // some proportional fonts provide tighter spacing which improves rendering
+    // characteristics
+    if (FT_HAS_KERNING(face) && bProcessedOnce) {
+      FT_Vector akerning;
+      error = FT_Get_Kerning(face, previous_index, glyph_index,
+                             FT_KERNING_DEFAULT, &akerning);
+      if (!error)
+        m_xpos += akerning.x >> 6;
+    }
+
+    // loop through the pixels
+    for (int i = m_xpos + bitmap->left, p = 0; i < xmax;
+         i++, p += storageSize) {
+      for (int j = m_ypos + height - bitmap->top, q = 0; j < ymax; j++, q++) {
+        int bufferPosition = q * bitmap->pitch + p;
+
+        // only plot active pixels
+        if (bitmap->buffer[bufferPosition]) {
+          // get the source color
+          if (bitmap->format == FT_PIXEL_MODE_LCD) {
+            unsigned char b = bitmap->buffer[bufferPosition];
+            unsigned char g = bitmap->buffer[bufferPosition + 1];
+            unsigned char r = bitmap->buffer[bufferPosition + 2];
+            color = ((255 - r) << 16) | ((255 - g) << 8) | ((255 - b));
+          } else {
+            unsigned c = bitmap->buffer[bufferPosition];
+            color = ((255 - c) << 16) | ((255 - c) << 8) | ((255 - c));
+          }
+
+          putPixel(i, j, color);
+        }
+      }
+    }
+    // move after render
+    m_xpos += bitmap->xadvance;
+    bProcessedOnce = true;
+    previous_index = glyph_index;
+  }
+  // goto next line
+  m_ypos += height;
+
 #endif
 }
+/**
 
-void viewManager::Visualizer::platform::flip() {}
+*/
+
+void viewManager::Visualizer::platform::clear(void) {
+  memset(m_offscreenBuffer, 0xFF, _bufferSize);
+  m_xpos=0;
+  m_ypos=0;
+}
+
+/**
+\brief The function places a color into the offscreen pixel buffer.
+*/
+void viewManager::Visualizer::platform::putPixel(int x, int y,
+                                                 unsigned int color) {
+  // clip coordinates
+  if (x > _w || y > _h)
+    return;
+
+  // calculate offset
+  unsigned int offset = x * 4 + y * 4 * _w;
+  if (offset > _bufferSize)
+    return;
+
+  // get pointer to buffer ( rgba bytes)
+  u_int8_t *pOff = m_offscreenBuffer + offset;
+  unsigned int *p = reinterpret_cast<unsigned int *>(pOff);
+  *p = color;
+}
+/**
+\brief The function provides the reallocation of the offscreen buffer
+
+*/
+void viewManager::Visualizer::platform::resize(int w, int h) {
+  _w = w;
+  _h = h;
+  _bufferSize = _w * _h * 4;
+  if (m_offscreenBuffer != nullptr)
+    free(m_offscreenBuffer);
+
+  m_offscreenBuffer = (uint8_t *)malloc(_bufferSize);
+  // realloc(m_offscreenBuffer, _bufferSize);
+
+  // clear to white
+  memset(m_offscreenBuffer, 0xFF, _bufferSize);
+
+  RECT rc;
+  GetClientRect(m_hwnd, &rc);
+  // Create a Direct2D render target
+  HRESULT hr = m_pDirect2dFactory->CreateHwndRenderTarget(
+      D2D1::RenderTargetProperties(),
+      D2D1::HwndRenderTargetProperties(
+          m_hwnd, D2D1::SizeU(rc.right - rc.left, rc.bottom - rc.top)),
+      &m_pRenderTarget);
+  if (FAILED(hr))
+    return;
+}
+
+/**
+\brief The function copies the pixel buffer to the screen
+
+*/
+void viewManager::Visualizer::platform::flip() {
+
+#if defined(__linux__)
+
+#elif defined(_WIN64)
+  if (!m_pRenderTarget)
+    return;
+
+  m_pRenderTarget->BeginDraw();
+
+  // create offscreen bitmap for pixel rendering
+  D2D1_PIXEL_FORMAT desc2D = D2D1::PixelFormat();
+  desc2D.format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+  desc2D.alphaMode = D2D1_ALPHA_MODE_IGNORE;
+
+  D2D1_BITMAP_PROPERTIES bmpProperties = D2D1::BitmapProperties();
+  m_pRenderTarget->GetDpi(&bmpProperties.dpiX, &bmpProperties.dpiY);
+  bmpProperties.pixelFormat = desc2D;
+
+  D2D1_RECT_F rect = D2D1::RectF(0.0, 0.0, _w, _h);
+  D2D1_SIZE_U size = D2D1::SizeU(_w, _h);
+  HRESULT hr = m_pRenderTarget->CreateBitmap(size, m_offscreenBuffer, _w * 4,
+                                             &bmpProperties, &m_Bitmap);
+#if 0
+  // copy pixel buffer to bitmap
+  D2D1_RECT_U crect;
+  crect.left = 0;
+  crect.top = 0;
+  crect.right = _w;
+  crect.bottom = _h;
+  m_Bitmap->CopyFromMemory(&crect, m_offscreenBuffer, _w * 4);
+#endif
+
+  // render bitmap to screen
+  D2D1_RECT_F rectf;
+  rectf.left = 0;
+  rectf.top = 0;
+  rectf.bottom = _h;
+  rectf.right = _w;
+  m_pRenderTarget->DrawBitmap(m_Bitmap, rectf);
+
+  m_pRenderTarget->EndDraw();
+  m_Bitmap->Release();
+
+#endif
+}

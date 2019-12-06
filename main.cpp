@@ -1,5 +1,3 @@
-
-#define INCLUDE_UX
 #include "viewManager.hpp"
 
 using namespace std;
@@ -62,8 +60,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
       marginLeft{5_pt}, marginBottom{5_pt}, marginRight{5_pt});
 
   test0(vm);
+
   test0c(vm);
   test0b(vm);
+#if 0
   testUX(vm);
   testUXmarkup(vm);
   test1(vm);
@@ -81,8 +81,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
   test8(vm);
   test8a(vm);
   test10(vm);
-
-  vm.render();
+#endif
+  
   vm.processEvents();
 }
 

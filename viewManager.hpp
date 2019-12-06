@@ -14,6 +14,35 @@ within the viewManager namespace.
 */
 #pragma once
 
+/**
+\addtogroup Library Build Options
+\brief Library Options
+\details These options provide the selection to configure selection
+options when compiling the source.
+@{
+*/
+#define USE_INLINE_RENDERER
+/**
+\def USE_INLINE_RENDERER
+\brief The system will be configured to use an inline version of the rendered
+*/
+#define USE_CHROMIUM_EMBEDDED_FRAMEWORK
+
+/**
+\def USE_CHROMIUM_EMBEDDED_FRAMEWORK
+\brief The system will be configured to use the CEF system.
+*/
+//#define USE_CHROMIUM_EMBEDDED_FRAMEWORK
+
+/**
+\def INCLUDE_UX
+\brief The system will be configured to include the base set of user interface
+controls.
+*/
+#define INCLUDE_UX
+
+/** @} */
+
 #include <algorithm>
 #include <any>
 #include <array>
@@ -71,6 +100,13 @@ OS SPECIFIC HEADERS
 EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 #define HINST_THISCOMPONENT ((HINSTANCE)&__ImageBase)
 #endif
+#endif
+
+#ifdef USE_INLINE_RENDERER
+#include "ft2build.h"
+#include FT_FREETYPE_H
+#include FT_LCD_FILTER_H
+#include FT_CACHE_H
 #endif
 
 /**
@@ -570,13 +606,28 @@ public:
   void openWindow(void);
   void closeWindow(void);
   void messageLoop(void);
-  void clearText(void);
   void drawText(std::string s);
+  inline void putPixel(int x, int y, unsigned int color);
   void flip(void);
+  void resize(int w, int h);
+  void clear(void);
+
 #if defined(_WIN64)
   static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam,
                                   LPARAM lParam);
 #endif
+
+#if defined(USE_INLINE_RENDERER)
+  typedef struct {
+    const char *filePath;
+    int   index;
+  } faceCacheStruct;
+
+  static FT_Error faceRequestor(FTC_FaceID face_id, FT_Library library,
+                            FT_Pointer request_data, FT_Face *aface);
+
+#endif
+
 public:
 #if defined(__linux__)
 
@@ -590,18 +641,35 @@ public:
 
 #elif defined(_WIN64)
   HWND m_hwnd;
-  HWND m_hListBox;
 
   ID2D1Factory *m_pDirect2dFactory;
   ID2D1HwndRenderTarget *m_pRenderTarget;
   ID2D1BitmapRenderTarget *m_pOffscreen;
-  ID2D1Bitmap *m_offScreenBitmap;
+  ID2D1Bitmap *m_Bitmap;
+
+    int ptSize;
+
 #endif
 private:
   eventHandler dispatchEvent;
 
   unsigned short _w;
   unsigned short _h;
+  u_int8_t* m_offscreenBuffer;
+  unsigned int _bufferSize;
+
+#ifdef USE_INLINE_RENDERER
+  FT_Library m_freeType;
+  FTC_Manager m_cacheManager;
+  FTC_ImageCache m_imageCache;
+  FTC_SBitCache m_bitCache;
+  FTC_CMapCache m_cmapCache;
+  std::vector<faceCacheStruct> m_faceCache;
+
+  int m_xpos;
+  int m_ypos;
+
+#endif
 
 }; // class platform
 }; // namespace Visualizer
