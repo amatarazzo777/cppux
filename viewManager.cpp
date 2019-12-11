@@ -559,6 +559,7 @@ viewManager::doubleNF::doubleNF(const string &sOption) {
       {"%", numericFormat::percent},
       {"autocalculate", numericFormat::autoCalculate},
       {"auto", numericFormat::autoCalculate}};
+
   // default to auto calculate
   option = numericFormat::autoCalculate;
   std::regex r("[\\s,_]+");
@@ -567,6 +568,7 @@ viewManager::doubleNF::doubleNF(const string &sOption) {
   u_int8_t opt;
   tie(value, opt) = strToNumericAndEnum("doubleNF", annotationMap, sOption);
   option = static_cast<numericFormat>(opt);
+
 }
 
 /**
@@ -629,9 +631,9 @@ viewManager::colorNF::colorNF(const string &_sOption) {
   if (it != colorFactory.end())
     color = it->second;
 
-  value[0] = static_cast<double>((color & 0xFF000000) >> 24);
-  value[1] = static_cast<double>((color & 0x00FF0000) >> 16);
-  value[2] = static_cast<double>((color & 0x0000FF00) >> 8);
+  value[0] = static_cast<double>((color & 0xFF0000) >> 16);
+  value[1] = static_cast<double>((color & 0x00FF00) >> 8);
+  value[2] = static_cast<double>((color & 0x0000FF));
   value[3] = 1.0;
 }
 
@@ -646,9 +648,9 @@ viewManager::colorNF::colorNF(colorMap::const_iterator it) {
   option = colorFormat::name;
   unsigned long color = it->second;
 
-  value[0] = static_cast<double>((color & 0xFF000000) >> 24);
-  value[1] = static_cast<double>((color & 0x00FF0000) >> 16);
-  value[2] = static_cast<double>((color & 0x0000FF00) >> 8);
+  value[0] = static_cast<double>((color & 0xFF0000) >> 16);
+  value[1] = static_cast<double>((color & 0x00FF00) >> 8);
+  value[2] = static_cast<double>((color & 0x0000FF));
   value[3] = 1.0;
 }
 /**
@@ -902,33 +904,12 @@ viewManager::Viewer::~Viewer() {}
 \brief main entry point for the rendering subsystem. The head of
 the recursive process.
 */
-void viewManager::Viewer::streamRender(std::stringstream &ss, Element &e,
-                                       int iLevel) {
-  int iWidth = iLevel * 4;
+void viewManager::Viewer::recursiveRender(Element &e) {
 
-  for (int i = 0; i < iLevel * iWidth; i++)
-    ss << " ";
+  e.render(*m_device.get());
 
-  ss << iLevel << " " << e.softName << " ";
-
-  std::string sID;
-
-  try {
-    sID = e.getAttribute<indexBy>().value;
-  } catch (const std::exception &e) {
-    sID = "-noID-";
-  }
-
-  ss << "(" << sID << ")"
-     << "\n";
-
-  e.streamRender(ss);
-
-  auto n = e.firstChild();
-
-  while (n) {
-    streamRender(ss, n->get(), iLevel + 1);
-    n = n->get().nextSibling();
+  for(auto &n : e.children()) {
+    recursiveRender(n);
   }
 }
 
@@ -937,15 +918,7 @@ void viewManager::Viewer::streamRender(std::stringstream &ss, Element &e,
 \brief main entry point for the rendering subsystem. The head of
 the recursive process.
 */
-void viewManager::Viewer::render(void) {
-  stringstream ss;
-
-  streamRender(ss, *this, 0);
-  string s;
-
-  while (getline(ss, s, '\n'))
-    m_device->drawText(s);
-}
+void viewManager::Viewer::render(void) { recursiveRender(*this); }
 
 /**
 \internal
@@ -2174,7 +2147,42 @@ This function is used internally and is not necessary to invoke. That
 is, system already invokes this as part of the processing stack. The
 work performed by this routine is accomplished using the surface image.
 */
-void viewManager::Element::render(void) {}
+void viewManager::Element::render(Visualizer::platform &device) {
+  stringstream ss;
+
+  for (auto m : m_usageAdaptorMap) {
+    if (m.first == typeid(std::vector<std::string>)) {
+      auto &o = std::any_cast<usageAdaptor<std::string> &>(m.second);
+      ss << o.textData() << "\n";
+    }
+  }
+
+  string sTextFace;
+  int tSize;
+  int tColor;
+
+  try {
+    sTextFace = getAttribute<textFace>().value;
+  } catch (const std::exception &e) {
+    sTextFace = "arial";
+  }
+  try {
+    auto [v,opt] =getAttribute<textSize>();
+    tSize = static_cast<int>(v);
+  } catch (const std::exception &e) {
+    tSize = 16;
+  }
+
+  try {
+    array<double, 4> tc = getAttribute<textColor>().value;
+    tColor = (static_cast<int>(tc[0]) << 16) | (static_cast<int>(tc[1]) << 8) |
+             static_cast<int>(tc[2]);
+  } catch (const std::exception &e) {
+    tColor = 0;
+  }
+
+  device.drawText(sTextFace, tSize, ss.str(), tColor);
+}
 
 /**
 \internal
@@ -2183,7 +2191,7 @@ to the passed string stream. This is useful for debugging.
 */
 void viewManager::Element::streamRender(stringstream &ss) {
   for (auto n : data()) {
-    ss << n << "\n";
+    ss << "     " << n << "\n";
   }
 }
 
@@ -2291,14 +2299,15 @@ Element &viewManager::Element::ingestMarkup(Element &node,
   /* the parser context applies memory to successive calls to the function.
     This is important for functions like printf or the stream insertion
     operators so that markup gets interpreted correctly. Since there is one of
-    these contexts per element, each element operates independently. For ease of
-    implementation, the structure and typedef is located at the function level.
+    these contexts per element, each element operates independently. For ease
+    of implementation, the structure and typedef is located at the function
+    level.
 
-    The parser acts in a two phase operation, first locating each of the tags as
-    markup and those that appears as tags but are not markup elements. The
-    second phase builds the elements and applies the attributes to the elements.
-    Since document fragments can be nested, the parser function maintains a
-    stack of created elements.
+    The parser acts in a two phase operation, first locating each of the tags
+    as markup and those that appears as tags but are not markup elements. The
+    second phase builds the elements and applies the attributes to the
+    elements. Since document fragments can be nested, the parser function
+    maintains a stack of created elements.
   */
   enum itemType {
     element,
@@ -2320,12 +2329,12 @@ Element &viewManager::Element::ingestMarkup(Element &node,
     vector<reference_wrapper<Element>>
         elementStack; // stack holding the tree of elements
 
-    bool bSignal; // true when a < is encountered, Presumed that the information
-                  // will be a markup
+    bool bSignal; // true when a < is encountered, Presumed that the
+                  // information will be a markup
     bool bToken;
     bool bSkip;
-    bool
-        bTerminal; // true when the / is encountered and a signal has been found
+    bool bTerminal; // true when the / is encountered and a signal has been
+                    // found
     bool bAttributeList;
     bool bAttributeListValue;
     bool bQuery; // true when the information should be queried for a token
@@ -2390,7 +2399,8 @@ Element &viewManager::Element::ingestMarkup(Element &node,
       std::transform(sKey.begin(), sKey.end(), sKey.begin(),
                      [](unsigned char c) { return std::tolower(c); });
 
-      if (pc.bToken) {
+      if (pc.bToken && !pc.bAttributeListValue) {
+
         // store iterator to the function
         auto it = attributeFactory.find(sKey);
         if (it != attributeFactory.end())
@@ -2415,8 +2425,8 @@ Element &viewManager::Element::ingestMarkup(Element &node,
 
         if (!pc.bSignal) {
           pc.bAttributeList = false;
-          pc.bAttributeListValue = false;
         }
+        pc.bAttributeListValue = false;
 
       } else {
 
@@ -2528,7 +2538,7 @@ Element &viewManager::Element::ingestMarkup(Element &node,
 
   // return the the item on the stack appropriate
   Element &eRet = pc.elementStack.back().get();
-  // pc.elementStack.pop_back();
+  pc.elementStack.pop_back();
 
   return eRet;
 }
@@ -2552,8 +2562,8 @@ void viewManager::Visualizer::closeWindow(Element &e) {}
 
 /**
   \internal
-  \brief constructor for the platform object. The platform object is coded such
-  that each of the operating systems supported is encapsulated within
+  \brief constructor for the platform object. The platform object is coded
+  such that each of the operating systems supported is encapsulated within
   preprocessor blocks.
 
   \param eventHandler evtDispatcher the dispatcher routine which connects the
@@ -2580,12 +2590,7 @@ viewManager::Visualizer::platform::platform(eventHandler evtDispatcher,
 #elif defined(_WIN64)
 
   m_hwnd = 0x00;
-  m_pDirect2dFactory = nullptr;
-  m_pRenderTarget = nullptr;
-  m_pOffscreen = nullptr;
-  m_Bitmap = nullptr;
-
-  ptSize = 18;
+  fontScale = 0;
   CoInitialize(NULL);
 
 #endif
@@ -2600,12 +2605,6 @@ viewManager::Visualizer::platform::platform(eventHandler evtDispatcher,
   if (error)
     throw std::runtime_error(errText);
 
-#if 0
-  error = FT_Library_SetLcdFilter(m_freeType, FT_LCD_FILTER_DEFAULT);
-  if (error)
-    throw std::runtime_error(errText);
-#endif
-
   // initalize the freetype cache
   error = FTC_Manager_New(m_freeType, 0, 0, 0, &faceRequestor, NULL,
                           &m_cacheManager);
@@ -2619,6 +2618,7 @@ viewManager::Visualizer::platform::platform(eventHandler evtDispatcher,
     throw std::runtime_error(errText);
 
 #elif defined USE_LCD_FILTER
+
   // initialize the image cache
   error = FTC_ImageCache_New(m_cacheManager, &m_imageCache);
   if (error)
@@ -2638,16 +2638,19 @@ viewManager::Visualizer::platform::platform(eventHandler evtDispatcher,
   and frees resources.
 */
 viewManager::Visualizer::platform::~platform() {
-#if defined(__linux__)
-  xcb_free_gc(m_connection, m_foreground);
-  xcb_key_symbols_free(m_syms);
-#elif defined(_WIN64)
-#endif
-
+// Freetype can be used for windows or linux
 #ifdef USE_INLINE_RENDERER
   FTC_Manager_Done(m_cacheManager);
   FT_Done_FreeType(m_freeType);
+#endif
+
+#if defined(__linux__)
+  xcb_free_gc(m_connection, m_foreground);
+  xcb_key_symbols_free(m_syms);
+
+#elif defined(_WIN64)
   CoUninitialize();
+
 #endif
 }
 /**
@@ -2687,13 +2690,6 @@ void viewManager::Visualizer::platform::openWindow(void) {
   return;
 
 #elif defined(_WIN64)
-  HRESULT hr;
-
-  // Create a Direct2D factory.
-  hr =
-      D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &m_pDirect2dFactory);
-  if (FAILED(hr))
-    return;
 
   // Register the window class.
   WNDCLASSEX wcex = {sizeof(WNDCLASSEX)};
@@ -2712,11 +2708,11 @@ void viewManager::Visualizer::platform::openWindow(void) {
                         WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
                         static_cast<UINT>(_w), static_cast<UINT>(_h), NULL,
                         NULL, HINST_THISCOMPONENT, 0L);
-  hr = m_hwnd ? S_OK : E_FAIL;
-  if (FAILED(hr))
-    throw std::runtime_error("Could not create window.");
 
   SetWindowLongPtr(m_hwnd, GWLP_USERDATA, (long long)this);
+
+  if (!initializeVideo())
+    throw std::runtime_error("Could not initalize direct x video subsystem.");
 
   // create offscreen bitmap
   resize(_w, _h);
@@ -2729,18 +2725,49 @@ void viewManager::Visualizer::platform::openWindow(void) {
 
 /**
   \internal
+  \brief Initalize the direct 3 video system.
+
+  Orginal code from
+*/
+#ifdef _WIN64
+bool viewManager::Visualizer::platform::initializeVideo() {
+  HRESULT hr;
+
+  // Create a Direct2D factory.
+  hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &m_pD2DFactory);
+
+  RECT rc;
+  GetClientRect(m_hwnd, &rc);
+
+  D2D1_SIZE_U size = D2D1::SizeU(rc.right - rc.left, rc.bottom - rc.top);
+
+  // Create a Direct2D render target.
+  hr = m_pD2DFactory->CreateHwndRenderTarget(
+      D2D1::RenderTargetProperties(),
+      D2D1::HwndRenderTargetProperties(m_hwnd, size), &m_pRenderTarget);
+  return true;
+}
+
+/**
+  \brief terminateVideo
+  \description the routine frees the resources of directx.
+*/
+void viewManager::Visualizer::platform::terminateVideo(void) {
+  m_pD2DFactory->Release();
+  m_pRenderTarget->Release();
+}
+
+#endif
+
+/**
+  \internal
   \brief closes a window on the target OS
 
 
 */
 void viewManager::Visualizer::platform::closeWindow(void) {
 #if defined(_WIN64)
-  m_pDirect2dFactory->Release();
-  m_pRenderTarget->Release();
-  /*
-  m_pOffscreen->Release();
-  m_offScreenBitmap->Release();
-  */
+
 #endif
 }
 
@@ -2802,7 +2829,7 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
         event{eventType::mouseup, static_cast<short>(LOWORD(lParam)),
               static_cast<short>(HIWORD(lParam)), 1});
     platformInstance->clear();
-    platformInstance->ptSize++;
+    platformInstance->fontScale++;
     platformInstance->dispatchEvent(event{eventType::paint});
     platformInstance->flip();
     break;
@@ -2826,7 +2853,7 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
         event{eventType::mouseup, static_cast<short>(LOWORD(lParam)),
               static_cast<short>(HIWORD(lParam)), 3});
     platformInstance->clear();
-    platformInstance->ptSize--;
+    platformInstance->fontScale--;
     platformInstance->dispatchEvent(event{eventType::paint});
     platformInstance->flip();
     break;
@@ -2837,15 +2864,20 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
     result = 0;
     handled = true;
     break;
-  case WM_MOUSEWHEEL:
+  case WM_MOUSEWHEEL: {
     platformInstance->dispatchEvent(event{
         eventType::wheel, static_cast<short>(LOWORD(lParam)),
         static_cast<short>(HIWORD(lParam)), GET_WHEEL_DELTA_WPARAM(wParam)});
     platformInstance->clear();
-    platformInstance->ptSize += GET_WHEEL_DELTA_WPARAM(wParam);
+    int wheel = GET_WHEEL_DELTA_WPARAM(wParam);
+    if (wheel > 0)
+      platformInstance->fontScale += 1;
+    else
+      platformInstance->fontScale -= 1;
+
     platformInstance->dispatchEvent(event{eventType::paint});
     platformInstance->flip();
-    break;
+  } break;
   case WM_DISPLAYCHANGE:
     InvalidateRect(hwnd, NULL, FALSE);
     result = 0;
@@ -2938,19 +2970,23 @@ that is named as user information by the cache system.
 FT_Error viewManager::Visualizer::platform::faceRequestor(
     FTC_FaceID face_id, FT_Library library, FT_Pointer request_data,
     FT_Face *aface) {
-
+  FT_Error error;
   faceCacheStruct *fID = static_cast<faceCacheStruct *>(face_id);
-  return FT_New_Face(library, fID->filePath, fID->index, aface);
+  error = FT_New_Face(library, fID->filePath.data(), 0, aface);
+
+  // we want to use unicode
+  error = FT_Select_Charmap(*aface, FT_ENCODING_UNICODE);
+
+  return error;
 }
 
 /**
 \internal
 \brief The drawText function provides textual character rendering.
 */
-void viewManager::Visualizer::platform::drawText(std::string s) {
-#if defined(__linux__)
-
-#elif defined(_WIN64)
+void viewManager::Visualizer::platform::drawText(std::string sTextFace,
+                                                 int pointSize, std::string s,
+                                                 unsigned int tC) {
   unsigned int color = 0x00;
   int x, y;
   bool bProcessedOnce = false;
@@ -2963,30 +2999,51 @@ void viewManager::Visualizer::platform::drawText(std::string s) {
   // logically this user structure holds information about the size
   // and name of the font.
 
-  if (m_faceCache.size() == 0) {
-    m_faceCache.push_back({"C:\\Windows\\Fonts\\arial.ttf",
-                           static_cast<int>(m_faceCache.size())});
+  string sFullFontPath;
+#if defined(__linux__)
+
+#elif defined(_WIN64)
+  sFullFontPath = "C:\\Windows\\Fonts\\" + sTextFace + ".ttf";
+#endif
+
+  // store a cache record for loaded fonts.
+  FTC_FaceID faceID;
+
+  auto it = m_faceCache.find(sTextFace);
+  if (it != m_faceCache.end()) {
+    faceID = static_cast<FTC_FaceID>(&it->second);
+  } else {
+    faceCacheStruct faceCacheRecord{sFullFontPath,
+                                    static_cast<int>(m_faceCache.size())};
+    m_faceCache[sTextFace] = faceCacheRecord;
+    auto it = m_faceCache.find(sTextFace);
+    faceID = static_cast<FTC_FaceID>(&it->second);
   }
 
   // having this as a local variable
-  scaler.face_id = static_cast<FTC_FaceID>(&m_faceCache.back());
-  scaler.pixel = false;
-  scaler.height = ptSize * 64;
-  scaler.width = ptSize * 64;
+  scaler.face_id = faceID;
+  scaler.pixel = 0;
+  scaler.height = (pointSize + fontScale) * 64;
+  scaler.width = (pointSize + fontScale) * 64;
 
-  scaler.x_res = 72;
-  scaler.y_res = 72;
+  scaler.x_res = 96;
+  scaler.y_res = 96;
 
   // get the face
   error = FTC_Manager_LookupSize(m_cacheManager, &scaler, &sizeFace);
   if (error)
     throw std::runtime_error("Could not retrieve font face.");
+
+  error = FT_Activate_Size(sizeFace);
+  if (error)
+    throw std::runtime_error("Could FT_Activate_Size for font.");
+
   FT_Face face = sizeFace->face;
 
   // get the height of the font
   int faceHeight = face->size->metrics.height >> 6;
   if (m_ypos < faceHeight)
-    m_ypos = faceHeight + faceHeight / 2;
+    m_ypos = 0;
   m_xpos = 10;
 
   for (auto &c : s) {
@@ -3003,19 +3060,18 @@ void viewManager::Visualizer::platform::drawText(std::string s) {
     }
 
     // get the index of the glyph
-    glyph_index = FTC_CMapCache_Lookup(
-        m_cmapCache, static_cast<FTC_FaceID>(&m_faceCache.back()), 0, c);
+    glyph_index = FTC_CMapCache_Lookup(m_cmapCache, faceID, 0, c);
 
     if (glyph_index == 0)
       continue;
 
     /*
-    There are two distinct types of bimap structures that are in use, grey scale
-    or lcd filtered. The buffer format is unique for each, the grey lite one
-    being a value indicating grey luminence while the lcd filter is a rgb one.
-    These values provide the same functionality for the looping and drawing
-    routine. You will notice that within each block of code, after getting the
-    image, these values are set.
+    There are two distinct types of bimap structures that are in use, grey
+    scale or lcd filtered. The buffer format is unique for each, the grey lite
+    one being a value indicating grey luminence while the lcd filter is a rgb
+    one. These values provide the same functionality for the looping and
+    drawing routine. You will notice that within each block of code, after
+    getting the image, these values are set.
     */
     int storageSize, pitch, top, left, height, width, xadvance;
     unsigned char *buffer;
@@ -3026,7 +3082,7 @@ void viewManager::Visualizer::platform::drawText(std::string s) {
 #ifdef USE_GREYSCALE_ANTIALIAS
     // get the image
     FTC_SBit bitmap;
-    error = FTC_SBitCache_LookupScaler(m_bitCache, &scaler, FT_LOAD_DEFAULT,
+    error = FTC_SBitCache_LookupScaler(m_bitCache, &scaler, FT_LOAD_RENDER,
                                        glyph_index, &bitmap, nullptr);
 
     if (error)
@@ -3048,12 +3104,11 @@ void viewManager::Visualizer::platform::drawText(std::string s) {
 
     // get the image, however this is just the outline
     error = FTC_ImageCache_LookupScaler(m_imageCache, &scaler, FT_LOAD_DEFAULT,
-                                        glyph_index, &aglyph, NULL);
+                                        glyph_index, &aglyph, nullptr);
     if (error)
       continue;
 
-    //xadvance = (aglyph->advance.x + 0x8000) >> 16;
-    xadvance = aglyph->advance.x  >> 16;
+    xadvance = (aglyph->advance.x + 0x8000) >> 16;
 
     // this converts the outline image to a rgb bitmap
     error = FT_Glyph_To_Bitmap(&aglyph, FT_RENDER_MODE_LCD, 0, 0);
@@ -3071,18 +3126,24 @@ void viewManager::Visualizer::platform::drawText(std::string s) {
 #endif
 
     // calculate the maximum bounds
-    int xmax = m_xpos + ((pitch + 1) / storageSize);
+    int xmax = m_xpos + width / storageSize + left;
     int ymax = m_ypos + faceHeight - top + height;
 
     // the kerning of a font depends on the previous character
-    // some proportional fonts provide tighter spacing which improves rendering
-    // characteristics
+    // some proportional fonts provide tighter spacing which improves
+    // rendering characteristics
     if (FT_HAS_KERNING(face) && bProcessedOnce) {
       FT_Vector akerning;
       error = FT_Get_Kerning(face, previous_index, glyph_index,
                              FT_KERNING_DEFAULT, &akerning);
-      if (!error)
+
+      /** provide special spacing for the charcters
+       and adjust the maximum width counter
+       These numbers usually preserve space.*/
+      if (!error) {
         m_xpos += akerning.x >> 6;
+        xmax += akerning.x >> 6;
+      }
     }
 
     // loop through the pixels
@@ -3099,7 +3160,23 @@ void viewManager::Visualizer::platform::drawText(std::string s) {
 #ifdef USE_GREYSCALE_ANTIALIAS
           // luminance is expressed in greyscal using one byte
           unsigned char c = buffer[bufferPosition];
-          color = ((255 - c) << 16) | ((255 - c) << 8) | ((255 - c));
+
+          unsigned char tR = tC >> 16;
+          unsigned char tG = tC >> 8;
+          unsigned char tB = tC;
+
+          unsigned char dR = tR - c;
+          unsigned char dG = tG - c;
+          unsigned char dB = tB - c;
+
+          unsigned int bC = getPixel(i,j);
+
+          unsigned char bR = bC >> 16;
+          unsigned char bG = bC >> 8;
+          unsigned char bB = bC;
+
+          color = ((tR- bR) << 16) | ((tG - bG) << 8) | (tB - bB);
+          color = ((tR) << 16) | ((tG) << 8) | (tB);
 
 #elif defined USE_LCD_FILTER
           // luminance is expressed within the LCD format as three bytes.
@@ -3112,15 +3189,13 @@ void viewManager::Visualizer::platform::drawText(std::string s) {
           putPixel(i, j, color);
         }
       }
-
     }
 
 #ifdef USE_LCD_FILTER
     // delete the bitmap data
     FT_Done_Glyph((FT_Glyph)bitmap);
-    
-#endif
 
+#endif
 
     // move after render
     m_xpos += xadvance;
@@ -3128,14 +3203,11 @@ void viewManager::Visualizer::platform::drawText(std::string s) {
     previous_index = glyph_index;
   }
   // goto next line
-  m_ypos += faceHeight;
-
-#endif
+  // m_ypos += faceHeight;
 }
 /**
 
 */
-
 void viewManager::Visualizer::platform::clear(void) {
   fill(m_offscreenBuffer.begin(), m_offscreenBuffer.end(), 0xFF);
   m_xpos = 0;
@@ -3153,7 +3225,7 @@ void viewManager::Visualizer::platform::clear(void) {
 void viewManager::Visualizer::platform::putPixel(int x, int y,
                                                  unsigned int color) {
   // clip coordinates
-  if (x > _w || y > _h)
+  if (x >= _w || y >= _h)
     return;
 
   // calculate offset
@@ -3175,7 +3247,7 @@ point of the pixel \param unsigned int color - the bgra color value
 */
 unsigned int viewManager::Visualizer::platform::getPixel(int x, int y) {
   // clip coordinates
-  if (x > _w || y > _h)
+  if (x >= _w || y >= _h)
     return 0;
 
   // calculate offset
@@ -3194,29 +3266,37 @@ unsigned int viewManager::Visualizer::platform::getPixel(int x, int y) {
 
 */
 void viewManager::Visualizer::platform::resize(int w, int h) {
+  // get the size ofthe window
+  RECT rc;
+  GetClientRect(m_hwnd, &rc);
+
   // resize the pixel memory
   _w = w;
   _h = h;
-  int _bufferSize = _w * _h * 4 + 4;
+
+  _w = rc.right - rc.left;
+  _h = rc.bottom - rc.top;
+
+  int _bufferSize = (_w) * (_h)*4 + 4;
   m_offscreenBuffer.resize(_bufferSize);
 
   // clear to white
   clear();
 
   // free existing resources
-  if (m_pRenderTarget)
-    m_pRenderTarget->Release();
+  if (m_pRenderTarget) {
+    m_pRenderTarget->Resize(D2D1::SizeU(_w, _h));
 
-  RECT rc;
-  GetClientRect(m_hwnd, &rc);
-  // Create a Direct2D render target
-  HRESULT hr = m_pDirect2dFactory->CreateHwndRenderTarget(
-      D2D1::RenderTargetProperties(),
-      D2D1::HwndRenderTargetProperties(
-          m_hwnd, D2D1::SizeU(rc.right - rc.left, rc.bottom - rc.top)),
-      &m_pRenderTarget);
-  if (FAILED(hr))
-    return;
+  } else {
+
+    // Create a Direct2D render target
+    HRESULT hr = m_pD2DFactory->CreateHwndRenderTarget(
+        D2D1::RenderTargetProperties(),
+        D2D1::HwndRenderTargetProperties(m_hwnd, D2D1::SizeU(_w, _h)),
+        &m_pRenderTarget);
+    if (FAILED(hr))
+      return;
+  }
 }
 
 /**
@@ -3224,7 +3304,6 @@ void viewManager::Visualizer::platform::resize(int w, int h) {
 
 */
 void viewManager::Visualizer::platform::flip() {
-
 #if defined(__linux__)
 
 #elif defined(_WIN64)
@@ -3235,17 +3314,19 @@ void viewManager::Visualizer::platform::flip() {
 
   // create offscreen bitmap for pixel rendering
   D2D1_PIXEL_FORMAT desc2D = D2D1::PixelFormat();
-  desc2D.format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+  desc2D.format = DXGI_FORMAT_B8G8R8A8_UNORM;
   desc2D.alphaMode = D2D1_ALPHA_MODE_IGNORE;
 
   D2D1_BITMAP_PROPERTIES bmpProperties = D2D1::BitmapProperties();
   m_pRenderTarget->GetDpi(&bmpProperties.dpiX, &bmpProperties.dpiY);
   bmpProperties.pixelFormat = desc2D;
 
-  D2D1_RECT_F rect = D2D1::RectF(0.0, 0.0, _w, _h);
+  RECT rc;
+  GetClientRect(m_hwnd, &rc);
+
   D2D1_SIZE_U size = D2D1::SizeU(_w, _h);
-  HRESULT hr = m_pRenderTarget->CreateBitmap(size, m_offscreenBuffer.data(),
-                                             _w * 4, &bmpProperties, &m_Bitmap);
+  HRESULT hr = m_pRenderTarget->CreateBitmap(
+      size, m_offscreenBuffer.data(), _w * 4, &bmpProperties, &m_pBitmap);
 
   // render bitmap to screen
   D2D1_RECT_F rectf;
@@ -3253,10 +3334,12 @@ void viewManager::Visualizer::platform::flip() {
   rectf.top = 0;
   rectf.bottom = _h;
   rectf.right = _w;
-  m_pRenderTarget->DrawBitmap(m_Bitmap, rectf);
+
+  m_pRenderTarget->DrawBitmap(m_pBitmap, rectf, 1.0f,
+                              D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR);
 
   m_pRenderTarget->EndDraw();
-  m_Bitmap->Release();
+  m_pBitmap->Release();
 
 #endif
 }

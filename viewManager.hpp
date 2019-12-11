@@ -33,7 +33,6 @@ options when compiling the source.
 \brief Use the freetype greyscale rendering. The Option is only for use with the 
 inline render. Use this option or the USE_LCD_FILTER. One one should be defined.
 */
-
 #define USE_GREYSCALE_ANTIALIAS
 
 /**
@@ -112,23 +111,35 @@ OS SPECIFIC HEADERS
 #include <X11/keysymdef.h>
 #include <xcb/xcb.h>
 #include <xcb/xcb_keysyms.h>
+
 #elif defined(_WIN64)
 // Windows Header Files:
+#define WIN32_LEAN_AND_MEAN
+
+#include <windows.h>
+
 #include <d2d1.h>
 #include <d2d1helper.h>
+#include <dwrite.h>
 #include <wincodec.h>
-#include <windows.h>
+
+
+// auto linking of direct x
+#pragma comment(lib, "d2d1.lib")
+
+
 #ifndef HINST_THISCOMPONENT
 EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 #define HINST_THISCOMPONENT ((HINSTANCE)&__ImageBase)
 #endif
+
 #endif
 
 #ifdef USE_INLINE_RENDERER
 #include "ft2build.h"
 #include FT_FREETYPE_H
-#include FT_LCD_FILTER_H
 #include FT_CACHE_H
+#include FT_SIZES_H
 #endif
 
 /**
@@ -628,7 +639,7 @@ public:
   void openWindow(void);
   void closeWindow(void);
   void messageLoop(void);
-  void drawText(std::string s);
+  void drawText(std::string sTextFace, int pointSize, std::string s, unsigned int tC);
   inline void putPixel(int x, int y, unsigned int color);
   inline unsigned int getPixel(int x, int y);
 
@@ -639,11 +650,15 @@ public:
 #if defined(_WIN64)
   static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam,
                                   LPARAM lParam);
+  bool initializeVideo(void);
+  void terminateVideo(void);
+
+
 #endif
 
 #if defined(USE_INLINE_RENDERER)
   typedef struct {
-    const char *filePath;
+    std::string filePath;
     int   index;
   } faceCacheStruct;
 
@@ -666,12 +681,10 @@ public:
 #elif defined(_WIN64)
   HWND m_hwnd;
 
-  ID2D1Factory *m_pDirect2dFactory;
+  ID2D1Factory *m_pD2DFactory;
   ID2D1HwndRenderTarget *m_pRenderTarget;
-  ID2D1BitmapRenderTarget *m_pOffscreen;
-  ID2D1Bitmap *m_Bitmap;
+  ID2D1Bitmap *m_pBitmap;
 
-    int ptSize;
 
 #endif
 private:
@@ -694,10 +707,13 @@ private:
   #endif
 
   FTC_CMapCache m_cmapCache;
-  std::vector<faceCacheStruct> m_faceCache;
+  std::unordered_map<std::string, faceCacheStruct> m_faceCache;
 
   int m_xpos;
   int m_ypos;
+  int fontScale;
+
+//  std::unordered_map<std::pair<unsigned int, unsigned int>, unsigned int> m_blend;
 
 #endif
 
@@ -784,7 +800,12 @@ private:
       saveState();
       return (_data);
     }
-
+    std::string textData(void) { 
+      std::stringstream ss;
+      for(auto n : _data)
+        ss << n;
+      return ss.str();
+    }
     std::function<Element &(T &)> &transform(void) { return fnTransform; }
 
     // analyze hint data and deduce states
@@ -1298,7 +1319,7 @@ public:
   auto resize(const double w, const double h) -> Element &;
   auto addListener(eventType evtType, eventHandler evtHandler) -> Element &;
   auto removeListener(eventType evtType, eventHandler evtHandler) -> Element &;
-  void render(void);
+  void render(Visualizer::platform &device);
   void streamRender(std::stringstream &ss);
   auto insertBefore(Element &newChild, Element &existingElement) -> Element &;
   auto insertBefore(Element &newChild, std::string &sID) -> Element &;
@@ -1395,7 +1416,7 @@ using H1 = class H1 : public Element {
 public:
   H1(const std::vector<std::any> &attribs)
       : Element("h1", {display::block, marginTop{.67_em}, marginLeft{.67_em},
-                       marginBottom{0_em}, marginRight{0_em}, textSize{2_em},
+                       marginBottom{0_em}, marginRight{0_em}, textSize{32_pt},
                        textWeight{800}}) {
     setAttribute(attribs);
   }
@@ -1424,7 +1445,7 @@ using H2 = class H2 : public Element {
 public:
   H2(const std::vector<std::any> &attribs)
       : Element("h2", {display::block, marginTop{.83_em}, marginLeft{.83_em},
-                       marginBottom{0_em}, marginRight{0_em}, textSize{1.5_em},
+                       marginBottom{0_em}, marginRight{0_em}, textSize{24_pt},
                        textWeight{800}}) {
     setAttribute(attribs);
   }
@@ -1855,8 +1876,8 @@ public:
   Viewer(const Viewer &) : Element("Viewer") {}
   Viewer &operator=(const Viewer &) {}
   Viewer &operator=(Viewer &&other) noexcept {} // move assignment
-  void render(void);
-  void streamRender(std::stringstream &ss, Element &e, int iLevel);
+  void render();
+  void recursiveRender(Element &e);
   void processEvents(void);
   // event implementation
   void dispatchEvent(const event &e);

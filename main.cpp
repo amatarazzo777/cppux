@@ -61,9 +61,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
 
   test0(vm);
 
+#if 0
   test0c(vm);
   test0b(vm);
-#if 0
   testUX(vm);
   testUXmarkup(vm);
   test1(vm);
@@ -93,10 +93,11 @@ void randomAttributeSettings(Element &e);
 /************************************************************************
 ************************************************************************/
 void test0(Viewer &vm) {
-  vm << "Hello World\n";
+  vm.ingestStream=true;
+  vm << "<h1 textFace=BRUSHSCI textsize=80pt color=hotpink>Hello World</h1>";
+  vm << "<h2 textFace=impact color=red>Subearth</h2>";
+  vm << "<lime>Got to be a pretty day upside and underneath.";
 
-  vm << "<h1>Hello World</h1>";
-  vm << "<blue>Got to be a pretty day.</blue>";
 }
 /************************************************************************
 ************************************************************************/
@@ -983,7 +984,7 @@ string randomString(int nChars) {
     return charset[rand() % max_index];
   };
   string s1(numChars, 0);
-  ;
+  
   string str(s1);
   std::generate_n(std::back_inserter(str), numChars, randchar);
   return str;
