@@ -568,7 +568,6 @@ viewManager::doubleNF::doubleNF(const string &sOption) {
   u_int8_t opt;
   tie(value, opt) = strToNumericAndEnum("doubleNF", annotationMap, sOption);
   option = static_cast<numericFormat>(opt);
-
 }
 
 /**
@@ -908,7 +907,7 @@ void viewManager::Viewer::recursiveRender(Element &e) {
 
   e.render(*m_device.get());
 
-  for(auto &n : e.children()) {
+  for (auto &n : e.children()) {
     recursiveRender(n);
   }
 }
@@ -2167,7 +2166,7 @@ void viewManager::Element::render(Visualizer::platform &device) {
     sTextFace = "arial";
   }
   try {
-    auto [v,opt] =getAttribute<textSize>();
+    auto [v, opt] = getAttribute<textSize>();
     tSize = static_cast<int>(v);
   } catch (const std::exception &e) {
     tSize = 16;
@@ -3169,13 +3168,13 @@ void viewManager::Visualizer::platform::drawText(std::string sTextFace,
           unsigned char dG = tG - c;
           unsigned char dB = tB - c;
 
-          unsigned int bC = getPixel(i,j);
+          unsigned int bC = getPixel(i, j);
 
           unsigned char bR = bC >> 16;
           unsigned char bG = bC >> 8;
           unsigned char bB = bC;
 
-          color = ((tR- bR) << 16) | ((tG - bG) << 8) | (tB - bB);
+          color = ((tR - bR) << 16) | ((tG - bG) << 8) | (tB - bB);
           color = ((tR) << 16) | ((tG) << 8) | (tB);
 
 #elif defined USE_LCD_FILTER
@@ -3266,6 +3265,9 @@ unsigned int viewManager::Visualizer::platform::getPixel(int x, int y) {
 
 */
 void viewManager::Visualizer::platform::resize(int w, int h) {
+#if defined(__linux__)
+
+#elif defined(_WIN64)
   // get the size ofthe window
   RECT rc;
   GetClientRect(m_hwnd, &rc);
@@ -3297,6 +3299,7 @@ void viewManager::Visualizer::platform::resize(int w, int h) {
     if (FAILED(hr))
       return;
   }
+#endif
 }
 
 /**

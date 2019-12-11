@@ -1,8 +1,8 @@
 #CC=clang
 CC=g++
 CFLAGS=-std=c++17 -Os
-INCLUDES=-I/projects/guidom
-LFLAGS=
+INCLUDES=-I/projects/guidom `pkg-config --cflags freetype2`
+LFLAGS=`pkg-config --libs freetype2`
 
 debug: CFLAGS += -g
 debug: guidom.out
@@ -12,8 +12,7 @@ release: guidom.out
 
 
 guidom.out: main.o viewManager.o
-	$(CC) $(INCLUDES) $(LFLAGS) -o guidom.out main.o viewManager.o -lstdc++ -lm -lxcb -lxcb-keysyms
-
+	$(CC) -o guidom.out main.o viewManager.o -lstdc++ -lm -lxcb -lxcb-keysyms $(LFLAGS) 
 main.o: main.cpp viewManager.hpp
 	$(CC) $(CFLAGS) $(INCLUDES) -c main.cpp -o main.o
 
