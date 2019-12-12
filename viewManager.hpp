@@ -30,7 +30,7 @@ options when compiling the source.
 
 /**
 \def USE_GREYSCALE_ANTIALIAS
-\brief Use the freetype greyscale rendering. The Option is only for use with the 
+\brief Use the freetype greyscale rendering. The Option is only for use with the
 inline render. Use this option or the USE_LCD_FILTER. One one should be defined.
 */
 #define USE_GREYSCALE_ANTIALIAS
@@ -108,9 +108,16 @@ OS SPECIFIC HEADERS
 *************************************/
 
 #if defined(__linux__)
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
 #include <X11/keysymdef.h>
 #include <xcb/xcb.h>
+#include <xcb/shm.h>
+#include <xcb/xcb_image.h>
 #include <xcb/xcb_keysyms.h>
+#include <fontconfig/fontconfig.h>
+
 
 #elif defined(_WIN64)
 // Windows Header Files:
@@ -647,6 +654,8 @@ public:
   void resize(int w, int h);
   void clear(void);
 
+  std::string getFontFilename(std::string sTextFace);
+
 #if defined(_WIN64)
   static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam,
                                   LPARAM lParam);
@@ -669,14 +678,17 @@ public:
 
 public:
 #if defined(__linux__)
-
   xcb_connection_t *m_connection;
   xcb_screen_t *m_screen;
   xcb_drawable_t m_window;
-  xcb_pixmap_t m_offScreen;
+  xcb_gcontext_t m_graphics;
+  xcb_pixmap_t m_pix;
+  xcb_shm_segment_info_t m_info;
+
   // xcb -- keyboard
   xcb_key_symbols_t *m_syms;
   uint32_t m_foreground;
+  u_int8_t *m_offscreenBuffer;
 
 #elif defined(_WIN64)
   HWND m_hwnd;
@@ -684,16 +696,22 @@ public:
   ID2D1Factory *m_pD2DFactory;
   ID2D1HwndRenderTarget *m_pRenderTarget;
   ID2D1Bitmap *m_pBitmap;
+  std::vector<u_int8_t> m_offscreenBuffer;
 
 
 #endif
+
+  int m_xpos;
+  int m_ypos;
+  int fontScale;
+
+
 private:
   eventHandler dispatchEvent;
 
   unsigned short _w;
   unsigned short _h;
-  std::vector<u_int8_t> m_offscreenBuffer;
-  
+
 #ifdef USE_INLINE_RENDERER
   FT_Library m_freeType;
   FTC_Manager m_cacheManager;
@@ -708,10 +726,6 @@ private:
 
   FTC_CMapCache m_cmapCache;
   std::unordered_map<std::string, faceCacheStruct> m_faceCache;
-
-  int m_xpos;
-  int m_ypos;
-  int fontScale;
 
 //  std::unordered_map<std::pair<unsigned int, unsigned int>, unsigned int> m_blend;
 
@@ -800,7 +814,7 @@ private:
       saveState();
       return (_data);
     }
-    std::string textData(void) { 
+    std::string textData(void) {
       std::stringstream ss;
       for(auto n : _data)
         ss << n;

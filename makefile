@@ -1,8 +1,8 @@
 #CC=clang
 CC=g++
 CFLAGS=-std=c++17 -Os
-INCLUDES=-I/projects/guidom `pkg-config --cflags freetype2`
-LFLAGS=`pkg-config --libs freetype2`
+INCLUDES=-I/projects/guidom `pkg-config --cflags freetype2 fontconfig`
+LFLAGS=`pkg-config --libs freetype2 xcb-image fontconfig`
 
 debug: CFLAGS += -g
 debug: guidom.out

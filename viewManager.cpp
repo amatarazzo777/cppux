@@ -485,10 +485,10 @@ const attributeStringMap
             e.setAttribute(listStyleType{s});
         }}
     }};
-  
-/** 
+
+/**
 \internal
-\brief the colorFactory is a static lookup map to translate the 
+\brief the colorFactory is a static lookup map to translate the
 textual color name to the 24bit rgb value.
 color names from https://www.w3schools.com/colors/colors_names.asp
 */
@@ -889,7 +889,6 @@ viewManager::Viewer::Viewer(const vector<any> &attrs)
       ev, getAttribute<objectWidth>().value,
       getAttribute<objectHeight>().value);
   m_device->openWindow();
-  int x = 5;
 }
 
 /**
@@ -935,9 +934,12 @@ processed from a queue and using a background thread.
 void viewManager::Viewer::dispatchEvent(const event &evt) {
   switch (evt.evtType) {
   case eventType::paint:
+    m_device->clear();
     render();
+    m_device->flip();
     break;
   case eventType::resize:
+    m_device->resize(evt.width, evt.height);
     break;
   case eventType::keydown:
     break;
@@ -950,8 +952,19 @@ void viewManager::Viewer::dispatchEvent(const event &evt) {
   case eventType::mousedown:
     break;
   case eventType::mouseup:
+    if (evt.mouseButton == 1)
+      m_device->fontScale++;
+    else
+      m_device->fontScale--;
+    dispatchEvent(event{eventType::paint});
     break;
   case eventType::wheel:
+    cout << evt.wheelDistance;
+    if (evt.wheelDistance > 0)
+      m_device->fontScale += 1;
+    else
+      m_device->fontScale -= 1;
+    dispatchEvent(event{eventType::paint});
     break;
   }
 /* these events do not come from the platform. However,
@@ -2582,7 +2595,6 @@ viewManager::Visualizer::platform::platform(eventHandler evtDispatcher,
   m_connection = nullptr;
   m_screen = nullptr;
   m_window = 0;
-  m_offScreen = 0;
   m_syms = nullptr;
   m_foreground = 0;
 
@@ -2644,8 +2656,15 @@ viewManager::Visualizer::platform::~platform() {
 #endif
 
 #if defined(__linux__)
+  xcb_shm_detach(m_connection, m_info.shmseg);
+  shmdt(m_info.shmaddr);
+
+  xcb_free_pixmap(m_connection, m_pix);
   xcb_free_gc(m_connection, m_foreground);
   xcb_key_symbols_free(m_syms);
+
+  xcb_destroy_window(m_connection, m_window);
+  xcb_disconnect(m_connection);
 
 #elif defined(_WIN64)
   CoUninitialize();
@@ -2659,17 +2678,21 @@ viewManager::Visualizer::platform::~platform() {
 */
 void viewManager::Visualizer::platform::openWindow(void) {
 #if defined(__linux__)
+
   /* Open the connection to the X server */
   m_connection = xcb_connect(nullptr, nullptr);
+
   /* Get the first screen */
   m_screen = xcb_setup_roots_iterator(xcb_get_setup(m_connection)).data;
   m_syms = xcb_key_symbols_alloc(m_connection);
+
   /* Create black (foreground) graphic context */
   m_window = m_screen->root;
-  m_foreground = xcb_generate_id(m_connection);
+  m_graphics = xcb_generate_id(m_connection);
   uint32_t mask = XCB_GC_FOREGROUND | XCB_GC_GRAPHICS_EXPOSURES;
   uint32_t values[2] = {m_screen->black_pixel, 0};
-  xcb_create_gc(m_connection, m_foreground, m_window, mask, values);
+  xcb_create_gc(m_connection, m_graphics, m_window, mask, values);
+
   /* Create a window */
   m_window = xcb_generate_id(m_connection);
   mask = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK;
@@ -2678,13 +2701,43 @@ void viewManager::Visualizer::platform::openWindow(void) {
               XCB_EVENT_MASK_KEY_RELEASE | XCB_EVENT_MASK_POINTER_MOTION |
               XCB_EVENT_MASK_BUTTON_MOTION | XCB_EVENT_MASK_BUTTON_PRESS |
               XCB_EVENT_MASK_BUTTON_RELEASE;
+
   xcb_create_window(
       m_connection, XCB_COPY_FROM_PARENT, m_window, m_screen->root, 0, 0,
       static_cast<unsigned short>(_w), static_cast<unsigned short>(_h), 10,
       XCB_WINDOW_CLASS_INPUT_OUTPUT, m_screen->root_visual, mask, values);
+
   /* Map the window on the screen and flush*/
   xcb_map_window(m_connection, m_window);
   xcb_flush(m_connection);
+
+  // Shared memory test.
+  // https://stackoverflow.com/questions/27745131/how-to-use-shm-pixmap-with-xcb?noredirect=1&lq=1
+  xcb_shm_query_version_reply_t *reply;
+
+  reply = xcb_shm_query_version_reply(
+      m_connection, xcb_shm_query_version(m_connection), NULL);
+
+  if (!reply || !reply->shared_pixmaps) {
+    cout << "Could not get a shared memory image." << endl;
+    exit(0);
+  }
+
+  m_info.shmid = shmget(IPC_PRIVATE, _w * _h * 4, IPC_CREAT | 0777);
+  m_info.shmaddr = (uint8_t *)shmat(m_info.shmid, 0, 0);
+
+  m_info.shmseg = xcb_generate_id(m_connection);
+  xcb_shm_attach(m_connection, m_info.shmseg, m_info.shmid, 0);
+  shmctl(m_info.shmid, IPC_RMID, 0);
+
+  m_offscreenBuffer = static_cast<uint8_t *>(m_info.shmaddr);
+
+  m_pix = xcb_generate_id(m_connection);
+  xcb_shm_create_pixmap(m_connection, m_pix, m_window, _w, _h,
+                        m_screen->root_depth, m_info.shmseg, 0);
+
+  // create offscreen bitmap
+  resize(_w, _h);
 
   return;
 
@@ -2765,7 +2818,9 @@ void viewManager::Visualizer::platform::terminateVideo(void) {
 
 */
 void viewManager::Visualizer::platform::closeWindow(void) {
-#if defined(_WIN64)
+#if defined(__linux__)
+
+#elif defined(_WIN64)
 
 #endif
 }
@@ -2788,7 +2843,6 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
   platform *platformInstance = (platform *)lpUserData;
   switch (message) {
   case WM_SIZE:
-    platformInstance->resize(LOWORD(lParam), HIWORD(lParam));
     platformInstance->dispatchEvent(event{eventType::resize,
                                           static_cast<short>(LOWORD(lParam)),
                                           static_cast<short>(HIWORD(lParam))});
@@ -2827,10 +2881,6 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
     platformInstance->dispatchEvent(
         event{eventType::mouseup, static_cast<short>(LOWORD(lParam)),
               static_cast<short>(HIWORD(lParam)), 1});
-    platformInstance->clear();
-    platformInstance->fontScale++;
-    platformInstance->dispatchEvent(event{eventType::paint});
-    platformInstance->flip();
     break;
   case WM_MBUTTONDOWN:
     platformInstance->dispatchEvent(
@@ -2851,10 +2901,6 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
     platformInstance->dispatchEvent(
         event{eventType::mouseup, static_cast<short>(LOWORD(lParam)),
               static_cast<short>(HIWORD(lParam)), 3});
-    platformInstance->clear();
-    platformInstance->fontScale--;
-    platformInstance->dispatchEvent(event{eventType::paint});
-    platformInstance->flip();
     break;
   case WM_MOUSEMOVE:
     platformInstance->dispatchEvent(event{eventType::mousemove,
@@ -2867,15 +2913,6 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
     platformInstance->dispatchEvent(event{
         eventType::wheel, static_cast<short>(LOWORD(lParam)),
         static_cast<short>(HIWORD(lParam)), GET_WHEEL_DELTA_WPARAM(wParam)});
-    platformInstance->clear();
-    int wheel = GET_WHEEL_DELTA_WPARAM(wParam);
-    if (wheel > 0)
-      platformInstance->fontScale += 1;
-    else
-      platformInstance->fontScale -= 1;
-
-    platformInstance->dispatchEvent(event{eventType::paint});
-    platformInstance->flip();
   } break;
   case WM_DISPLAYCHANGE:
     InvalidateRect(hwnd, NULL, FALSE);
@@ -2885,9 +2922,7 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
   case WM_PAINT: {
     PAINTSTRUCT ps;
     HDC hdc = BeginPaint(hwnd, &ps);
-    platformInstance->clear();
     platformInstance->dispatchEvent(event{eventType::paint});
-    platformInstance->flip();
     EndPaint(hwnd, &ps);
     ValidateRect(hwnd, NULL);
     result = 0;
@@ -2918,18 +2953,29 @@ void viewManager::Visualizer::platform::messageLoop(void) {
     switch (xcbEvent->response_type & ~0x80) {
     case XCB_MOTION_NOTIFY: {
       xcb_motion_notify_event_t *motion = (xcb_motion_notify_event_t *)xcbEvent;
-      dispatchEvent(
-          event{eventType::mousemove, motion->event_x, motion->event_y});
+      dispatchEvent(event{
+          eventType::mousemove,
+          motion->event_x,
+          motion->event_y,
+      });
     } break;
     case XCB_BUTTON_PRESS: {
       xcb_button_press_event_t *bp = (xcb_button_press_event_t *)xcbEvent;
-      dispatchEvent(
-          event{eventType::mousedown, bp->event_x, bp->event_y, bp->detail});
+      if (bp->detail == XCB_BUTTON_INDEX_4 ||
+          bp->detail == XCB_BUTTON_INDEX_5) {
+        dispatchEvent(event{eventType::wheel, bp->event_x, bp->event_y,
+                            bp->detail == XCB_BUTTON_INDEX_4 ? 1 : -1});
+
+      } else {
+        dispatchEvent(
+            event{eventType::mousedown, bp->event_x, bp->event_y, bp->detail});
+      }
     } break;
     case XCB_BUTTON_RELEASE: {
       xcb_button_release_event_t *br = (xcb_button_release_event_t *)xcbEvent;
-      dispatchEvent(
-          event{eventType::mouseup, br->event_x, br->event_y, br->detail});
+      if (br->detail != XCB_BUTTON_INDEX_4 && br->detail != XCB_BUTTON_INDEX_5)
+        dispatchEvent(
+            event{eventType::mouseup, br->event_x, br->event_y, br->detail});
     } break;
     case XCB_KEY_PRESS: {
       xcb_key_press_event_t *kp = (xcb_key_press_event_t *)xcbEvent;
@@ -2940,6 +2986,9 @@ void viewManager::Visualizer::platform::messageLoop(void) {
       xcb_key_release_event_t *kr = (xcb_key_release_event_t *)xcbEvent;
       xcb_keysym_t sym = xcb_key_press_lookup_keysym(m_syms, kr, 0);
       // dispatchEvent(event{eventType::keyup, sym});
+    } break;
+    case XCB_EXPOSE: {
+      flip();
     } break;
     }
     free(xcbEvent);
@@ -2978,6 +3027,51 @@ FT_Error viewManager::Visualizer::platform::faceRequestor(
 
   return error;
 }
+/**
+\internal
+\brief The function provides the building and location of a textFace name
+The function indepdantly works on linux vs. windows.
+The function comes from the following source:
+https://stackoverflow.com/questions/10542832/how-to-use-fontconfig-to-get-font-list-c-c
+https://stackoverflow.com/questions/3954223/platform-independent-way-to-get-font-directory
+
+\param sTextFace
+
+*/
+std::string
+viewManager::Visualizer::platform::getFontFilename(std::string sTextFace) {
+  std::string fontFile;
+
+#if defined(__linux__)
+
+  FcConfig *config = FcInitLoadConfigAndFonts();
+
+  // configure the search pattern,
+  // assume "name" is a std::string with the desired font name in it
+  FcPattern *pat = FcNameParse((const FcChar8 *)(sTextFace.c_str()));
+  FcConfigSubstitute(config, pat, FcMatchPattern);
+  FcDefaultSubstitute(pat);
+
+  // find the font
+  FcResult ret;
+  FcPattern *font = FcFontMatch(config, pat, &ret);
+  if (font) {
+    FcChar8 *file = NULL;
+    if (FcPatternGetString(font, FC_FILE, 0, &file) == FcResultMatch) {
+      // save the file to another std::string
+      fontFile = (char *)file;
+    }
+    FcPatternDestroy(font);
+  }
+
+  FcPatternDestroy(pat);
+
+#elif defined(_WIN64)
+  fontFile = "c:\\Windows\\Fonts\\" + sTextFace + ".ttf";
+#endif
+
+  return fontFile;
+}
 
 /**
 \internal
@@ -2997,13 +3091,7 @@ void viewManager::Visualizer::platform::drawText(std::string sTextFace,
 
   // logically this user structure holds information about the size
   // and name of the font.
-
-  string sFullFontPath;
-#if defined(__linux__)
-
-#elif defined(_WIN64)
-  sFullFontPath = "C:\\Windows\\Fonts\\" + sTextFace + ".ttf";
-#endif
+  string sFullFontPath = getFontFilename(sTextFace);
 
   // store a cache record for loaded fonts.
   FTC_FaceID faceID;
@@ -3208,7 +3296,13 @@ void viewManager::Visualizer::platform::drawText(std::string sTextFace,
 
 */
 void viewManager::Visualizer::platform::clear(void) {
+#if defined(__linux__)
+  memset(m_offscreenBuffer, 0xFF, _w * _h * 4);
+
+#elif defined(_WIN64)
   fill(m_offscreenBuffer.begin(), m_offscreenBuffer.end(), 0xFF);
+#endif
+
   m_xpos = 0;
   m_ypos = 0;
 }
@@ -3229,8 +3323,6 @@ void viewManager::Visualizer::platform::putPixel(int x, int y,
 
   // calculate offset
   unsigned int offset = x * 4 + y * 4 * _w;
-  if (offset > m_offscreenBuffer.size())
-    return;
 
   // put rgba color
   unsigned int *p =
@@ -3251,8 +3343,6 @@ unsigned int viewManager::Visualizer::platform::getPixel(int x, int y) {
 
   // calculate offset
   unsigned int offset = x * 4 + y * 4 * _w;
-  if (offset > m_offscreenBuffer.size())
-    return 0;
 
   // put rgba color
   unsigned int *p =
@@ -3266,6 +3356,15 @@ unsigned int viewManager::Visualizer::platform::getPixel(int x, int y) {
 */
 void viewManager::Visualizer::platform::resize(int w, int h) {
 #if defined(__linux__)
+  // resize the pixel memory
+  _w = w;
+  _h = h;
+
+  int _bufferSize = (_w) * (_h)*4 + 4;
+  // m_offscreenBuffer.resize(_bufferSize);
+
+  // clear to white
+  clear();
 
 #elif defined(_WIN64)
   // get the size ofthe window
@@ -3308,6 +3407,10 @@ void viewManager::Visualizer::platform::resize(int w, int h) {
 */
 void viewManager::Visualizer::platform::flip() {
 #if defined(__linux__)
+
+  xcb_copy_area(m_connection, m_pix, m_window, m_graphics, 0, 0, 0, 0, _w, _h);
+
+  xcb_flush(m_connection);
 
 #elif defined(_WIN64)
   if (!m_pRenderTarget)
