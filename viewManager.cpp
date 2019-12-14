@@ -3166,7 +3166,7 @@ viewManager::Visualizer::platform::getFontFilename(std::string sTextFace) {
 */
 void viewManager::Visualizer::platform::drawText(std::string sTextFace,
                                                  int pointSize, std::string s,
-                                                 unsigned int tC) {
+                                                 unsigned int foregroundColor) {
   unsigned int color = 0x00;
   int x, y;
   bool bProcessedOnce = false;
@@ -3333,24 +3333,34 @@ void viewManager::Visualizer::platform::drawText(std::string sTextFace,
 
 #ifdef USE_GREYSCALE_ANTIALIAS
           // luminance is expressed in greyscal using one byte
-          unsigned char c = buffer[bufferPosition];
+          unsigned char freetypeColor = buffer[bufferPosition];
 
-          unsigned char tR = tC >> 16;
-          unsigned char tG = tC >> 8;
-          unsigned char tB = tC;
+          unsigned char foregroundR = foregroundColor >> 16;
+          unsigned char foregroundG = foregroundColor >> 8;
+          unsigned char foregroundB = foregroundColor;
 
-          unsigned char dR = tR - c;
-          unsigned char dG = tG - c;
-          unsigned char dB = tB - c;
+          unsigned char freetypeR = freetypeColor;
+          unsigned char freetypeG = freetypeColor;
+          unsigned char freetypeB = freetypeColor;
 
-          unsigned int bC = getPixel(i, j);
+          unsigned int destinationC = getPixel(i, j);
 
-          unsigned char bR = bC >> 16;
-          unsigned char bG = bC >> 8;
-          unsigned char bB = bC;
+          unsigned char destinationR = destinationC >> 16;
+          unsigned char destinationG = destinationC >> 8;
+          unsigned char destinationB = destinationC;
 
-          color = ((tR - bR) << 16) | ((tG - bG) << 8) | (tB - bB);
-          color = ((tR) << 16) | ((tG) << 8) | (tB);
+          // https://www.codeguru.com/cpp/cpp/algorithms/general/article.php/c15989/Tip-An-Optimized-Formula-for-Alpha-Blending-Pixels.htm
+          unsigned char targetR = ((foregroundR * freetypeR) +
+                                   (destinationR * (255 - freetypeR))) >>
+                                  8;
+          unsigned char targetG = ((foregroundG * freetypeG) +
+                                   (destinationG * (255 - freetypeG))) >>
+                                  8;
+          unsigned char targetB = ((foregroundB * freetypeB) +
+                                   (destinationB * (255 - freetypeB))) >>
+                                  8;
+
+          color = ((targetR) << 16) | ((targetG) << 8) | (targetB);
 
 #elif defined USE_LCD_FILTER
           // luminance is expressed within the LCD format as three bytes.
