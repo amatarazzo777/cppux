@@ -36,23 +36,29 @@ studio, the language standard must be set to c++17 or above.
 When creating the project, create a windows 32bit or windows 64bit
 application. 
 
-As well, additional dependancies are required. The following 
-libraries must also be linked:
+As well, additional dependancies are required.
+The direct X d2d1 library is required. The freetype
+library from freetype.org is also required. When the 
+program is running, the freetype.dll must be within
+the program or environment search path. The following 
+libraries must be linked:
 
 - d2d1.lib
+- freetype.lib
+- freetype.dll
 
 Linux
 -----
-To compile programs for linux, the stdc++, m, xcb, and 
-xcb-keysyms libraries must be linked. An example of the makefile
-is listed below.
+To compile programs for linux, the stdc++, m, xcb, xcb-image 
+xcb-keysyms, freetype2, and fontconfig libraries must be linked. 
+An example of the makefile is listed below.
 
 \code
 #CC=clang
 CC=g++
 CFLAGS=-std=c++17 -Os
-INCLUDES=-I/projects/guidom
-LFLAGS=
+INCLUDES=-I/projects/guidom `pkg-config --cflags freetype2 fontconfig`
+LFLAGS=`pkg-config --libs freetype2 xcb-image fontconfig`
 
 debug: CFLAGS += -g
 debug: guidom.out
@@ -62,8 +68,7 @@ release: guidom.out
 
 
 guidom.out: main.o viewManager.o
-	$(CC) $(INCLUDES) $(LFLAGS) -o guidom.out main.o viewManager.o -lstdc++ -lm -lxcb -lxcb-keysyms
-
+	$(CC) -o guidom.out main.o viewManager.o -lstdc++ -lm -lxcb -lxcb-keysyms $(LFLAGS) 
 main.o: main.cpp viewManager.hpp
 	$(CC) $(CFLAGS) $(INCLUDES) -c main.cpp -o main.o
 
@@ -72,7 +77,7 @@ viewManager.o: viewManager.cpp viewManager.hpp
 
 clean:
 	rm *.o *.out
-	
+
 \endcode	
 
 Examples
