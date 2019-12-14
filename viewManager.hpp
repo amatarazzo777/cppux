@@ -688,7 +688,7 @@ public:
   // xcb -- keyboard
   xcb_key_symbols_t *m_syms;
   uint32_t m_foreground;
-  u_int8_t *m_offscreenBuffer;
+  u_int8_t *m_screenMemoryBuffer;
 
 #elif defined(_WIN64)
   HWND m_hwnd;
@@ -696,7 +696,6 @@ public:
   ID2D1Factory *m_pD2DFactory;
   ID2D1HwndRenderTarget *m_pRenderTarget;
   ID2D1Bitmap *m_pBitmap;
-  std::vector<u_int8_t> m_offscreenBuffer;
 
 
 #endif
@@ -704,6 +703,7 @@ public:
   int m_xpos;
   int m_ypos;
   int fontScale;
+  std::vector<u_int8_t> m_offscreenBuffer;
 
 
 private:

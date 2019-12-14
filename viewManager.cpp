@@ -959,7 +959,6 @@ void viewManager::Viewer::dispatchEvent(const event &evt) {
     dispatchEvent(event{eventType::paint});
     break;
   case eventType::wheel:
-    cout << evt.wheelDistance;
     if (evt.wheelDistance > 0)
       m_device->fontScale += 1;
     else
@@ -2711,31 +2710,6 @@ void viewManager::Visualizer::platform::openWindow(void) {
   xcb_map_window(m_connection, m_window);
   xcb_flush(m_connection);
 
-  // Shared memory test.
-  // https://stackoverflow.com/questions/27745131/how-to-use-shm-pixmap-with-xcb?noredirect=1&lq=1
-  xcb_shm_query_version_reply_t *reply;
-
-  reply = xcb_shm_query_version_reply(
-      m_connection, xcb_shm_query_version(m_connection), NULL);
-
-  if (!reply || !reply->shared_pixmaps) {
-    cout << "Could not get a shared memory image." << endl;
-    exit(0);
-  }
-
-  m_info.shmid = shmget(IPC_PRIVATE, _w * _h * 4, IPC_CREAT | 0777);
-  m_info.shmaddr = (uint8_t *)shmat(m_info.shmid, 0, 0);
-
-  m_info.shmseg = xcb_generate_id(m_connection);
-  xcb_shm_attach(m_connection, m_info.shmseg, m_info.shmid, 0);
-  shmctl(m_info.shmid, IPC_RMID, 0);
-
-  m_offscreenBuffer = static_cast<uint8_t *>(m_info.shmaddr);
-
-  m_pix = xcb_generate_id(m_connection);
-  xcb_shm_create_pixmap(m_connection, m_pix, m_window, _w, _h,
-                        m_screen->root_depth, m_info.shmseg, 0);
-
   // create offscreen bitmap
   resize(_w, _h);
 
@@ -2839,6 +2813,11 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
                                                             LPARAM lParam) {
   LRESULT result = 0;
   bool handled = false;
+  /** get the platform objext which is stored within the user data of the
+   window. this is necessary as the wndproc for the windows operating system is
+   called from an external library. The routine needs to be a static
+   implementation which is not directly locate within the class.
+  */
   LONG_PTR lpUserData = GetWindowLongPtr(hwnd, GWLP_USERDATA);
   platform *platformInstance = (platform *)lpUserData;
   switch (message) {
@@ -2943,7 +2922,8 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
 /**
   \internal
   \brief the routine handles the message processing for the specific
-  operating system.
+  operating system. The function is called from processEvents.
+
 */
 void viewManager::Visualizer::platform::messageLoop(void) {
 #if defined(__linux__)
@@ -2973,6 +2953,7 @@ void viewManager::Visualizer::platform::messageLoop(void) {
     } break;
     case XCB_BUTTON_RELEASE: {
       xcb_button_release_event_t *br = (xcb_button_release_event_t *)xcbEvent;
+      // ignore button 4 and 5 which are wheel events.
       if (br->detail != XCB_BUTTON_INDEX_4 && br->detail != XCB_BUTTON_INDEX_5)
         dispatchEvent(
             event{eventType::mouseup, br->event_x, br->event_y, br->detail});
@@ -3003,17 +2984,15 @@ void viewManager::Visualizer::platform::messageLoop(void) {
 }
 
 /**
-  \internal
-  \brief the routine handles the message processing for the specific
-  operating system.
-*/
-
-/**
 \internal
 \brief The faceRequestor is a callback routine that provides
 creation of a face object. The parameter face_id is a pointer
 that is named as user information by the cache system.
 
+\param FTC_FaceID face_id the user generated index
+\param FT_Library library handle to the free type library
+\param FT_Pointer request_data unused
+\param FT_Face *aface the newly ycreated fash object.
 */
 FT_Error viewManager::Visualizer::platform::faceRequestor(
     FTC_FaceID face_id, FT_Library library, FT_Pointer request_data,
@@ -3030,7 +3009,11 @@ FT_Error viewManager::Visualizer::platform::faceRequestor(
 /**
 \internal
 \brief The function provides the building and location of a textFace name
-The function indepdantly works on linux vs. windows.
+The function independently works on linux vs. windows. The linux is much more
+advanced in that it uses the fontconfig api. This api provides for family
+matching as a browser would incorporate. Whereas the windows portion uses the
+registry access and simply compares a string.
+
 The function comes from the following source:
 https://stackoverflow.com/questions/10542832/how-to-use-fontconfig-to-get-font-list-c-c
 https://stackoverflow.com/questions/3954223/platform-independent-way-to-get-font-directory
@@ -3040,7 +3023,7 @@ https://stackoverflow.com/questions/3954223/platform-independent-way-to-get-font
 */
 std::string
 viewManager::Visualizer::platform::getFontFilename(std::string sTextFace) {
-  std::string fontFile;
+  std::string fontFileReturn;
 
 #if defined(__linux__)
 
@@ -3059,7 +3042,7 @@ viewManager::Visualizer::platform::getFontFilename(std::string sTextFace) {
     FcChar8 *file = NULL;
     if (FcPatternGetString(font, FC_FILE, 0, &file) == FcResultMatch) {
       // save the file to another std::string
-      fontFile = (char *)file;
+      fontFileReturn = (char *)file;
     }
     FcPatternDestroy(font);
   }
@@ -3067,10 +3050,114 @@ viewManager::Visualizer::platform::getFontFilename(std::string sTextFace) {
   FcPatternDestroy(pat);
 
 #elif defined(_WIN64)
-  fontFile = "c:\\Windows\\Fonts\\" + sTextFace + ".ttf";
+
+  wstring subKey = L"Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts";
+
+  HKEY regKey = 0;
+  LONG ret;
+  wstring wsName;
+  DWORD dwNameSize;
+  vector<BYTE> vValue;
+  DWORD dwValueSize;
+  DWORD dwType = 0;
+  DWORD index = 0;
+  wstring wsSearch;
+
+  // convert input string to a multibyte wstring.
+  int wsSize =
+      MultiByteToWideChar(CP_ACP, MB_ERR_INVALID_CHARS, sTextFace.data(),
+                          sTextFace.size(), wsSearch.data(), 0);
+  wsSearch.resize(wsSize);
+  MultiByteToWideChar(CP_ACP, MB_ERR_INVALID_CHARS, sTextFace.data(),
+                      sTextFace.size(), wsSearch.data(), wsSize);
+
+  // open the registry key
+  ret = RegOpenKeyExW(HKEY_LOCAL_MACHINE, subKey.c_str(), 0, KEY_READ, &regKey);
+  if (ret != ERROR_SUCCESS) {
+    string errorCode;
+    errorCode = "Could not open windows registry (" + to_string(ret) + ")";
+    throw std::runtime_error(errorCode);
+  }
+
+  // get the number of entries
+  DWORD valueCount;
+  DWORD maxValueNameLen;
+  DWORD maxValueLen;
+
+  // get the numer of items and the maximum lengths.
+  ret = RegQueryInfoKey(regKey, nullptr, nullptr, nullptr, nullptr, nullptr,
+                        nullptr, &valueCount, &maxValueNameLen, &maxValueLen,
+                        nullptr, nullptr);
+  if (ret != ERROR_SUCCESS) {
+    string errorCode;
+    errorCode = "Could not open windows registry (" + to_string(ret) + ")";
+    throw std::runtime_error(errorCode);
+  }
+
+  // resize for space and clear
+  maxValueLen++;
+  maxValueNameLen++;
+  wsName.resize(maxValueNameLen);
+  vValue.resize(maxValueLen);
+  bool bFound = false;
+
+  // look for a match
+  for (DWORD index = 0; index < valueCount; index++) {
+
+    // get registry value
+    dwNameSize = maxValueNameLen;
+    dwValueSize = maxValueLen;
+    ret = RegEnumValueW(regKey, index, wsName.data(), &dwNameSize, NULL,
+                        &dwType, vValue.data(), &dwValueSize);
+    if (ret != ERROR_SUCCESS) {
+      string errorCode;
+      errorCode = "Could not open windows registry (" + to_string(ret) + ")";
+      throw std::runtime_error(errorCode);
+    }
+
+    // match name or file names
+    if (_wcsnicmp(wsName.c_str(), wsSearch.c_str(), wsSearch.size()) == 0) {
+      bFound = true;
+      break;
+    }
+  }
+
+  // close the registry key
+  RegCloseKey(regKey);
+
+  /**
+    Some font filenames within the registry have the path built in
+    while most windows fonts do not. This provides the full path.
+    For simplicity, check the second and third characters of the
+    file name to determine if it has a drive specifier.
+  */
+  LPWSTR lpwData = reinterpret_cast<LPWSTR>(vValue.data());
+  wstring wsfontFileReturn;
+
+  // if (!bFound)
+  // wcscpy_s(lpwData, L"arial.ttf");
+
+  if (_wcsnicmp(lpwData + 1, L":\\", 2) == 0) {
+    wsfontFileReturn = lpwData;
+
+  } else {
+    wsfontFileReturn.resize(MAX_PATH);
+    int lLen = GetSystemWindowsDirectoryW(wsfontFileReturn.data(), MAX_PATH);
+    wsfontFileReturn.resize(lLen);
+    wsfontFileReturn.append(L"\\Fonts\\");
+    wsfontFileReturn.append(lpwData);
+  }
+
+  // convert the widestring to an utf8 or default character representation
+  fontFileReturn.resize(MAX_PATH);
+  DWORD dw =
+      WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+                          wsfontFileReturn.data(), wsfontFileReturn.size(),
+                          fontFileReturn.data(), MAX_PATH, nullptr, nullptr);
+  fontFileReturn.resize(dw);
 #endif
 
-  return fontFile;
+  return fontFileReturn;
 }
 
 /**
@@ -3091,7 +3178,6 @@ void viewManager::Visualizer::platform::drawText(std::string sTextFace,
 
   // logically this user structure holds information about the size
   // and name of the font.
-  string sFullFontPath = getFontFilename(sTextFace);
 
   // store a cache record for loaded fonts.
   FTC_FaceID faceID;
@@ -3100,6 +3186,7 @@ void viewManager::Visualizer::platform::drawText(std::string sTextFace,
   if (it != m_faceCache.end()) {
     faceID = static_cast<FTC_FaceID>(&it->second);
   } else {
+    string sFullFontPath = getFontFilename(sTextFace);
     faceCacheStruct faceCacheRecord{sFullFontPath,
                                     static_cast<int>(m_faceCache.size())};
     m_faceCache[sTextFace] = faceCacheRecord;
@@ -3296,13 +3383,7 @@ void viewManager::Visualizer::platform::drawText(std::string sTextFace,
 
 */
 void viewManager::Visualizer::platform::clear(void) {
-#if defined(__linux__)
-  memset(m_offscreenBuffer, 0xFF, _w * _h * 4);
-
-#elif defined(_WIN64)
   fill(m_offscreenBuffer.begin(), m_offscreenBuffer.end(), 0xFF);
-#endif
-
   m_xpos = 0;
   m_ypos = 0;
 }
@@ -3355,13 +3436,48 @@ unsigned int viewManager::Visualizer::platform::getPixel(int x, int y) {
 
 */
 void viewManager::Visualizer::platform::resize(int w, int h) {
-#if defined(__linux__)
-  // resize the pixel memory
+
   _w = w;
   _h = h;
 
-  int _bufferSize = (_w) * (_h)*4 + 4;
-  // m_offscreenBuffer.resize(_bufferSize);
+#if defined(__linux__)
+
+  // free old one if it exists
+  if (m_pix) {
+    xcb_shm_detach(m_connection, m_info.shmseg);
+    shmdt(m_info.shmaddr);
+
+    xcb_free_pixmap(m_connection, m_pix);
+  }
+
+  // Shared memory test.
+  // https://stackoverflow.com/questions/27745131/how-to-use-shm-pixmap-with-xcb?noredirect=1&lq=1
+  xcb_shm_query_version_reply_t *reply;
+
+  reply = xcb_shm_query_version_reply(
+      m_connection, xcb_shm_query_version(m_connection), NULL);
+
+  if (!reply || !reply->shared_pixmaps) {
+    cout << "Could not get a shared memory image." << endl;
+    exit(0);
+  }
+
+  m_info.shmid = shmget(IPC_PRIVATE, _w * _h * 4, IPC_CREAT | 0777);
+  m_info.shmaddr = (uint8_t *)shmat(m_info.shmid, 0, 0);
+
+  m_info.shmseg = xcb_generate_id(m_connection);
+  xcb_shm_attach(m_connection, m_info.shmseg, m_info.shmid, 0);
+  shmctl(m_info.shmid, IPC_RMID, 0);
+
+  m_screenMemoryBuffer = static_cast<uint8_t *>(m_info.shmaddr);
+
+  m_pix = xcb_generate_id(m_connection);
+  xcb_shm_create_pixmap(m_connection, m_pix, m_window, _w, _h,
+                        m_screen->root_depth, m_info.shmseg, 0);
+
+  int _bufferSize = _w * _h * 4;
+
+  m_offscreenBuffer.resize(_bufferSize);
 
   // clear to white
   clear();
@@ -3378,7 +3494,7 @@ void viewManager::Visualizer::platform::resize(int w, int h) {
   _w = rc.right - rc.left;
   _h = rc.bottom - rc.top;
 
-  int _bufferSize = (_w) * (_h)*4 + 4;
+  int _bufferSize = _w * _h * 4;
   m_offscreenBuffer.resize(_bufferSize);
 
   // clear to white
@@ -3407,7 +3523,11 @@ void viewManager::Visualizer::platform::resize(int w, int h) {
 */
 void viewManager::Visualizer::platform::flip() {
 #if defined(__linux__)
+  // copy offscreen data to the shared memory video buffer
+  memcpy(m_screenMemoryBuffer, m_offscreenBuffer.data(),
+         m_offscreenBuffer.size());
 
+  // blit the shared memory buffer
   xcb_copy_area(m_connection, m_pix, m_window, m_graphics, 0, 0, 0, 0, _w, _h);
 
   xcb_flush(m_connection);

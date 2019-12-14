@@ -94,11 +94,13 @@ void randomAttributeSettings(Element &e);
 ************************************************************************/
 void test0(Viewer &vm) {
   vm.ingestStream=true;
-  vm << "<h1 textFace=BRUSHSCI textsize=80pt color=hotpink>Hello World</h1>";
+  vm << "<h1 textFace=bradley textsize=80pt color=hotpink>Hello World</h1>";
   vm << "<h2 textFace=impact color=red>Subearth</h2>";
-  vm << "<lime>Got to be a pretty day upside and underneath.";
-
+  vm << "<p textcolor=orange>Got to be a pretty day upside and underneath.</p>";
+  vm << "<p textcolor=blue>Yet sometimes when evil lerks, days may be more creative than usual.</p>";
+  vm << "<p color=green>green</p><p color=lime>lime</p><p color=crimson>crimson</p>";
 }
+
 /************************************************************************
 ************************************************************************/
 //! [test0]
