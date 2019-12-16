@@ -586,6 +586,8 @@ _NUMERIC_ATTRIBUTE(zIndex);
 /// \class listStyleType controls the icon used to show aside the list items.
 _ENUMERATED_ATTRIBUTE(listStyleType, none, disc, circle, square, decimal, alpha,
                       greek, latin, roman);
+/// \class windowTitle sets the title of the window. The window class is viewManagerApp always.
+_STRING_ATTRIBUTE(windowTitle);
 
 /** @}*/
 
@@ -643,7 +645,7 @@ public:
   platform(eventHandler evtDispatcher, unsigned short width,
            unsigned short height);
   ~platform();
-  void openWindow(void);
+  void openWindow(std::string sWindowTitle);
   void closeWindow(void);
   void messageLoop(void);
   void drawText(std::string sTextFace, int pointSize, std::string s, unsigned int tC);
@@ -653,6 +655,7 @@ public:
   void flip(void);
   void resize(int w, int h);
   void clear(void);
+  bool filled(void);
 
   std::string getFontFilename(std::string sTextFace);
 
@@ -743,6 +746,48 @@ template <typename TYPE>
 auto &_createElement(const std::vector<std::any> &attr);
 
 /**
+\internal
+\typedef factoryLambda is used by the document element factory as a
+data type for the factory function within the unordered_map.
+*/
+typedef std::function<Element &(const std::vector<std::any> &attr)>
+    factoryLambda;
+/**
+\internal
+\typedef factoryMap is a definition of strings and lambda creation functions.
+The document element is referenced by textual tag name wher the function
+returns the creation of the object.
+*/
+typedef std::unordered_map<std::string, factoryLambda> factoryMap;
+/**
+\internal
+\var objectFactoryMap is a constant unordered_map which contains the table.
+*/
+extern const factoryMap objectFactoryMap;
+/**
+\internal
+\typedef attributeLambda is a function that sets the specific attribute upon
+the pased element object.
+*/
+typedef std::function<void(Element &e, const std::string &param)>
+    attributeLambda;
+/**
+\internal
+\typedef attributeStringMap defines the unordered_map that is searched for
+an attribute text name. The storage provides an information of the expected
+number of parameters. 0 or 1.
+*/
+typedef std::unordered_map<std::string, std::pair<bool, attributeLambda>>
+    attributeStringMap;
+/**
+\internal
+\var attributeFactory is a const variable which holds the collection of
+attribute strings, numer of parameters and attribute setting lambda.
+*/
+extern const attributeStringMap attributeFactory;
+
+
+/**
   \class Element
   \brief This is the main Element API. All document entities have this
   interface.
@@ -765,6 +810,12 @@ public:
   Element(Element &&other) noexcept;
   Element &operator=(const Element &other);
   Element &operator=(Element &&other) noexcept;
+#if 0
+  inline bool operator==(const Element& lhs, const Element& rhs) {
+    return lhs.m_self == rhs.m_self;
+  }
+#endif
+
 
 private:
   /**
@@ -1355,6 +1406,44 @@ public:
 #endif
 
 private:
+
+  enum itemType {
+    element,
+    elementTerminal,
+    attribute,
+    attributeValue,
+    attributeSimple,
+    color,
+    textData
+  };
+
+  /// \typedef the variant holds the payload from the parser
+  typedef std::variant<std::string, factoryLambda, attributeLambda, colorNF>
+      parserOperator;
+
+  /// \typedef the structure that holds the parser context.
+  typedef struct {
+    std::vector<std::tuple<itemType, bool, parserOperator>>
+        parsedData; // the elements parsed thus far token
+    std::vector<std::reference_wrapper<Element>>
+        elementStack; // stack holding the tree of elements
+
+    bool bSignal; // true when a < is encountered, Presumed that the
+                  // information will be a markup
+    bool bToken;
+    bool bSkip;
+    bool bTerminal; // true when the / is encountered and a signal has been
+                    // found
+    bool bAttributeList;
+    bool bAttributeListValue;
+    bool bQuery; // true when the information should be queried for a token
+    const char *signalStart; // holds the position of the signal start
+    std::string sCapture;         // the capturing of an element or token name
+    std::string sText; // text information that will be added to the elements data
+
+  } parserContext;
+
+  void processParseContext(parserContext &pc);
   auto ingestMarkup(Element &node, const std::string &markup) -> Element &;
   void updateIndexBy(const indexBy &setting);
 }; // class Element
@@ -1842,47 +1931,6 @@ are added on top of the viewManager base library.
         [](const std::vector <std::any> &attrs)                                \
              -> Element & { return _createElement<OBJECT_TYPE>(attrs); }       \
   }
-/**
-\internal
-\typedef factoryLambda is used by the document element factory as a
-data type for the factory function within the unordered_map.
-*/
-typedef std::function<Element &(const std::vector<std::any> &attr)>
-    factoryLambda;
-/**
-\internal
-\typedef factoryMap is a definition of strings and lambda creation functions.
-The document element is referenced by textual tag name wher the function
-returns the creation of the object.
-*/
-typedef std::unordered_map<std::string, factoryLambda> factoryMap;
-/**
-\internal
-\var objectFactoryMap is a constant unordered_map which contains the table.
-*/
-extern const factoryMap objectFactoryMap;
-/**
-\internal
-\typedef attributeLambda is a function that sets the specific attribute upon
-the pased element object.
-*/
-typedef std::function<void(Element &e, const std::string &param)>
-    attributeLambda;
-/**
-\internal
-\typedef attributeStringMap defines the unordered_map that is searched for
-an attribute text name. The storage provides an information of the expected
-number of parameters. 0 or 1.
-*/
-typedef std::unordered_map<std::string, std::pair<bool, attributeLambda>>
-    attributeStringMap;
-/**
-\internal
-\var attributeFactory is a const variable which holds the collection of
-attribute strings, numer of parameters and attribute setting lambda.
-*/
-extern const attributeStringMap attributeFactory;
-
 class Viewer : public Element {
 public:
   Viewer(const std::vector<std::any> &attribs);

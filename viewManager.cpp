@@ -66,7 +66,7 @@ const factoryMap viewManager::objectFactoryMap = {
     CREATE_OBJECT(masked, UX::masked),
     CREATE_OBJECT(pushbutton, UX::pushButton),
     CREATE_OBJECT(button, UX::pushButton),
-    CREATE_OBJECT(radioButton, UX::radioButton),
+    CREATE_OBJECT(radiobutton, UX::radioButton),
     CREATE_OBJECT(radio, UX::radioButton),
     CREATE_OBJECT(hotimage, UX::hotImage),
     CREATE_OBJECT(group, UX::group),
@@ -882,13 +882,14 @@ object.
 */
 viewManager::Viewer::Viewer(const vector<any> &attrs)
     : Element("Viewer", attrs) {
-  // setAttribute(indexBy{"_root"};
+  setAttribute(indexBy{"_root"});
   eventHandler ev =
       std::bind(&Viewer::dispatchEvent, this, std::placeholders::_1);
   m_device = std::make_unique<Visualizer::platform>(
       ev, getAttribute<objectWidth>().value,
       getAttribute<objectHeight>().value);
-  m_device->openWindow();
+  getAttribute<windowTitle>().value;
+  m_device->openWindow(getAttribute<windowTitle>().value);
 }
 
 /**
@@ -903,6 +904,8 @@ viewManager::Viewer::~Viewer() {}
 the recursive process.
 */
 void viewManager::Viewer::recursiveRender(Element &e) {
+  if(m_device->filled())
+    return;
 
   e.render(*m_device.get());
 
@@ -1762,6 +1765,7 @@ auto viewManager::Element::insertAfter(Element &newChild,
   m_childCount++;
   return newChild;
 }
+
 /**
 \brief replaces the child with the new one specified.
 \details The function replaces the reference child with the new one selected.
@@ -2168,6 +2172,10 @@ void viewManager::Element::render(Visualizer::platform &device) {
     }
   }
 
+  // skip blank lines
+  if (ss.str().size() == 0)
+    return;
+
   string sTextFace;
   int tSize;
   int tColor;
@@ -2177,6 +2185,7 @@ void viewManager::Element::render(Visualizer::platform &device) {
   } catch (const std::exception &e) {
     sTextFace = "arial";
   }
+
   try {
     auto [v, opt] = getAttribute<textSize>();
     tSize = static_cast<int>(v);
@@ -2301,59 +2310,22 @@ The routine is called by the functions that allow a markup string.
 This routine uses the object factory and color map to query the
 contents of the maps.
 
+The parser context applies memory to successive calls to the function.
+This is important for functions like printf or the stream insertion
+operators so that markup gets interpreted correctly. Since there is one of
+these contexts per element, each element operates independently.
+
+The parser acts in a two phase operation, first locating each of the tags
+as markup and those that appears as tags but are not markup elements. The
+second phase builds the elements and applies the attributes to the
+elements. Since document fragments can be nested, the parser function
+maintains a stack of created elements.
+
 \ref markupInputFormat
 
 */
 Element &viewManager::Element::ingestMarkup(Element &node,
                                             const std::string &markup) {
-
-  /* the parser context applies memory to successive calls to the function.
-    This is important for functions like printf or the stream insertion
-    operators so that markup gets interpreted correctly. Since there is one of
-    these contexts per element, each element operates independently. For ease
-    of implementation, the structure and typedef is located at the function
-    level.
-
-    The parser acts in a two phase operation, first locating each of the tags
-    as markup and those that appears as tags but are not markup elements. The
-    second phase builds the elements and applies the attributes to the
-    elements. Since document fragments can be nested, the parser function
-    maintains a stack of created elements.
-  */
-  enum itemType {
-    element,
-    elementTerminal,
-    attribute,
-    attributeValue,
-    attributeSimple,
-    color,
-    textData
-  };
-
-  // the variant holds the payload from the parser
-  typedef variant<string, factoryLambda, attributeLambda, colorNF>
-      parserOperator;
-
-  typedef struct {
-    vector<tuple<itemType, bool, parserOperator>>
-        parsedData; // the elements parsed thus far token
-    vector<reference_wrapper<Element>>
-        elementStack; // stack holding the tree of elements
-
-    bool bSignal; // true when a < is encountered, Presumed that the
-                  // information will be a markup
-    bool bToken;
-    bool bSkip;
-    bool bTerminal; // true when the / is encountered and a signal has been
-                    // found
-    bool bAttributeList;
-    bool bAttributeListValue;
-    bool bQuery; // true when the information should be queried for a token
-    const char *signalStart; // holds the position of the signal start
-    string sCapture;         // the capturing of an element or token name
-    string sText; // text information that will be added to the elements data
-
-  } parserContext;
 
   static parserContext pc;
 
@@ -2404,76 +2376,8 @@ Element &viewManager::Element::ingestMarkup(Element &node,
 
     // the query flag is on when a item has been tokenized after a signal has
     // been found.
-    if (pc.bQuery) {
-
-      string sKey = pc.sCapture;
-      std::transform(sKey.begin(), sKey.end(), sKey.begin(),
-                     [](unsigned char c) { return std::tolower(c); });
-
-      if (pc.bToken && !pc.bAttributeListValue) {
-
-        // store iterator to the function
-        auto it = attributeFactory.find(sKey);
-        if (it != attributeFactory.end())
-
-          // if the attribute is a series of two tokens
-          if (get<0>(it->second)) {
-            pc.parsedData.emplace_back(attribute, false, get<1>(it->second));
-            pc.bAttributeListValue = true; // value is expected to follow.
-
-          } else {
-            pc.parsedData.emplace_back(attributeSimple, false,
-                                       get<1>(it->second));
-            pc.bAttributeListValue = false;
-          }
-        pc.sCapture = "";
-        pc.bQuery = false;
-
-      } else if (pc.bAttributeList && pc.bAttributeListValue) {
-        pc.parsedData.emplace_back(attributeValue, false, pc.sCapture);
-        pc.sCapture = "";
-        pc.bQuery = false;
-
-        if (!pc.bSignal) {
-          pc.bAttributeList = false;
-        }
-        pc.bAttributeListValue = false;
-
-      } else {
-
-        auto it = objectFactoryMap.find(sKey);
-        if (it != objectFactoryMap.end()) {
-
-          if (pc.bTerminal) {
-            pc.parsedData.emplace_back(elementTerminal, false, "");
-            pc.bToken = false;
-            pc.bTerminal = false;
-            pc.bAttributeList = false;
-            pc.bAttributeListValue = false;
-
-          } else {
-            // store lambda for the element factory
-            pc.parsedData.emplace_back(element, false, it->second);
-            pc.bToken = true;
-            pc.bAttributeList = true;
-            pc.bAttributeListValue = false;
-          }
-
-          pc.sCapture = "";
-          pc.bQuery = false;
-
-        } else {
-          // store the color object within the parser payload
-          auto it = colorNF::colorIndex(sKey);
-          if (it != colorNF::colorFactory.end()) {
-            pc.parsedData.emplace_back(color, false, colorNF(it));
-          }
-
-          // illegal match found, pipe contents into ?
-          pc.bQuery = false;
-        }
-      }
-    }
+    if (pc.bQuery)
+      processParseContext(pc);
 
     if (!pc.bSkip)
       if (pc.bSignal)
@@ -2496,9 +2400,13 @@ Element &viewManager::Element::ingestMarkup(Element &node,
   // color text nodes, and set attributes for the items on the stack. once
   // items are processed, they are removed from the stack using the delete
   // range operator, For a complete tag to exist, the end tab must also exist.
+  auto itemProcessedBegin=pc.parsedData.end();
+  auto itemProcessedEnd=pc.parsedData.end();
+  bool bItemsProcessed=false;
+
   auto item = pc.parsedData.begin();
   while (item != pc.parsedData.end()) {
-
+    // if the item is processed
     if (!get<1>(*item)) {
       switch (get<0>(*item)) {
       case element: {
@@ -2510,12 +2418,12 @@ Element &viewManager::Element::ingestMarkup(Element &node,
 
       case elementTerminal: {
         pc.elementStack.pop_back();
+        // mark as processed
         get<1>(*item) = true;
       } break;
 
       // the attribute and value are handled here together
       case attribute: {
-        get<1>(*item) = true;
 
         auto itAttributeValue = std::next(item, 1);
         if (itAttributeValue != pc.parsedData.end() &&
@@ -2523,6 +2431,8 @@ Element &viewManager::Element::ingestMarkup(Element &node,
           get<attributeLambda>(get<2>(*item))(
               pc.elementStack.back(), get<string>(get<2>(*itAttributeValue)));
           get<1>(*itAttributeValue) = true;
+          // mark as processed
+          get<1>(*item) = true;
           item++;
         }
 
@@ -2543,15 +2453,108 @@ Element &viewManager::Element::ingestMarkup(Element &node,
       }
     }
 
+    // record the beginnign and ending positions of the items to erase 
+    if(get<1>(*item)) {
+      bItemsProcessed=true;
+      if(itemProcessedBegin != pc.parsedData.end())
+        itemProcessedBegin=item;
+      else
+        itemProcessedEnd=item;
+    }
+
     // goto next item
     item++;
   }
 
-  // return the the item on the stack appropriate
-  Element &eRet = pc.elementStack.back().get();
-  pc.elementStack.pop_back();
+  // if all items have been terminated, and only one element is on the stack
+  // it should be the node, so pop it off.
+  if (pc.elementStack.size() == 1) {
+    Element &eRet = pc.elementStack.back().get();
+    if (eRet.m_self == node.m_self)
+      pc.elementStack.pop_back();
+  }
 
-  return eRet;
+
+  // erase processed items when marked,
+  if(itemProcessedBegin != pc.parsedData.end())
+    pc.parsedData.erase(itemProcessedBegin, itemProcessedEnd);
+
+  return node;
+}
+
+/**
+\internal
+\brief the function processes one query of a parse context.
+*/
+void viewManager::Element::processParseContext(
+    viewManager::Element::parserContext &pc) {
+
+  string sKey = pc.sCapture;
+  std::transform(sKey.begin(), sKey.end(), sKey.begin(),
+                 [](unsigned char c) { return std::tolower(c); });
+
+  if (pc.bToken && !pc.bAttributeListValue) {
+
+    // store iterator to the function
+    auto it = attributeFactory.find(sKey);
+    if (it != attributeFactory.end())
+
+      // if the attribute is a series of two tokens
+      if (get<0>(it->second)) {
+        pc.parsedData.emplace_back(attribute, false, get<1>(it->second));
+        pc.bAttributeListValue = true; // value is expected to follow.
+
+      } else {
+        pc.parsedData.emplace_back(attributeSimple, false, get<1>(it->second));
+        pc.bAttributeListValue = false;
+      }
+    pc.sCapture = "";
+    pc.bQuery = false;
+
+  } else if (pc.bAttributeList && pc.bAttributeListValue) {
+    pc.parsedData.emplace_back(attributeValue, false, pc.sCapture);
+    pc.sCapture = "";
+    pc.bQuery = false;
+
+    if (!pc.bSignal) {
+      pc.bAttributeList = false;
+    }
+    pc.bAttributeListValue = false;
+
+  } else {
+
+    auto it = objectFactoryMap.find(sKey);
+    if (it != objectFactoryMap.end()) {
+
+      if (pc.bTerminal) {
+        pc.parsedData.emplace_back(elementTerminal, false, "");
+        pc.bToken = false;
+        pc.bTerminal = false;
+        pc.bAttributeList = false;
+        pc.bAttributeListValue = false;
+
+      } else {
+        // store lambda for the element factory
+        pc.parsedData.emplace_back(element, false, it->second);
+        pc.bToken = true;
+        pc.bAttributeList = true;
+        pc.bAttributeListValue = false;
+      }
+
+      pc.sCapture = "";
+      pc.bQuery = false;
+
+    } else {
+      // store the color object within the parser payload
+      auto it = colorNF::colorIndex(sKey);
+      if (it != colorNF::colorFactory.end()) {
+        pc.parsedData.emplace_back(color, false, colorNF(it));
+      }
+
+      // illegal match found, pipe contents into ?
+      pc.bQuery = false;
+    }
+  }
 }
 
 /**
@@ -2675,7 +2678,7 @@ viewManager::Visualizer::platform::~platform() {
   \brief opens a window on the target OS
 
 */
-void viewManager::Visualizer::platform::openWindow(void) {
+void viewManager::Visualizer::platform::openWindow(std::string sWindowTitle) {
 #if defined(__linux__)
 
   /* Open the connection to the X server */
@@ -2705,6 +2708,10 @@ void viewManager::Visualizer::platform::openWindow(void) {
       m_connection, XCB_COPY_FROM_PARENT, m_window, m_screen->root, 0, 0,
       static_cast<unsigned short>(_w), static_cast<unsigned short>(_h), 10,
       XCB_WINDOW_CLASS_INPUT_OUTPUT, m_screen->root_visual, mask, values);
+  // set window title
+  xcb_change_property(m_connection, XCB_PROP_MODE_REPLACE, m_window,
+                      XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, sWindowTitle.size(),
+                      sWindowTitle.data());
 
   /* Map the window on the screen and flush*/
   xcb_map_window(m_connection, m_window);
@@ -2730,10 +2737,10 @@ void viewManager::Visualizer::platform::openWindow(void) {
   wcex.lpszClassName = "viewManagerApp";
   RegisterClassEx(&wcex);
   // Create the window.
-  m_hwnd = CreateWindow("viewManagerApp", "viewManager Application",
-                        WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
-                        static_cast<UINT>(_w), static_cast<UINT>(_h), NULL,
-                        NULL, HINST_THISCOMPONENT, 0L);
+  m_hwnd =
+      CreateWindow("viewManagerApp", sWindowTitle.data(), WS_OVERLAPPEDWINDOW,
+                   CW_USEDEFAULT, CW_USEDEFAULT, static_cast<UINT>(_w),
+                   static_cast<UINT>(_h), NULL, NULL, HINST_THISCOMPONENT, 0L);
 
   SetWindowLongPtr(m_hwnd, GWLP_USERDATA, (long long)this);
 
@@ -3163,11 +3170,15 @@ viewManager::Visualizer::platform::getFontFilename(std::string sTextFace) {
 /**
 \internal
 \brief The drawText function provides textual character rendering.
+
+Optimized Blend
+https://www.codeguru.com/cpp/cpp/algorithms/general/article.php/c15989/Tip-An-Optimized-Formula-for-Alpha-Blending-Pixels.htm
+
 */
 void viewManager::Visualizer::platform::drawText(std::string sTextFace,
                                                  int pointSize, std::string s,
                                                  unsigned int foregroundColor) {
-  unsigned int color = 0x00;
+  unsigned int color = 0x00; // computed color
   int x, y;
   bool bProcessedOnce = false;
   FT_Error error;
@@ -3176,8 +3187,10 @@ void viewManager::Visualizer::platform::drawText(std::string sTextFace,
   FT_UInt glyph_index = 0;
   FT_UInt previous_index = 0;
 
-  // logically this user structure holds information about the size
-  // and name of the font.
+  // get color components of the foreground color used later.
+  unsigned char foregroundR = foregroundColor >> 16;
+  unsigned char foregroundG = foregroundColor >> 8;
+  unsigned char foregroundB = foregroundColor;
 
   // store a cache record for loaded fonts.
   FTC_FaceID faceID;
@@ -3216,21 +3229,21 @@ void viewManager::Visualizer::platform::drawText(std::string sTextFace,
 
   // get the height of the font
   int faceHeight = face->size->metrics.height >> 6;
-  if (m_ypos < faceHeight)
-    m_ypos = 0;
-  m_xpos = 10;
+  m_xpos = 0;
 
+  // iterate characters in string
   for (auto &c : s) {
 
     // handle special characters
     // new line
     if (c == '\n') {
-      m_xpos = 10;
+      m_xpos = 0;
       m_ypos += faceHeight;
-
+      continue;
       // tab
     } else if (c == '\t') {
       m_xpos += 50;
+      continue;
     }
 
     // get the index of the glyph
@@ -3239,20 +3252,19 @@ void viewManager::Visualizer::platform::drawText(std::string sTextFace,
     if (glyph_index == 0)
       continue;
 
-    /*
-    There are two distinct types of bimap structures that are in use, grey
-    scale or lcd filtered. The buffer format is unique for each, the grey lite
-    one being a value indicating grey luminence while the lcd filter is a rgb
-    one. These values provide the same functionality for the looping and
-    drawing routine. You will notice that within each block of code, after
-    getting the image, these values are set.
+    /**
+    \brief use greyscale or color lcd filtering
+\details
+        There are two distinct types of bimap structures that are in use, grey
+        scale or lcd filtered. The buffer format is unique for each, the grey
+    lite one being a value indicating grey luminence while the lcd filter is a
+    rgb one. These values provide the same functionality for the looping and
+        drawing routine. You will notice that within each block of code, after
+        getting the image, these values are set.
     */
     int storageSize, pitch, top, left, height, width, xadvance;
     unsigned char *buffer;
 
-/***********************
-\brief use greyscale or color lcd filtering
-*/
 #ifdef USE_GREYSCALE_ANTIALIAS
     // get the image
     FTC_SBit bitmap;
@@ -3299,9 +3311,12 @@ void viewManager::Visualizer::platform::drawText(std::string sTextFace,
 
 #endif
 
+    x = m_xpos;
+    y = m_ypos + faceHeight - top;
+
     // calculate the maximum bounds
-    int xmax = m_xpos + width / storageSize + left;
-    int ymax = m_ypos + faceHeight - top + height;
+    int xmax = x + width / storageSize + left;
+    int ymax = m_ypos + faceHeight + height - top;
 
     // the kerning of a font depends on the previous character
     // some proportional fonts provide tighter spacing which improves
@@ -3315,14 +3330,13 @@ void viewManager::Visualizer::platform::drawText(std::string sTextFace,
        and adjust the maximum width counter
        These numbers usually preserve space.*/
       if (!error) {
-        m_xpos += akerning.x >> 6;
+        x += akerning.x >> 6;
         xmax += akerning.x >> 6;
       }
     }
-
     // loop through the pixels
-    for (int i = m_xpos + left, p = 0; i < xmax; i++, p += storageSize) {
-      for (int j = m_ypos + faceHeight - top, q = 0; j < ymax; j++, q++) {
+    for (int i = x + left, p = 0; i < xmax; i++, p += storageSize) {
+      for (int j = y, q = 0; j < ymax; j++, q++) {
         int bufferPosition = q * pitch + p;
 
         /* only plot active pixels, the term
@@ -3331,25 +3345,26 @@ void viewManager::Visualizer::platform::drawText(std::string sTextFace,
          glyph bitmap. */
         if (buffer[bufferPosition]) {
 
-#ifdef USE_GREYSCALE_ANTIALIAS
-          // luminance is expressed in greyscal using one byte
-          unsigned char freetypeColor = buffer[bufferPosition];
-
-          unsigned char foregroundR = foregroundColor >> 16;
-          unsigned char foregroundG = foregroundColor >> 8;
-          unsigned char foregroundB = foregroundColor;
-
-          unsigned char freetypeR = freetypeColor;
-          unsigned char freetypeG = freetypeColor;
-          unsigned char freetypeB = freetypeColor;
-
           unsigned int destinationC = getPixel(i, j);
 
           unsigned char destinationR = destinationC >> 16;
           unsigned char destinationG = destinationC >> 8;
           unsigned char destinationB = destinationC;
 
-          // https://www.codeguru.com/cpp/cpp/algorithms/general/article.php/c15989/Tip-An-Optimized-Formula-for-Alpha-Blending-Pixels.htm
+#ifdef USE_GREYSCALE_ANTIALIAS
+          // luminance is expressed in greyscal using one byte
+          unsigned char freetypeColor = buffer[bufferPosition];
+          unsigned char freetypeR = freetypeColor;
+          unsigned char freetypeG = freetypeColor;
+          unsigned char freetypeB = freetypeColor;
+
+#elif defined USE_LCD_FILTER
+          // luminance is expressed within the LCD format as three bytes.
+          unsigned char freetypeR = buffer[bufferPosition];
+          unsigned char freetypeG = buffer[bufferPosition + 1];
+          unsigned char freetypeB = buffer[bufferPosition + 2];
+#endif
+
           unsigned char targetR = ((foregroundR * freetypeR) +
                                    (destinationR * (255 - freetypeR))) >>
                                   8;
@@ -3362,13 +3377,6 @@ void viewManager::Visualizer::platform::drawText(std::string sTextFace,
 
           color = ((targetR) << 16) | ((targetG) << 8) | (targetB);
 
-#elif defined USE_LCD_FILTER
-          // luminance is expressed within the LCD format as three bytes.
-          unsigned char r = buffer[bufferPosition];
-          unsigned char g = buffer[bufferPosition + 1];
-          unsigned char b = buffer[bufferPosition + 2];
-          color = ((255 - r) << 16) | ((255 - g) << 8) | ((255 - b));
-#endif
           // place the computed color into pixel buffer
           putPixel(i, j, color);
         }
@@ -3386,8 +3394,6 @@ void viewManager::Visualizer::platform::drawText(std::string sTextFace,
     bProcessedOnce = true;
     previous_index = glyph_index;
   }
-  // goto next line
-  // m_ypos += faceHeight;
 }
 /**
 
@@ -3408,6 +3414,9 @@ void viewManager::Visualizer::platform::clear(void) {
 */
 void viewManager::Visualizer::platform::putPixel(int x, int y,
                                                  unsigned int color) {
+  if (x < 0 || y < 0)
+    return;
+
   // clip coordinates
   if (x >= _w || y >= _h)
     return;
@@ -3429,6 +3438,9 @@ point of the pixel \param unsigned int color - the bgra color value
 */
 unsigned int viewManager::Visualizer::platform::getPixel(int x, int y) {
   // clip coordinates
+  if (x < 0 || y < 0)
+    return 0;
+
   if (x >= _w || y >= _h)
     return 0;
 
@@ -3487,7 +3499,8 @@ void viewManager::Visualizer::platform::resize(int w, int h) {
 
   int _bufferSize = _w * _h * 4;
 
-  m_offscreenBuffer.resize(_bufferSize);
+  if(m_offscreenBuffer.size()<_bufferSize)
+    m_offscreenBuffer.resize(_bufferSize);
 
   // clear to white
   clear();
@@ -3498,14 +3511,12 @@ void viewManager::Visualizer::platform::resize(int w, int h) {
   GetClientRect(m_hwnd, &rc);
 
   // resize the pixel memory
-  _w = w;
-  _h = h;
-
   _w = rc.right - rc.left;
   _h = rc.bottom - rc.top;
 
   int _bufferSize = _w * _h * 4;
-  m_offscreenBuffer.resize(_bufferSize);
+  if(m_offscreenBuffer.size()<_bufferSize)
+    m_offscreenBuffer.resize(_bufferSize);
 
   // clear to white
   clear();
@@ -3525,6 +3536,11 @@ void viewManager::Visualizer::platform::resize(int w, int h) {
       return;
   }
 #endif
+}
+
+bool viewManager::Visualizer::platform::filled() {
+  return m_ypos>_h;
+
 }
 
 /**

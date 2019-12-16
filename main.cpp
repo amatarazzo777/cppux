@@ -52,16 +52,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
   // create the main window area. This may this is called a Viewer object.
   // The main browsing window. It is an element as well.
   auto &vm = createElement<Viewer>(
-      objectTop{10_pct}, objectLeft{10_pct}, objectHeight{640_px},
-      objectWidth{800_px}, textFace{"arial"}, textSize{16_pt}, textWeight{400},
-      textIndent{2_em}, lineHeight::normal, textAlignment::left,
-      position::relative, paddingTop{5_pt}, paddingLeft{5_pt},
-      paddingBottom{5_pt}, paddingRight{5_pt}, marginTop{5_pt},
-      marginLeft{5_pt}, marginBottom{5_pt}, marginRight{5_pt});
+      windowTitle{"Examples"}, objectTop{10_pct}, objectLeft{10_pct},
+      objectHeight{640_px}, objectWidth{800_px}, textFace{"arial"},
+      textSize{16_pt}, textWeight{400}, textIndent{2_em}, lineHeight::normal,
+      textAlignment::left, position::relative, paddingTop{5_pt},
+      paddingLeft{5_pt}, paddingBottom{5_pt}, paddingRight{5_pt},
+      marginTop{5_pt}, marginLeft{5_pt}, marginBottom{5_pt}, marginRight{5_pt});
 
   test0(vm);
-
-#if 0
   test0c(vm);
   test0b(vm);
   testUX(vm);
@@ -78,11 +76,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
   test7b(vm);
   test7c(vm);
 
+  /*
+  test7d(vm);
+  test7e(vm);
+  test7f(vm);
+  test7g(vm);
+  test7h(vm);
+  test7i(vm);
+  */
+
   test8(vm);
   test8a(vm);
   test10(vm);
-#endif
-  
+
+
   vm.processEvents();
 }
 
@@ -90,15 +97,19 @@ string randomString(int nChars);
 double randomDouble(double a, double b);
 int randomInt(int a);
 void randomAttributeSettings(Element &e);
+
 /************************************************************************
 ************************************************************************/
 void test0(Viewer &vm) {
-  vm.ingestStream=true;
-  vm << "<h1 textFace=bradley textsize=80pt color=hotpink>Hello World</h1>";
-  vm << "<h2 textFace=impact color=red>Subearth</h2>";
+  vm.ingestStream = true;
+  vm << "<h1 textFace=arial textsize=30pt color=hotpink>Hello World, high "
+        "yags</h1>";
+  vm << "<h2 textFace=britannic color=darkgrey >Subearth low jumps</h2>";
   vm << "<p textcolor=orange>Got to be a pretty day upside and underneath.</p>";
-  vm << "<p textcolor=blue>Yet sometimes when evil lerks, days may be more creative than usual.</p>";
-  vm << "<p color=green>green</p><p color=lime>lime</p><p color=crimson>crimson</p>";
+  vm << "<p textcolor=blue>Yet sometimes when evil lerks, days may be more "
+        "creative than usual.</p>";
+  vm << "<p color=green>green</p><p color=lime>lime</p><p "
+        "color=crimson>crimson</p>";
 }
 
 /************************************************************************
@@ -130,6 +141,7 @@ void test0b(Viewer &vm) {
                                     "<li>test item 3</li>"
                                     "<li>test item 4</li>"
                                     "<li>test item 5</li></ul>");
+
 }
 /************************************************************************
 ************************************************************************/
@@ -500,7 +512,6 @@ void test5(Viewer &vm) {
                            randomString(200));
     chapter.push_back(e);
   }
-  cout << "document building finished" << endl;
   vm.appendChild<DIV>(indexBy{"booklet5"}).appendChild(chapter);
 }
 //! [test5]
@@ -903,7 +914,7 @@ void test7i(Viewer &view) {
 void test8a(Viewer &vm) {
   testStart(__FUNCTION__);
 
-  auto &dBook = vm.appendChild<DIV>(indexBy{"booklet5"});
+  auto &dBook = vm.appendChild<DIV>(indexBy{"booklet5_t8a"});
   PARAGRAPH *pBooklet = nullptr;
   // a warning is issued which is what is required.
   // main.cpp:XXXXX: warning: format string is not a string
@@ -912,10 +923,10 @@ void test8a(Viewer &vm) {
   string s = "not literal";
   dBook.ingestStream = true;
   dBook.printf(s.c_str());
-  dBook.printf("<div id=BookletParagraph>");
+  dBook.printf("<div id=BookletParagraph_8a>");
   dBook.printf("The paragraph content is here.");
-  dBook.printf("<img id=imgData/>");
-  dBook.printf("<ul id=chapterList>");
+  //dBook.printf("<img id=imgData/>");
+  dBook.printf("<ul id=chapterList_t8a>");
   for (int i = 0; i < 10; i++)
     dBook.printf("<li>Chapter List %i</li>", i);
   dBook.printf("</ul>");
@@ -929,17 +940,17 @@ void test8(Viewer &vm) {
   testStart(__FUNCTION__);
 
   int m = randomInt(5);
-  auto &dBook = vm.appendChild<DIV>(indexBy{"booklet5"});
+  auto &dBook = vm.appendChild<DIV>(indexBy{"booklet5_t8"});
   dBook.ingestStream = true;
 
   for (int i = 0; i < m; i++) {
-    string sID = "BookletParagraph_" + to_string(i);
+    string sID = "BookletParagraph_t8_" + to_string(i);
     dBook.printf("<p id=%s>", sID.data());
     dBook.printf("The paragraph content is here.");
-    dBook.printf(" <ul id=notes_%i>%s", i, "text content ul");
-    dBook.printf(" <ul id=guestSpeaker_%i>%s</ul>", i,
+    dBook.printf(" <ul id=notes_t8_%i>%s", i, "text content ul");
+    dBook.printf(" <ul id=guestSpeaker_t8_%i>%s</ul>", i,
                  "guest speaker information ... ");
-    dBook.printf(" <ul id=references_%i>%s</ul>", i,
+    dBook.printf(" <ul id=references_t8_%i>%s</ul>", i,
                  " reference information: ... ");
     dBook.printf(" </ul>");
     dBook.printf("</p>");
@@ -952,23 +963,23 @@ void test10(Viewer &vm) {
   testStart(__FUNCTION__);
 
   int m = randomInt(5);
-  auto &dBook = vm.appendChild<DIV>(indexBy{"booklet5"});
+  auto &dBook = vm.appendChild<DIV>(indexBy{"booklet5_t10"});
   dBook.ingestStream = true;
 
   for (int i = 0; i < m; i++) {
-    string sID = "BookletParagraph_" + to_string(i);
+    string sID = "BookletParagraph_t10_" + to_string(i);
     dBook << "<p id=" << sID << ">"
           << "The paragraph content is here."
-          << " <ul id=notes_" << i << ">text content ul"
-          << "<ul id=guestSpeaker_" << i << ">"
+          << " <ul id=notes_t10_" << i << ">text content ul"
+          << "<ul id=guestSpeaker_t10_" << i << ">"
           << "guest speaker information ... "
           << "</ul>"
-          << "<ul id=references_" << i << ">"
+          << "<ul id=references_t10_" << i << ">"
           << "reference information: ... "
           << "</ul>"
           << "</ul>"
           << "</p>";
-    getElement(sID).setAttribute(textColor{"red"});
+    getElement(sID).setAttribute(textColor{"plum"});
   }
 }
 //! [test10]
@@ -986,7 +997,7 @@ string randomString(int nChars) {
     return charset[rand() % max_index];
   };
   string s1(numChars, 0);
-  
+
   string str(s1);
   std::generate_n(std::back_inserter(str), numChars, randchar);
   return str;
