@@ -37,9 +37,9 @@ inline render. Use this option or the USE_LCD_FILTER. One one should be defined.
 
 /**
 \def USE_LCD_FILTER
-\brief The system must be configured to use the inline renderer. This uses the lcd
-filtering mode of the freetype glyph library. The option is exclusive against the
-USE_GREYSCALE_ANTIALIAS option. One one should be defined.
+\brief The system must be configured to use the inline renderer. This uses the
+lcd filtering mode of the freetype glyph library. The option is exclusive
+against the USE_GREYSCALE_ANTIALIAS option. One one should be defined.
 */
 //#define USE_LCD_FILTER
 
@@ -111,13 +111,14 @@ OS SPECIFIC HEADERS
 #include <sys/ipc.h>
 #include <sys/shm.h>
 
+#include <X11/Xlib-xcb.h>
+#include <X11/Xutil.h>
+#include <X11/keysym.h>
 #include <X11/keysymdef.h>
-#include <xcb/xcb.h>
+#include <fontconfig/fontconfig.h>
 #include <xcb/shm.h>
 #include <xcb/xcb_image.h>
 #include <xcb/xcb_keysyms.h>
-#include <fontconfig/fontconfig.h>
-
 
 #elif defined(_WIN64)
 // Windows Header Files:
@@ -130,10 +131,8 @@ OS SPECIFIC HEADERS
 #include <dwrite.h>
 #include <wincodec.h>
 
-
 // auto linking of direct x
 #pragma comment(lib, "d2d1.lib")
-
 
 #ifndef HINST_THISCOMPONENT
 EXTERN_C IMAGE_DOS_HEADER __ImageBase;
@@ -246,18 +245,19 @@ using event = class event {
 public:
   event(const eventType &et) {
     evtType = et;
-    bUnicodeEvent = false;
+    bVirtualKey = false;
   }
   event(const eventType &et, const char &k) {
     evtType = et;
     key = k;
-    bUnicodeEvent = false;
+    bVirtualKey = false;
   }
-  event(const eventType &et, const std::wstring &uniK) {
+  event(const eventType &et, const unsigned int &vk) {
     evtType = et;
-    unicodeKeys = uniK;
-    bUnicodeEvent = true;
+    virtualKey = vk;
+    bVirtualKey=true;
   }
+
   event(const eventType &et, const short &mx, const short &my,
         const short &mb_dis) {
     evtType = et;
@@ -267,25 +267,26 @@ public:
       wheelDistance = mb_dis;
     else
       mouseButton = static_cast<char>(mb_dis);
-    bUnicodeEvent = false;
+    bVirtualKey = false;
   }
   event(const eventType &et, const short &w, const short &h) {
     evtType = et;
     width = w;
     height = h;
-    bUnicodeEvent = false;
+    bVirtualKey = false;
   }
   event(const eventType &et, const short &distance) {
     evtType = et;
     wheelDistance = distance;
-    bUnicodeEvent = false;
+    bVirtualKey = false;
   }
   ~event(){};
 
 public:
   eventType evtType;
-  bool bUnicodeEvent;
+  bool bVirtualKey;
   char key;
+  unsigned int virtualKey;
   std::wstring unicodeKeys;
   short mousex;
   short mousey;
@@ -507,6 +508,11 @@ enumerated constant
     NAME(std::vector<std::string> _val) : value(std::move(_val)) {}            \
   }
 
+#define _STRUCT_ATTRIBUTE(NAME,NAME2) using NAME = NAME2
+
+
+
+
 /**
   \addtogroup Attributes
   @{
@@ -583,11 +589,23 @@ _NUMERIC_ATTRIBUTE(borderRadius);
 _NUMERIC_ATTRIBUTE(focusIndex);
 /// \class zIndex controls the zplane order rendering .
 _NUMERIC_ATTRIBUTE(zIndex);
+
 /// \class listStyleType controls the icon used to show aside the list items.
 _ENUMERATED_ATTRIBUTE(listStyleType, none, disc, circle, square, decimal, alpha,
                       greek, latin, roman);
-/// \class windowTitle sets the title of the window. The window class is viewManagerApp always.
+
+/// \class windowTitle sets the title of the window. The window class is
+/// viewManagerApp always.
 _STRING_ATTRIBUTE(windowTitle);
+
+
+/// \class documentState holds the document state. The stateStructure applies
+/// the structure which holds the information.
+using documentState = class documentState {
+public:
+  int i;
+  Element *focusField;
+};
 
 /** @}*/
 
@@ -637,50 +655,56 @@ typedef struct {
 extern std::vector<rectangle> items;
 std::size_t allocate(Element &e);
 void deallocate(const std::size_t &token);
-void openWindow(Element &e);
-void closeWindow(Element &e);
 
+/**
+\internal
+\class platform
+\brief The platform contains logic to connect the document object model to the
+local operating system.
+*/
 class platform {
 public:
-  platform(eventHandler evtDispatcher, unsigned short width,
-           unsigned short height);
+  platform(const eventHandler &evtDispatcher, const unsigned short width,
+           const unsigned short height);
   ~platform();
-  void openWindow(std::string sWindowTitle);
+  void openWindow(const std::string &sWindowTitle);
   void closeWindow(void);
   void messageLoop(void);
-  void drawText(std::string sTextFace, int pointSize, std::string s, unsigned int tC);
-  inline void putPixel(int x, int y, unsigned int color);
-  inline unsigned int getPixel(int x, int y);
+  void drawText(const std::string &sTextFace, const int pointSize, const std::string &s,
+                const unsigned int tC);
+  void drawCaret(const int x, const int y, const int h);
+  inline void putPixel(const int x, const int y, const unsigned int color);
+  inline unsigned int getPixel(const int x,const  int y);
 
   void flip(void);
-  void resize(int w, int h);
+  void resize(const int w,const int h);
   void clear(void);
   bool filled(void);
+  std::string getFontFilename(const std::string &sTextFace);
 
-  std::string getFontFilename(std::string sTextFace);
+#if defined(__linux__)
 
-#if defined(_WIN64)
+#elif defined(_WIN64)
   static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam,
                                   LPARAM lParam);
   bool initializeVideo(void);
   void terminateVideo(void);
-
-
 #endif
 
 #if defined(USE_INLINE_RENDERER)
   typedef struct {
     std::string filePath;
-    int   index;
+    int index;
   } faceCacheStruct;
 
   static FT_Error faceRequestor(FTC_FaceID face_id, FT_Library library,
-                            FT_Pointer request_data, FT_Face *aface);
+                                FT_Pointer request_data, FT_Face *aface);
 
 #endif
 
 public:
 #if defined(__linux__)
+  Display *m_xdisplay;
   xcb_connection_t *m_connection;
   xcb_screen_t *m_screen;
   xcb_drawable_t m_window;
@@ -700,14 +724,12 @@ public:
   ID2D1HwndRenderTarget *m_pRenderTarget;
   ID2D1Bitmap *m_pBitmap;
 
-
 #endif
 
   int m_xpos;
   int m_ypos;
   int fontScale;
   std::vector<u_int8_t> m_offscreenBuffer;
-
 
 private:
   eventHandler dispatchEvent;
@@ -719,18 +741,19 @@ private:
   FT_Library m_freeType;
   FTC_Manager m_cacheManager;
 
-  #ifdef USE_LCD_FILTER
+#ifdef USE_LCD_FILTER
   FTC_ImageCache m_imageCache;
-  #endif
+#endif
 
-  #ifdef USE_GREYSCALE_ANTIALIAS
+#ifdef USE_GREYSCALE_ANTIALIAS
   FTC_SBitCache m_bitCache;
-  #endif
+#endif
 
   FTC_CMapCache m_cmapCache;
   std::unordered_map<std::string, faceCacheStruct> m_faceCache;
 
-//  std::unordered_map<std::pair<unsigned int, unsigned int>, unsigned int> m_blend;
+  //  std::unordered_map<std::pair<unsigned int, unsigned int>, unsigned int>
+  //  m_blend;
 
 #endif
 
@@ -786,7 +809,6 @@ attribute strings, numer of parameters and attribute setting lambda.
 */
 extern const attributeStringMap attributeFactory;
 
-
 /**
   \class Element
   \brief This is the main Element API. All document entities have this
@@ -815,7 +837,6 @@ public:
     return lhs.m_self == rhs.m_self;
   }
 #endif
-
 
 private:
   /**
@@ -865,12 +886,20 @@ private:
       saveState();
       return (_data);
     }
-    std::string textData(void) {
+
+    std::string get(std::size_t i) {
       std::stringstream ss;
-      for(auto n : _data)
-        ss << n;
+      ss << _data[i];
       return ss.str();
     }
+
+    std::string textData(void) {
+      std::stringstream ss;
+      for (T n : _data)
+        ss << n << "\n";
+      return ss.str();
+    }
+
     std::function<Element &(T &)> &transform(void) { return fnTransform; }
 
     // analyze hint data and deduce states
@@ -1384,8 +1413,8 @@ public:
   auto resize(const double w, const double h) -> Element &;
   auto addListener(eventType evtType, eventHandler evtHandler) -> Element &;
   auto removeListener(eventType evtType, eventHandler evtHandler) -> Element &;
-  void render(Visualizer::platform &device);
-  void streamRender(std::stringstream &ss);
+  void dispatch(const event& e);
+  virtual void render(Visualizer::platform &device);
   auto insertBefore(Element &newChild, Element &existingElement) -> Element &;
   auto insertBefore(Element &newChild, std::string &sID) -> Element &;
   auto insertAfter(Element &newChild, Element &existingElement) -> Element &;
@@ -1406,7 +1435,6 @@ public:
 #endif
 
 private:
-
   enum itemType {
     element,
     elementTerminal,
@@ -1438,8 +1466,9 @@ private:
     bool bAttributeListValue;
     bool bQuery; // true when the information should be queried for a token
     const char *signalStart; // holds the position of the signal start
-    std::string sCapture;         // the capturing of an element or token name
-    std::string sText; // text information that will be added to the elements data
+    std::string sCapture;    // the capturing of an element or token name
+    std::string
+        sText; // text information that will be added to the elements data
 
   } parserContext;
 
@@ -1947,7 +1976,6 @@ public:
 private:
   std::unique_ptr<Visualizer::platform> m_device;
 };
-
 }; // namespace viewManager
 
 #ifdef INCLUDE_UX

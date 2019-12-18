@@ -58,10 +58,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
       textAlignment::left, position::relative, paddingTop{5_pt},
       paddingLeft{5_pt}, paddingBottom{5_pt}, paddingRight{5_pt},
       marginTop{5_pt}, marginLeft{5_pt}, marginBottom{5_pt}, marginRight{5_pt});
-
+  #if 0
   test0(vm);
   test0c(vm);
+  #endif
+
   test0b(vm);
+  #if 0
   testUX(vm);
   testUXmarkup(vm);
   test1(vm);
@@ -88,7 +91,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
   test8(vm);
   test8a(vm);
   test10(vm);
-
+  #endif
 
   vm.processEvents();
 }
@@ -141,7 +144,7 @@ void test0b(Viewer &vm) {
                                     "<li>test item 3</li>"
                                     "<li>test item 4</li>"
                                     "<li>test item 5</li></ul>");
-
+  vm.appendChild<UX::text>();
 }
 /************************************************************************
 ************************************************************************/
@@ -663,7 +666,7 @@ void test7d(Viewer &vm) {
       {1, "Squeeler"},
       {0, "Books"},
       {1, "Yada yada yada"}};
-  divTest.appendChild("<Combo></Combo>").data() = {
+  divTest.appendChild("<list></list>").data() = {
       "option a", "option b", "option c", "option d", "option e"};
   divTest.append("<ul><li>Hello added to the end</li></ul>");
   divTest.appendChild<paragraph>().data() = {"fdff", "fdfdfdf", "Yttyty",
@@ -872,6 +875,7 @@ can be described in the form :*/
                                               {"Alien Spacecraft R+", 97.1},
                                               {"Jupiter Time Shift R", 64.3}}}};
 }
+
 void test7i(Viewer &view) {
   using processList = std::tuple<int, std::string, float, std::string>;
   view.appendChild<ul>(indexBy{"corp"}).data<processList>() = {
@@ -925,7 +929,7 @@ void test8a(Viewer &vm) {
   dBook.printf(s.c_str());
   dBook.printf("<div id=BookletParagraph_8a>");
   dBook.printf("The paragraph content is here.");
-  //dBook.printf("<img id=imgData/>");
+  // dBook.printf("<img id=imgData/>");
   dBook.printf("<ul id=chapterList_t8a>");
   for (int i = 0; i < 10; i++)
     dBook.printf("<li>Chapter List %i</li>", i);

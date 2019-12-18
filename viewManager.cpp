@@ -890,6 +890,9 @@ viewManager::Viewer::Viewer(const vector<any> &attrs)
       getAttribute<objectHeight>().value);
   getAttribute<windowTitle>().value;
   m_device->openWindow(getAttribute<windowTitle>().value);
+  documentState st;
+  st.focusField = this;
+  setAttribute<documentState>(st);
 }
 
 /**
@@ -904,7 +907,7 @@ viewManager::Viewer::~Viewer() {}
 the recursive process.
 */
 void viewManager::Viewer::recursiveRender(Element &e) {
-  if(m_device->filled())
+  if (m_device->filled())
     return;
 
   e.render(*m_device.get());
@@ -944,12 +947,21 @@ void viewManager::Viewer::dispatchEvent(const event &evt) {
   case eventType::resize:
     m_device->resize(evt.width, evt.height);
     break;
-  case eventType::keydown:
-    break;
-  case eventType::keyup:
-    break;
-  case eventType::keypress:
-    break;
+  case eventType::keydown: {
+    auto &state = getAttribute<documentState>();
+    state.focusField->dispatch(evt);
+    dispatchEvent(event{eventType::paint});
+  } break;
+  case eventType::keyup: {
+    auto &state = getAttribute<documentState>();
+    state.focusField->dispatch(evt);
+    dispatchEvent(event{eventType::paint});
+  } break;
+  case eventType::keypress: {
+    auto &state = getAttribute<documentState>();
+    state.focusField->dispatch(evt);
+    dispatchEvent(event{eventType::paint});
+  } break;
   case eventType::mousemove:
     break;
   case eventType::mousedown:
@@ -2128,6 +2140,19 @@ auto viewManager::Element::addListener(eventType evtType,
 }
 
 /**
+
+\brief The function is invoked when an event occurrs. Normally this occurs
+from the platform device. However, this may be invoked by the soft generation of
+events.
+
+*/
+void viewManager::Element::dispatch(const event &e) {
+  auto &v = getEventVector(e.evtType);
+  for (auto &fn : v)
+    fn(e);
+}
+
+/**
 \brief removes dispatching of an event to the caller.
 <summary>The function will remove an event listener from the list of
 events to receive messages.</summary>
@@ -2168,7 +2193,16 @@ void viewManager::Element::render(Visualizer::platform &device) {
   for (auto m : m_usageAdaptorMap) {
     if (m.first == typeid(std::vector<std::string>)) {
       auto &o = std::any_cast<usageAdaptor<std::string> &>(m.second);
-      ss << o.textData() << "\n";
+      ss << o.textData();
+    } else if (m.first == typeid(std::vector<double>)) {
+      auto &o = std::any_cast<usageAdaptor<double> &>(m.second);
+      ss << o.textData();
+    } else if (m.first == typeid(std::vector<float>)) {
+      auto &o = std::any_cast<usageAdaptor<float> &>(m.second);
+      ss << o.textData();
+    } else if (m.first == typeid(std::vector<int>)) {
+      auto &o = std::any_cast<usageAdaptor<int> &>(m.second);
+      ss << o.textData();
     }
   }
 
@@ -2202,17 +2236,6 @@ void viewManager::Element::render(Visualizer::platform &device) {
   }
 
   device.drawText(sTextFace, tSize, ss.str(), tColor);
-}
-
-/**
-\internal
-\brief The function dumps the default string data member
-to the passed string stream. This is useful for debugging.
-*/
-void viewManager::Element::streamRender(stringstream &ss) {
-  for (auto n : data()) {
-    ss << "     " << n << "\n";
-  }
 }
 
 /**
@@ -2336,8 +2359,8 @@ Element &viewManager::Element::ingestMarkup(Element &node,
   const char *p = markup.data();
 
   // tokenize the markup string
-  while (*p) {
-    switch (*p) {
+  for (auto ch : markup) {
+    switch (ch) {
     case '<':
       if (pc.sText.size() != 0) {
         pc.parsedData.emplace_back(textData, false, pc.sText);
@@ -2381,16 +2404,14 @@ Element &viewManager::Element::ingestMarkup(Element &node,
 
     if (!pc.bSkip)
       if (pc.bSignal)
-        pc.sCapture += *p;
+        pc.sCapture += ch;
       else
-        pc.sText += *p;
+        pc.sText += ch;
 
     pc.bSkip = false;
-
-    // goto next character
-    p++;
   }
 
+  // if text exists, add as a textdata element.
   if (pc.sText.size() != 0) {
     pc.parsedData.emplace_back(textData, false, pc.sText);
     pc.sText = "";
@@ -2400,66 +2421,54 @@ Element &viewManager::Element::ingestMarkup(Element &node,
   // color text nodes, and set attributes for the items on the stack. once
   // items are processed, they are removed from the stack using the delete
   // range operator, For a complete tag to exist, the end tab must also exist.
-  auto itemProcessedBegin=pc.parsedData.end();
-  auto itemProcessedEnd=pc.parsedData.end();
-  bool bItemsProcessed=false;
-
   auto item = pc.parsedData.begin();
   while (item != pc.parsedData.end()) {
-    // if the item is processed
-    if (!get<1>(*item)) {
-      switch (get<0>(*item)) {
-      case element: {
-        Element &e = get<factoryLambda>(get<2>(*item))({});
-        pc.elementStack.back().get().appendChild(e);
-        pc.elementStack.push_back(e);
-        get<1>(*item) = true;
-      } break;
 
-      case elementTerminal: {
-        pc.elementStack.pop_back();
+    // if the item is processed
+    if (get<1>(*item))
+      continue;
+
+    switch (get<0>(*item)) {
+    case element: {
+      Element &e = get<factoryLambda>(get<2>(*item))({});
+      pc.elementStack.back().get().appendChild(e);
+      pc.elementStack.push_back(e);
+      get<1>(*item) = true;
+    } break;
+
+    case elementTerminal: {
+      pc.elementStack.pop_back();
+      // mark as processed
+      get<1>(*item) = true;
+    } break;
+
+    // the attribute and value are handled here together
+    case attribute: {
+      auto itAttributeValue = std::next(item, 1);
+      if (itAttributeValue != pc.parsedData.end() &&
+          get<0>(*itAttributeValue) == attributeValue) {
+        get<attributeLambda>(get<2>(*item))(
+            pc.elementStack.back(), get<string>(get<2>(*itAttributeValue)));
+        get<1>(*itAttributeValue) = true;
         // mark as processed
         get<1>(*item) = true;
-      } break;
-
-      // the attribute and value are handled here together
-      case attribute: {
-
-        auto itAttributeValue = std::next(item, 1);
-        if (itAttributeValue != pc.parsedData.end() &&
-            get<0>(*itAttributeValue) == attributeValue) {
-          get<attributeLambda>(get<2>(*item))(
-              pc.elementStack.back(), get<string>(get<2>(*itAttributeValue)));
-          get<1>(*itAttributeValue) = true;
-          // mark as processed
-          get<1>(*item) = true;
-          item++;
-        }
-
-      } break;
-
-      case color: {
-        auto &e = pc.elementStack.back().get().appendChild<textNode>(
-            textColor{get<colorNF>(get<2>(*item))});
-        pc.elementStack.push_back(e);
-        get<1>(*item) = true;
-      } break;
-
-      case textData:
-        pc.elementStack.back().get().data().push_back(
-            get<string>(get<2>(*item)));
-        get<1>(*item) = true;
-        break;
+        item++;
       }
-    }
 
-    // record the beginnign and ending positions of the items to erase 
-    if(get<1>(*item)) {
-      bItemsProcessed=true;
-      if(itemProcessedBegin != pc.parsedData.end())
-        itemProcessedBegin=item;
-      else
-        itemProcessedEnd=item;
+    } break;
+
+    case color: {
+      auto &e = pc.elementStack.back().get().appendChild<textNode>(
+          textColor{get<colorNF>(get<2>(*item))});
+      pc.elementStack.push_back(e);
+      get<1>(*item) = true;
+    } break;
+
+    case textData: {
+      pc.elementStack.back().get().data().push_back(get<string>(get<2>(*item)));
+      get<1>(*item) = true;
+      break;
+    }
     }
 
     // goto next item
@@ -2474,17 +2483,25 @@ Element &viewManager::Element::ingestMarkup(Element &node,
       pc.elementStack.pop_back();
   }
 
-
   // erase processed items when marked,
-  if(itemProcessedBegin != pc.parsedData.end())
-    pc.parsedData.erase(itemProcessedBegin, itemProcessedEnd);
+  pc.parsedData.erase(std::remove_if(pc.parsedData.begin(), pc.parsedData.end(),
+                                     [](auto &n) { return get<1>(n); }),
+                      pc.parsedData.end());
 
   return node;
 }
 
 /**
 \internal
-\brief the function processes one query of a parse context.
+\brief The function processes one query of a parse context.
+\details The first process of the function is to transform the
+input to lowr case to ensure case insensitive comparisons. The
+pc parserContext structure operates on a stream basis. Therefore
+the logic within this function provides the pass through and control
+break logic to implement the functionality. An intersting effect
+is that at times a token must be completely found before it may be processed.
+For example the ID of a element should be sent within one context.
+
 */
 void viewManager::Element::processParseContext(
     viewManager::Element::parserContext &pc) {
@@ -2571,8 +2588,6 @@ std::size_t viewManager::Visualizer::allocate(Element &e) {
   return ret;
 }
 void viewManager::Visualizer::deallocate(const std::size_t &token) {}
-void viewManager::Visualizer::openWindow(Element &e) {}
-void viewManager::Visualizer::closeWindow(Element &e) {}
 
 /**
   \internal
@@ -2585,9 +2600,9 @@ void viewManager::Visualizer::closeWindow(Element &e) {}
   \param unsigned short width - window size.
   \param unsigned short height - window size.
 */
-viewManager::Visualizer::platform::platform(eventHandler evtDispatcher,
-                                            unsigned short width,
-                                            unsigned short height) {
+viewManager::Visualizer::platform::platform(const eventHandler &evtDispatcher,
+                                            const unsigned short width,
+                                            const unsigned short height) {
   dispatchEvent = evtDispatcher;
   _w = width;
   _h = height;
@@ -2678,11 +2693,15 @@ viewManager::Visualizer::platform::~platform() {
   \brief opens a window on the target OS
 
 */
-void viewManager::Visualizer::platform::openWindow(std::string sWindowTitle) {
+void viewManager::Visualizer::platform::openWindow(
+    const std::string &sWindowTitle) {
 #if defined(__linux__)
+  // this open provide interoperability between xcb and xwindows
+  // this is used here because of the necessity of key mapping.
+  m_xdisplay = XOpenDisplay(nullptr);
 
-  /* Open the connection to the X server */
-  m_connection = xcb_connect(nullptr, nullptr);
+  /* get the connection to the X server */
+  m_connection = XGetXCBConnection(m_xdisplay);
 
   /* Get the first screen */
   m_screen = xcb_setup_roots_iterator(xcb_get_setup(m_connection)).data;
@@ -2837,56 +2856,61 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
     break;
   case WM_KEYDOWN: {
     UINT scandCode = (lParam >> 8) & 0xFFFFFF00;
-    WCHAR lBuffer[10];
-    BYTE State[256];
-    GetKeyboardState(State);
-    ToUnicode(wParam, scandCode, State, lBuffer, wcslen(lBuffer), 0);
-    platformInstance->dispatchEvent(
-        event{eventType::keydown, wstring(lBuffer)});
+    platformInstance->dispatchEvent(event{eventType::keydown,(unsigned int) wParam});
+    handled = true;
   } break;
   case WM_KEYUP: {
     UINT scandCode = (lParam >> 8) & 0xFFFFFF00;
-    WCHAR lBuffer[10];
-    BYTE State[256];
-    GetKeyboardState(State);
-    ToUnicode(wParam, scandCode, State, lBuffer, wcslen(lBuffer), 0);
-    platformInstance->dispatchEvent(event{eventType::keyup, wstring(lBuffer)});
+    platformInstance->dispatchEvent(event{eventType::keydown,(unsigned int) wParam});
+    handled = true;
   } break;
   case WM_CHAR: {
-    WCHAR tmp[2];
-    tmp[0] = wParam;
-    tmp[1] = 0x00;
-    platformInstance->dispatchEvent(event{eventType::keypress, wstring(tmp)});
+    // filter out some of the control keys that
+    // slip through such as the back and tab keys
+    if(wParam>27) {
+      WCHAR tmp[2];
+      tmp[0] = wParam;
+      tmp[1] = 0x00;
+      char ch = wParam;
+      platformInstance->dispatchEvent(event{eventType::keypress, ch});
+      handled = true;
+    }
   } break;
   case WM_LBUTTONDOWN:
     platformInstance->dispatchEvent(
         event{eventType::mousedown, static_cast<short>(LOWORD(lParam)),
               static_cast<short>(HIWORD(lParam)), 1});
+    handled = true;
     break;
   case WM_LBUTTONUP:
     platformInstance->dispatchEvent(
         event{eventType::mouseup, static_cast<short>(LOWORD(lParam)),
               static_cast<short>(HIWORD(lParam)), 1});
+    handled = true;
     break;
   case WM_MBUTTONDOWN:
     platformInstance->dispatchEvent(
         event{eventType::mousedown, static_cast<short>(LOWORD(lParam)),
               static_cast<short>(HIWORD(lParam)), 2});
+    handled = true;
     break;
   case WM_MBUTTONUP:
     platformInstance->dispatchEvent(
         event{eventType::mouseup, static_cast<short>(LOWORD(lParam)),
               static_cast<short>(HIWORD(lParam)), 2});
+    handled = true;
     break;
   case WM_RBUTTONDOWN:
     platformInstance->dispatchEvent(
         event{eventType::mousedown, static_cast<short>(LOWORD(lParam)),
               static_cast<short>(HIWORD(lParam)), 3});
+    handled = true;
     break;
   case WM_RBUTTONUP:
     platformInstance->dispatchEvent(
         event{eventType::mouseup, static_cast<short>(LOWORD(lParam)),
               static_cast<short>(HIWORD(lParam)), 3});
+    handled = true;
     break;
   case WM_MOUSEMOVE:
     platformInstance->dispatchEvent(event{eventType::mousemove,
@@ -2899,6 +2923,7 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
     platformInstance->dispatchEvent(event{
         eventType::wheel, static_cast<short>(LOWORD(lParam)),
         static_cast<short>(HIWORD(lParam)), GET_WHEEL_DELTA_WPARAM(wParam)});
+    handled = true;
   } break;
   case WM_DISPLAYCHANGE:
     InvalidateRect(hwnd, NULL, FALSE);
@@ -2968,12 +2993,22 @@ void viewManager::Visualizer::platform::messageLoop(void) {
     case XCB_KEY_PRESS: {
       xcb_key_press_event_t *kp = (xcb_key_press_event_t *)xcbEvent;
       xcb_keysym_t sym = xcb_key_press_lookup_keysym(m_syms, kp, 0);
-      // dispatchEvent(event{eventType::keydown, sym});
+      if(sym<0x99) {
+        XKeyEvent keyEvent;
+        keyEvent.display = m_xdisplay;
+        keyEvent.keycode=kp->detail;
+        keyEvent.state=kp->state;
+        std::array<char,16> buf{};
+        if(XLookupString(&keyEvent,buf.data(),buf.size(),nullptr,nullptr))
+          dispatchEvent(event{eventType::keypress,(char)buf[0]});
+      } else {
+        dispatchEvent(event{eventType::keydown, sym});
+      }
     } break;
     case XCB_KEY_RELEASE: {
       xcb_key_release_event_t *kr = (xcb_key_release_event_t *)xcbEvent;
       xcb_keysym_t sym = xcb_key_press_lookup_keysym(m_syms, kr, 0);
-      // dispatchEvent(event{eventType::keyup, sym});
+      dispatchEvent(event{eventType::keyup, sym});
     } break;
     case XCB_EXPOSE: {
       flip();
@@ -3028,8 +3063,8 @@ https://stackoverflow.com/questions/3954223/platform-independent-way-to-get-font
 \param sTextFace
 
 */
-std::string
-viewManager::Visualizer::platform::getFontFilename(std::string sTextFace) {
+std::string viewManager::Visualizer::platform::getFontFilename(
+    const std::string &sTextFace) {
   std::string fontFileReturn;
 
 #if defined(__linux__)
@@ -3171,13 +3206,14 @@ viewManager::Visualizer::platform::getFontFilename(std::string sTextFace) {
 \internal
 \brief The drawText function provides textual character rendering.
 
+\param std::string
 Optimized Blend
 https://www.codeguru.com/cpp/cpp/algorithms/general/article.php/c15989/Tip-An-Optimized-Formula-for-Alpha-Blending-Pixels.htm
 
 */
-void viewManager::Visualizer::platform::drawText(std::string sTextFace,
-                                                 int pointSize, std::string s,
-                                                 unsigned int foregroundColor) {
+void viewManager::Visualizer::platform::drawText(
+    const std::string &sTextFace, const int pointSize, const std::string &s,
+    const unsigned int foregroundColor) {
   unsigned int color = 0x00; // computed color
   int x, y;
   bool bProcessedOnce = false;
@@ -3396,7 +3432,17 @@ void viewManager::Visualizer::platform::drawText(std::string sTextFace,
   }
 }
 /**
+\internal
+\brief the function draws the cursor.
+*/
+void viewManager::Visualizer::platform::drawCaret(const int x, const int y, const int h) {
+  for(int j=y;j<y+h;j++)
+    putPixel(x,j,0x00);
+}
 
+/**
+\internal
+\brief the function clears the dirty rectangles of the off screen buffer.
 */
 void viewManager::Visualizer::platform::clear(void) {
   fill(m_offscreenBuffer.begin(), m_offscreenBuffer.end(), 0xFF);
@@ -3412,8 +3458,8 @@ void viewManager::Visualizer::platform::clear(void) {
 \param unsigned int color - the bgra color value
 
 */
-void viewManager::Visualizer::platform::putPixel(int x, int y,
-                                                 unsigned int color) {
+void viewManager::Visualizer::platform::putPixel(const int x, const int y,
+                                                 const unsigned int color) {
   if (x < 0 || y < 0)
     return;
 
@@ -3436,7 +3482,8 @@ void viewManager::Visualizer::platform::putPixel(int x, int y,
 point of the pixel \param unsigned int color - the bgra color value
 
 */
-unsigned int viewManager::Visualizer::platform::getPixel(int x, int y) {
+unsigned int viewManager::Visualizer::platform::getPixel(const int x,
+                                                         const int y) {
   // clip coordinates
   if (x < 0 || y < 0)
     return 0;
@@ -3457,7 +3504,7 @@ unsigned int viewManager::Visualizer::platform::getPixel(int x, int y) {
 \brief The function provides the reallocation of the offscreen buffer
 
 */
-void viewManager::Visualizer::platform::resize(int w, int h) {
+void viewManager::Visualizer::platform::resize(const int w, const int h) {
 
   _w = w;
   _h = h;
@@ -3499,7 +3546,7 @@ void viewManager::Visualizer::platform::resize(int w, int h) {
 
   int _bufferSize = _w * _h * 4;
 
-  if(m_offscreenBuffer.size()<_bufferSize)
+  if (m_offscreenBuffer.size() < _bufferSize)
     m_offscreenBuffer.resize(_bufferSize);
 
   // clear to white
@@ -3515,7 +3562,7 @@ void viewManager::Visualizer::platform::resize(int w, int h) {
   _h = rc.bottom - rc.top;
 
   int _bufferSize = _w * _h * 4;
-  if(m_offscreenBuffer.size()<_bufferSize)
+  if (m_offscreenBuffer.size() < _bufferSize)
     m_offscreenBuffer.resize(_bufferSize);
 
   // clear to white
@@ -3538,10 +3585,7 @@ void viewManager::Visualizer::platform::resize(int w, int h) {
 #endif
 }
 
-bool viewManager::Visualizer::platform::filled() {
-  return m_ypos>_h;
-
-}
+bool viewManager::Visualizer::platform::filled() { return m_ypos > _h; }
 
 /**
 \brief The function copies the pixel buffer to the screen

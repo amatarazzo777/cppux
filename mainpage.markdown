@@ -49,7 +49,7 @@ libraries must be linked:
 
 Linux
 -----
-To compile programs for linux, the stdc++, m, xcb, xcb-image 
+To compile programs for linux, the stdc++, m, x11-xcb, xcb-image 
 xcb-keysyms, freetype2, and fontconfig libraries must be linked. 
 An example of the makefile is listed below.
 
@@ -57,8 +57,8 @@ An example of the makefile is listed below.
 #CC=clang
 CC=g++
 CFLAGS=-std=c++17 -Os
-INCLUDES=-I/projects/guidom `pkg-config --cflags freetype2 fontconfig`
-LFLAGS=`pkg-config --libs freetype2 xcb-image fontconfig`
+INCLUDES=-I/projects/guidom `pkg-config --cflags x11-xcb freetype2 fontconfig`
+LFLAGS=`pkg-config --libs x11-xcb freetype2 xcb-image fontconfig`
 
 debug: CFLAGS += -g
 debug: guidom.out
@@ -68,16 +68,15 @@ release: guidom.out
 
 
 guidom.out: main.o viewManager.o
-	$(CC) -o guidom.out main.o viewManager.o -lstdc++ -lm -lxcb -lxcb-keysyms $(LFLAGS) 
+        $(CC) -o guidom.out main.o viewManager.o -lstdc++ -lm -lxcb-keysyms $(LFLAGS) 
 main.o: main.cpp viewManager.hpp
-	$(CC) $(CFLAGS) $(INCLUDES) -c main.cpp -o main.o
+        $(CC) $(CFLAGS) $(INCLUDES) -c main.cpp -o main.o
 
 viewManager.o: viewManager.cpp viewManager.hpp
-	$(CC) $(CFLAGS) $(INCLUDES) -c viewManager.cpp -o viewManager.o
+        $(CC) $(CFLAGS) $(INCLUDES) -c viewManager.cpp -o viewManager.o
 
 clean:
-	rm *.o *.out
-
+        rm *.o *.out
 \endcode	
 
 Examples
