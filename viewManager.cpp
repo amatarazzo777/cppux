@@ -2861,7 +2861,7 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
   } break;
   case WM_KEYUP: {
     UINT scandCode = (lParam >> 8) & 0xFFFFFF00;
-    platformInstance->dispatchEvent(event{eventType::keydown,(unsigned int) wParam});
+    platformInstance->dispatchEvent(event{eventType::keyup,(unsigned int) wParam});
     handled = true;
   } break;
   case WM_CHAR: {
