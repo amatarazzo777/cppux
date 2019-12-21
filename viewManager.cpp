@@ -571,6 +571,48 @@ viewManager::doubleNF::doubleNF(const string &sOption) {
 }
 
 /**
+\brief The routine convert from the stored unit to pixel values. This is a
+simple convertion using the ratio 1_em = 16px;
+*/
+double viewManager::doubleNF::toPx(void) {
+  double dRet = 0.0;
+  switch (option) {
+  case numericFormat::em:
+    dRet = 16.0 * value;
+    break;
+  case numericFormat::pt:
+    dRet = 1.333 * value;
+    break;
+  case numericFormat::px:
+    dRet = value;
+    break;
+  }
+
+  return dRet;
+}
+
+/**
+\brief The routine convert from the stored unit to point values. This is a
+simple convertion using the ratio 1_em = 16px;
+*/
+double viewManager::doubleNF::toPt(void) {
+  double dRet = 0.0;
+  switch (option) {
+  case numericFormat::em:
+    dRet = value * 16.0 * .75;
+    break;
+  case numericFormat::pt:
+    dRet = value;
+    break;
+  case numericFormat::px:
+    dRet = value * .75;
+    break;
+  }
+
+  return dRet;
+  return dRet;
+}
+/**
 \internal
 \brief  a function that returns a tuple of the four coordinates specified in a
 doubleNF object. this routine is used by the attributes that accept four at a
@@ -883,13 +925,7 @@ object.
 viewManager::Viewer::Viewer(const vector<any> &attrs)
     : Element("Viewer", attrs) {
   setAttribute(indexBy{"_root"});
-  eventHandler ev =
-      std::bind(&Viewer::dispatchEvent, this, std::placeholders::_1);
-  m_device = std::make_unique<Visualizer::platform>(
-      ev, getAttribute<objectWidth>().value,
-      getAttribute<objectHeight>().value);
-  getAttribute<windowTitle>().value;
-  m_device->openWindow(getAttribute<windowTitle>().value);
+
   documentState st;
   st.focusField = this;
   setAttribute<documentState>(st);
@@ -902,27 +938,439 @@ viewManager::Viewer::Viewer(const vector<any> &attrs)
 viewManager::Viewer::~Viewer() {}
 
 /**
-\internal
-\brief main entry point for the rendering subsystem. The head of
-the recursive process.
+  \internal
+  \brief The function is a recursive one that calculates the
+  items that could not be resolved previously. At the completetion
+  of this functionality, all items that appear within the viewport
+  should be calculated.
+
 */
-void viewManager::Viewer::recursiveRender(Element &e) {
-  if (m_device->filled())
-    return;
+void viewManager::Viewer::recursiveComputeLayout(Element &e) {
+  doubleNF numeric = doubleNF(0_px);
+  // the logic skips the calculation if it has already been
+  // performed. Also because of the walking order, object parents
+  // will already be resolved.
+  if (!e.displayList.completed()) {
 
-  e.render(*m_device.get());
+    // dereference for ease of syntax
+    displayListItem &listEntry = e.displayList;
+    Element &eParent = (*e.parent()).get();
 
-  for (auto &n : e.children()) {
-    recursiveRender(n);
+    if (!listEntry.bCalculatedLeft) {
+      if (listEntry.bAutoCalculateLeft) {
+        listEntry.x1 = m_layoutPenX;
+        listEntry.x1_nf = numericFormat::px;
+        listEntry.bCalculatedLeft = true;
+        listEntry.bAutoCalculateLeft = false;
+      } else if (listEntry.x1_nf == numericFormat::percent) {
+        listEntry.x1 =
+            m_layoutPenX + (eParent.displayList.oh * (listEntry.x1 / 100));
+        listEntry.x1_nf = numericFormat::px;
+        listEntry.bCalculatedLeft = true;
+        listEntry.bAutoCalculateLeft = false;
+      } else {
+        numeric = doubleNF(listEntry.x1, listEntry.x1_nf);
+        listEntry.x1 = numeric.toPx();
+        listEntry.x1_nf = numericFormat::px;
+        listEntry.bCalculatedLeft = true;
+        listEntry.bAutoCalculateLeft = false;
+      }
+    }
+    if (!listEntry.bCalculatedTop) {
+      if (listEntry.bAutoCalculateTop) {
+        listEntry.y1 = m_layoutPenY;
+        listEntry.y1_nf = numericFormat::px;
+        listEntry.bCalculatedTop = true;
+        listEntry.bAutoCalculateTop = false;
+
+      } else if (listEntry.y1_nf == numericFormat::percent) {
+        listEntry.y1 =
+            m_layoutPenY + (eParent.displayList.oh * (listEntry.y1 / 100));
+        listEntry.y1_nf = numericFormat::px;
+        listEntry.bCalculatedTop = true;
+        listEntry.bAutoCalculateTop = false;
+      } else {
+        numeric = doubleNF(listEntry.x1, listEntry.x1_nf);
+        listEntry.y1 = numeric.toPx();
+        listEntry.y1_nf = numericFormat::px;
+        listEntry.bCalculatedTop = true;
+        listEntry.bAutoCalculateTop = false;
+      }
+    }
+
+    if (!listEntry.bCalculatedRight) {
+      if (listEntry.bAutoCalculateRight) {
+        // get with of the text lines, the max size
+        // m_device->measureTextWidth(e.data()[0]);
+        if (listEntry.disp == display::in_line) {
+          
+          listEntry.x2 = m_layoutPenX + 100;
+
+        } else {
+          listEntry.x2 = eParent.displayList.x2;
+        }
+        listEntry.bCalculatedRight = true;
+        listEntry.bAutoCalculateRight = false;
+      } else if (listEntry.ow_nf == numericFormat::percent) {
+        listEntry.ow = ((eParent.displayList.ow) * (listEntry.ow / 100));
+        listEntry.ow_nf = numericFormat::px;
+        listEntry.x2 = m_layoutPenX + listEntry.ow;
+        listEntry.bCalculatedRight = true;
+        listEntry.bAutoCalculateRight = false;
+      } else {
+        numeric = doubleNF(listEntry.ow, listEntry.ow_nf);
+        listEntry.x2 = numeric.toPx();
+        listEntry.ow_nf = numericFormat::px;
+        listEntry.bCalculatedRight = true;
+        listEntry.bAutoCalculateRight = false;
+      }
+    }
+
+    if (!listEntry.bCalculatedBottom) {
+      if (listEntry.bAutoCalculateBottom) {
+        // get with of the text lines, the max size
+        // m_device->measureTextWidth(e.data()[0]);
+        listEntry.oh = 50;
+        listEntry.oh_nf = numericFormat::px;
+        listEntry.y2 = listEntry.y1 + listEntry.oh + 50;
+        listEntry.bCalculatedBottom = true;
+        listEntry.bAutoCalculateBottom = false;
+      } else if (listEntry.oh_nf == numericFormat::percent) {
+        listEntry.oh = (eParent.displayList.oh * (listEntry.y2 / 100));
+        listEntry.oh_nf = numericFormat::px;
+        listEntry.y2 = m_layoutPenY + listEntry.oh;
+        listEntry.bCalculatedBottom = true;
+        listEntry.bAutoCalculateBottom = false;
+      } else {
+        numeric = doubleNF(listEntry.oh, listEntry.oh_nf);
+        listEntry.y2 = numeric.toPx();
+        listEntry.bCalculatedBottom = true;
+        listEntry.bAutoCalculateBottom = false;
+      }
+    }
+
+    // advance the pen based upon the display mode
+    if (listEntry.disp == display::in_line) {
+      m_layoutPenX = listEntry.x2;
+      m_layoutPenY = listEntry.y1;
+    } else if (listEntry.disp == display::block) {
+      m_layoutPenX = eParent.displayList.x1;
+      m_layoutPenY = listEntry.y2;
+    }
   }
+  for (auto &n : e.children())
+    recursiveComputeLayout(n);
 }
+
+/**
+\brief The routine processes the list of element such that the layout
+and units are all expressed within the model as pixel units. After this
+function is ran, each element will have a rectangle attached that expresses
+it pixel size on the viewing device.
+*/
+void viewManager::Viewer::computeLayout(Element &e) {
+  m_layoutPenX = 0;
+  m_layoutPenY = 0;
+
+  // clear the display list.
+  m_displayList.erase(m_displayList.begin(), m_displayList.end());
+
+  // ensure word break indexing are performed for
+  // knowing where to wrap textual data.
+  for (auto &ptr : elements) {
+    Element &e = *(ptr.second.get());
+    e.wordBreaks();
+  }
+
+  /*
+   This loop establishes all items that will be involved within the
+   display of elements. The first process resolves all
+   calculations without dependencies than can be found.
+
+   A particually area of interest is exception handling that occurrs.
+   As the resuolt, items and options are set to default, however preserving
+   the unstored state within the attribute list. The display list has the
+   defaults set.
+  */
+  for (auto &ptr : elements) {
+    // store local reference for ease of syntax
+    Element &e = *(ptr.second.get());
+
+    displayListItem &listEntry = e.displayList;
+
+    // items that are not displayed are not included in the list
+    try {
+      if (e.getAttribute<display>().value == display::optionEnum::none)
+        continue;
+    } catch (std::exception e) {
+    }
+
+    // initialize base structure with defualts or the information from the
+    // class object needed for display
+    listEntry.bCalculatedTop = false;
+    listEntry.bCalculatedLeft = false;
+    listEntry.bCalculatedBottom = false;
+    listEntry.bCalculatedRight = false;
+    listEntry.bCalculatedWidth = false;
+    listEntry.bCalculatedHeight = false;
+    listEntry.bAutoCalculateTop = false;
+    listEntry.bAutoCalculateLeft = false;
+    listEntry.bAutoCalculateBottom = false;
+    listEntry.bAutoCalculateRight = false;
+    listEntry.bAutoCalculateWidth = false;
+    listEntry.bAutoCalculateHeight = false;
+
+    listEntry.x1 = 0;
+    listEntry.y1 = 0;
+    listEntry.x2 = 0;
+    listEntry.y2 = 0;
+    listEntry.ow = 0;
+    listEntry.oh = 0;
+
+    try {
+      listEntry.disp = e.getAttribute<display>().value;
+    } catch (std::exception e) {
+      listEntry.disp = display::in_line;
+    }
+    try {
+      listEntry.pos = e.getAttribute<position>().value;
+    } catch (std::exception e) {
+      listEntry.pos = position::relative;
+    }
+    try {
+      listEntry.zIndex = e.getAttribute<zIndex>().value;
+    } catch (std::exception e) {
+      listEntry.zIndex = 0;
+    }
+
+    listEntry.ptr = ptr.second.get();
+
+    // the numeric value is used to hold the class while reading information
+    doubleNF numeric = doubleNF(0_px);
+
+    /* if items are absolute, they can be calculated
+     absolute position items must have the coordinates expressed
+     in numerical values, not percentages.
+     resoluve on measurements that can be converted or calculated.
+     At times the developer using the library may choose to have absolute
+     positioning however let the system calculate the defaults or the terms
+     might be expressed in a percentage.
+    */
+    if (listEntry.pos == position::absolute) {
+      try {
+        numeric = e.getAttribute<objectLeft>();
+        if (numeric.option != numericFormat::percent ||
+            numeric.option != numericFormat::autoCalculate) {
+          listEntry.x1 = numeric.value;
+          listEntry.x1_nf = numeric.option;
+
+        } else {
+          listEntry.x1 = numeric.toPx();
+          listEntry.x1_nf = numeric.option;
+          listEntry.bCalculatedLeft = true;
+        }
+      } catch (std::exception e) {
+        listEntry.x1_nf = numericFormat::autoCalculate;
+        listEntry.bAutoCalculateLeft = true;
+      }
+
+      try {
+        numeric = e.getAttribute<objectTop>();
+        if (numeric.option == numericFormat::percent ||
+            numeric.option == numericFormat::autoCalculate) {
+          listEntry.y1 = numeric.value;
+          listEntry.y1_nf = numeric.option;
+        } else {
+          listEntry.y1 = numeric.toPx();
+          listEntry.y1_nf = numeric.option;
+          listEntry.bCalculatedTop = true;
+        }
+      } catch (std::exception e) {
+        listEntry.y1_nf = numericFormat::autoCalculate;
+        listEntry.bAutoCalculateTop = true;
+      }
+    }
+
+    /*
+    These series of tests performs the logic of calculation when the value
+    can be determine without other dependency. If the item is not found
+    within the structure or if its option is set to auto calculate, the auto
+    calculate option is turned on within the display list structure.
+    */
+
+    /** X1 object left */
+    if (!listEntry.bCalculatedLeft) {
+      try {
+        numeric = e.getAttribute<objectLeft>();
+        listEntry.x1_nf = numeric.option;
+        if (numeric.option == numericFormat::autoCalculate)
+          listEntry.bAutoCalculateLeft = true;
+        else if (numeric.option == numericFormat::percent) {
+          listEntry.x1 = numeric.value;
+          listEntry.x1_nf = numeric.option;
+
+        } else {
+          listEntry.x1 = numeric.toPx();
+          listEntry.x1_nf = numericFormat::px;
+          listEntry.bCalculatedLeft = true;
+        }
+
+      } catch (std::exception e) {
+        listEntry.x1_nf = numericFormat::autoCalculate;
+        listEntry.bAutoCalculateLeft = true;
+      }
+    }
+
+    /** Y1 object top */
+    if (!listEntry.bCalculatedTop) {
+      try {
+        numeric = e.getAttribute<objectTop>();
+        listEntry.y1_nf = numeric.option;
+
+        if (numeric.option == numericFormat::autoCalculate)
+          listEntry.bAutoCalculateTop = true;
+        if (numeric.option == numericFormat::percent) {
+          listEntry.y1 = numeric.value;
+          listEntry.y1_nf = numeric.option;
+
+        } else {
+          listEntry.y1 = numeric.toPx();
+          listEntry.y1_nf = numericFormat::px;
+          listEntry.bCalculatedTop = true;
+        }
+
+      } catch (std::exception e) {
+        listEntry.y1_nf = numericFormat::autoCalculate;
+        listEntry.bAutoCalculateTop = true;
+      }
+    }
+
+    /** object width */
+    try {
+      numeric = e.getAttribute<objectWidth>();
+      listEntry.ow_nf = numeric.option;
+      if (numeric.option == numericFormat::autoCalculate) {
+        listEntry.bAutoCalculateRight = true;
+        listEntry.bAutoCalculateWidth = true;
+      } else if (numeric.option == numericFormat::percent) {
+        listEntry.ow = numeric.value;
+        listEntry.ow_nf = numeric.option;
+      } else {
+        listEntry.ow = numeric.toPx();
+        listEntry.ow_nf = numericFormat::px;
+        // if the width is less than zero, it will
+        // not be visible, so do not include it
+        if (listEntry.ow <= 0.0)
+          continue;
+        listEntry.bCalculatedWidth = true;
+      }
+    } catch (std::exception e) {
+      listEntry.ow_nf = numericFormat::autoCalculate;
+      listEntry.bAutoCalculateRight = true;
+      listEntry.bAutoCalculateWidth = true;
+    }
+
+    /** object height */
+    try {
+      numeric = e.getAttribute<objectHeight>();
+      listEntry.oh_nf = numeric.option;
+      if (numeric.option == numericFormat::autoCalculate) {
+        listEntry.bAutoCalculateBottom = true;
+        listEntry.bAutoCalculateHeight = true;
+
+      } else if (numeric.option == numericFormat::percent) {
+        listEntry.oh = numeric.value;
+        listEntry.oh_nf = numeric.option;
+      } else {
+        listEntry.oh = numeric.toPx();
+        listEntry.oh_nf = numericFormat::px;
+        // if the height is less than zero,
+        // it will not be visible, so do not include it
+        if (listEntry.oh <= 0.0)
+          continue;
+        listEntry.bCalculatedHeight = true;
+      }
+    } catch (std::exception e) {
+      listEntry.oh_nf = numericFormat::autoCalculate;
+      listEntry.bAutoCalculateBottom = true;
+      listEntry.bAutoCalculateHeight = true;
+    }
+
+    // if the preceeding operations were resolved to find the widths or
+    // heights and the top or left coordinates are also known, the bottom
+    // may be found as well.
+    if (listEntry.bCalculatedLeft && listEntry.bCalculatedWidth) {
+      listEntry.x2 = listEntry.x1 + listEntry.ow;
+      listEntry.bCalculatedRight = true;
+      listEntry.bAutoCalculateRight = false;
+      listEntry.bAutoCalculateWidth = false;
+    }
+
+    if (listEntry.bCalculatedTop && listEntry.bCalculatedHeight) {
+      listEntry.y2 = listEntry.y1 + listEntry.oh;
+      listEntry.bCalculatedBottom = true;
+      listEntry.bAutoCalculateHeight = false;
+      listEntry.bAutoCalculateBottom = false;
+    }
+
+  // add the item to the list and set the index.
+  // this stores the direct link to the calculation record
+  // within the vector.
+  listInsertion:
+    m_displayList.push_back(&e.displayList);
+  }
+
+  /*
+  The second phase walks the document object model to resolve uncalculated
+  items that are relative, or percentage based that require the parent
+  to be calculated first. With respect to the priming rectangle, the
+  document viewer object or _root is established by the _w and _h
+  properties. These values are directly linked to the window size.
+  These values are placed into the object here since they can be
+  calculated directly.
+  */
+  Viewer &eRoot = getElement<Viewer>("_root");
+  eRoot.displayList.bAutoCalculateTop = false;
+  eRoot.displayList.bAutoCalculateLeft = false;
+  eRoot.displayList.bAutoCalculateBottom = false;
+  eRoot.displayList.bAutoCalculateRight = false;
+  eRoot.displayList.bAutoCalculateWidth = false;
+  eRoot.displayList.bAutoCalculateHeight = false;
+
+  eRoot.displayList.bCalculatedLeft = true;
+  eRoot.displayList.x1 = 0;
+  eRoot.displayList.bCalculatedTop = true;
+  eRoot.displayList.y1 = 0;
+  eRoot.displayList.bCalculatedRight = true;
+  eRoot.displayList.x2 = eRoot.getAttribute<objectWidth>().toPx();
+  eRoot.displayList.bCalculatedBottom = true;
+  eRoot.displayList.y2 = eRoot.getAttribute<objectHeight>().toPx();
+
+  // recursively wlak the document and calculate layout.
+  recursiveComputeLayout(eRoot);
+
+  // sort the displayList by left, top, and zOrder
+  sort(m_displayList.begin(), m_displayList.end(),
+       [](displayListItem *a, displayListItem *b) {
+         return a->x1 < b->x1 && a->y1 < b->y1 && a->zIndex < b->zIndex;
+       });
+}
+
 
 /**
 \internal
 \brief main entry point for the rendering subsystem. The head of
 the recursive process.
 */
-void viewManager::Viewer::render(void) { recursiveRender(*this); }
+void viewManager::Viewer::render(void) {
+  computeLayout(*this);
+
+  /* the display list is a sorted entity providing a searchable list
+  for the beginning and ending of a viewport clipping region. */
+  for (auto n : m_displayList) {
+    n->ptr->render(*m_device.get());
+  }
+}
 
 /**
 \internal
@@ -945,6 +1393,10 @@ void viewManager::Viewer::dispatchEvent(const event &evt) {
     m_device->flip();
     break;
   case eventType::resize:
+    setAttribute<objectWidth>(
+        {static_cast<double>(evt.width), numericFormat::px});
+    setAttribute<objectHeight>(
+        {static_cast<double>(evt.height), numericFormat::px});
     m_device->resize(evt.width, evt.height);
     break;
   case eventType::keydown: {
@@ -1006,19 +1458,27 @@ buffer. while on windows the direct x library is used in combination
 with windows message queue processing.
 */
 void viewManager::Viewer::processEvents(void) {
-  render();
-  m_device->flip();
+  // setup the event dispatcher
+  eventHandler ev =
+      std::bind(&Viewer::dispatchEvent, this, std::placeholders::_1);
+  m_device = std::make_unique<Visualizer::platform>(
+      ev, getAttribute<objectWidth>().value,
+      getAttribute<objectHeight>().value);
+
+  m_device->openWindow(getAttribute<windowTitle>().value);
+
   m_device->messageLoop();
 }
 
 /**
 \addtogroup udl User Defined Literals
 
-User defined liters are created for the project to consolidate parameter input.
+User defined liters are created for the project to consolidate parameter
+input.
 
 When more information would be required in a C++ constructor creation, the
-syntax provides the returning of the numerical format object in an easy to read
-syntax,
+syntax provides the returning of the numerical format object in an easy to
+read syntax,
 
 For example:
     getElement("testDiv").setAttribute<objectTop>(10_px);
@@ -1030,24 +1490,24 @@ rather than
 */
 
 /**
-\brief enables labeling numeric literals as _pt. The operator returns a doubleNF
-object.
+\brief enables labeling numeric literals as _pt. The operator returns a
+doubleNF object.
 */
 auto viewManager::operator""_pt(unsigned long long int value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::pt};
 }
 
 /**
-\brief enables labeling numeric literals as _pt. The operator returns a doubleNF
-object.
+\brief enables labeling numeric literals as _pt. The operator returns a
+doubleNF object.
 */
 auto viewManager::operator""_pt(long double value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::pt};
 }
 
 /**
-\brief enables labeling numeric literals as _em. The operator returns a doubleNF
-object.
+\brief enables labeling numeric literals as _em. The operator returns a
+doubleNF object.
 */
 auto viewManager::operator""_em(unsigned long long int value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::em};
@@ -1062,16 +1522,16 @@ auto viewManager::operator""_em(long double value) -> doubleNF {
 }
 
 /**
-\brief enables labeling numeric literals as _px. The operator returns a doubleNF
-object.
+\brief enables labeling numeric literals as _px. The operator returns a
+doubleNF object.
 */
 auto viewManager::operator""_px(unsigned long long int value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::px};
 }
 
 /**
-\brief enables labeling numeric literals as _px. The operator returns a doubleNF
-object.
+\brief enables labeling numeric literals as _px. The operator returns a
+doubleNF object.
 */
 auto viewManager::operator""_px(long double value) -> doubleNF {
   return doubleNF{static_cast<double>(value), numericFormat::px};
@@ -1466,9 +1926,9 @@ auto viewManager::Element::append(ElementList &elementCollection) -> Element & {
 /**
 \brief The function sets the given attribute inside the elements indexed
 map. Settings are filtered on specific types to determine if it is a true
-attribute or one that is filtered to be a compound. Compound attributes require
-other operations such as data insertion into the data property or using an
-official attribute object where only an enumeration value is given.
+attribute or one that is filtered to be a compound. Compound attributes
+require other operations such as data insertion into the data property or
+using an official attribute object where only an enumeration value is given.
 
 \param
 setting an attribute.
@@ -1494,8 +1954,9 @@ Example
 \snippet examples.cpp setAttribute_base
 
 */
-Element &viewManager::Element::setAttribute(const std::any &setting) {
+Element &viewManager::Element::setAttribute(const std::any &paramSetting) {
 
+  std::any setting = paramSetting;
   /**
   \internal
   \enum _enumTypeFilter
@@ -1515,6 +1976,11 @@ Element &viewManager::Element::setAttribute(const std::any &setting) {
     dt_vector_vector_string,
     dt_vector_pair_int_string,
     dt_indexBy,
+    dt_display_enum,
+    dt_position_enum,
+    dt_textAlignment_enum,
+    dt_borderStyle_enum,
+    dt_listStyleType_enum,
 
     dt_nonFiltered
   };
@@ -1541,7 +2007,19 @@ Element &viewManager::Element::setAttribute(const std::any &setting) {
            typeid(std::vector<std::vector<std::pair<int, std::string>>>))
            .hash_code(),
        dt_vector_pair_int_string},
-      {std::type_index(typeid(indexBy)).hash_code(), dt_indexBy}};
+      {std::type_index(typeid(indexBy)).hash_code(), dt_indexBy},
+      {std::type_index(typeid(display::optionEnum)).hash_code(),
+       dt_display_enum},
+      {std::type_index(typeid(position::optionEnum)).hash_code(),
+       dt_position_enum},
+      {std::type_index(typeid(textAlignment::optionEnum)).hash_code(),
+       dt_textAlignment_enum},
+      {std::type_index(typeid(borderStyle::optionEnum)).hash_code(),
+       dt_borderStyle_enum},
+      {std::type_index(typeid(listStyleType::optionEnum)).hash_code(),
+       dt_listStyleType_enum}
+
+  };
   // set search result defaults for not found in filter
   _enumTypeFilter dtFilter = dt_nonFiltered;
   bool bSaveInMap = false;
@@ -1609,6 +2087,28 @@ Element &viewManager::Element::setAttribute(const std::any &setting) {
   // attributes stored in map but filtered for processing.
   case dt_indexBy: {
     updateIndexBy(std::any_cast<indexBy>(setting));
+    bSaveInMap = true;
+  } break;
+  case dt_display_enum: {
+    setting = display{std::any_cast<display::optionEnum>(paramSetting)};
+    bSaveInMap = true;
+  } break;
+  case dt_position_enum: {
+    setting = position{std::any_cast<position::optionEnum>(paramSetting)};
+    bSaveInMap = true;
+  } break;
+  case dt_textAlignment_enum: {
+    setting =
+        textAlignment{std::any_cast<textAlignment::optionEnum>(paramSetting)};
+    bSaveInMap = true;
+  } break;
+  case dt_borderStyle_enum: {
+    setting = borderStyle{std::any_cast<borderStyle::optionEnum>(paramSetting)};
+    bSaveInMap = true;
+  } break;
+  case dt_listStyleType_enum: {
+    setting =
+        listStyleType{std::any_cast<listStyleType::optionEnum>(paramSetting)};
     bSaveInMap = true;
   } break;
 
@@ -1681,8 +2181,8 @@ void viewManager::Element::updateIndexBy(const indexBy &setting) {
 
 /**
 \brief inserts the given element before the named second parameter.
-The version of the function is useful when the element is indexed by a string
-and a reference to it does not exist.
+The version of the function is useful when the element is indexed by a
+string and a reference to it does not exist.
 
 \param Element &newChild
 
@@ -1731,8 +2231,8 @@ auto viewManager::Element::insertBefore(Element &newChild,
 
 /**
 \brief inserts the given element after the named second parameter element.
-The version of the function is useful when the element is indexed by a string
-and a reference to it does not exist.
+The version of the function is useful when the element is indexed by a
+string and a reference to it does not exist.
 
 \param Element &newChild
 
@@ -1780,10 +2280,10 @@ auto viewManager::Element::insertAfter(Element &newChild,
 
 /**
 \brief replaces the child with the new one specified.
-\details The function replaces the reference child with the new one selected.
-The ne child should be within the first parameter while the second parameter
-should contain an existing child. When the oldChild is replaced, it is removed
-from the indexBy list and its memory is freed.
+\details The function replaces the reference child with the new one
+selected. The ne child should be within the first parameter while the second
+parameter should contain an existing child. When the oldChild is replaced,
+it is removed from the indexBy list and its memory is freed.
 
 \param Element& newChild a newly created child.
 \param std::string& sID an existing child that is to be replaced.
@@ -1799,10 +2299,10 @@ auto viewManager::Element::replaceChild(Element &newChild, std::string &sID)
 
 /**
 \brief replaces the child with the new one specified.
-\details The function replaces the reference child with the new one selected.
-The new child should be within the first parameter while the second parameter
-should contain an existing child. When the oldChild is replaced, it is removed
-from the indexBy list and its memory is freed.
+\details The function replaces the reference child with the new one
+selected. The new child should be within the first parameter while the
+second parameter should contain an existing child. When the oldChild is
+replaced, it is removed from the indexBy list and its memory is freed.
 
 \param Element& newChild a newly created child.
 \param Element& oldChild an existing child that is to be replaced.
@@ -1849,8 +2349,8 @@ auto viewManager::Element::replaceChild(Element &newChild, Element &oldChild)
 \brief moves the element to the specified location.
 \details The method provides a shortened call to move both coordinates
 at the same time. The objectTop and objectLeft are set. The method accepts
-numerical values and only sets the value of the attribute. It does not change
-the numerical format of the underlying attribute values.
+numerical values and only sets the value of the attribute. It does not
+change the numerical format of the underlying attribute values.
 
 Example
 -------
@@ -1865,9 +2365,9 @@ auto viewManager::Element::move(const double t, const double l) -> Element & {
 /**
 \brief resizes the element
 \details The method provides a shortened call to resize an element.
-The objectWidth and objectHeight are set at the same time. The method accepts
-numerical values and only sets the value of the attribute. It does not change
-the numerical format of the underlying attribute values.
+The objectWidth and objectHeight are set at the same time. The method
+accepts numerical values and only sets the value of the attribute. It does
+not change the numerical format of the underlying attribute values.
 
 Example
 -------
@@ -1885,8 +2385,8 @@ associated.
 
 \details The remove method provides an easy method to delete an
 object from the document hierarchy. The method does not provide continuation
-syntax as after the call is complete, all memory associated with the object will
-be freed. The indexBy list is also modified to update the change.
+syntax as after the call is complete, all memory associated with the object
+will be freed. The indexBy list is also modified to update the change.
 
 Example
 -------
@@ -1930,12 +2430,13 @@ void viewManager::Element::remove(void) {
 \param std::string& isID is an existing child of the referenced element to
 remove.
 
-\details The removeChild destroys an existing child element of a document tree.
-After the function completes, all associated reference within the system will be
-discontinued. This includes the smart pointer and the indexBy list.
+\details The removeChild destroys an existing child element of a document
+tree. After the function completes, all associated reference within the
+system will be discontinued. This includes the smart pointer and the indexBy
+list.
 
-\exception std::invalid_argument may be thrown if the element is not found by
-the given id or the referenced element is not a child.
+\exception std::invalid_argument may be thrown if the element is not found
+by the given id or the referenced element is not a child.
 
 Example
 -------
@@ -1950,12 +2451,13 @@ auto viewManager::Element::removeChild(std::string &sID) -> Element & {
 \param Element& oldChild is an existing child of the referenced element to
 remove.
 
-\details The removeChild destroys an existing child element of a document tree.
-After the function completes, all associated reference within the system will be
-discontinued. This includes the smart pointer and the indexBy list.
+\details The removeChild destroys an existing child element of a document
+tree. After the function completes, all associated reference within the
+system will be discontinued. This includes the smart pointer and the indexBy
+list.
 
-\exception std::invalid_argument may be thrown if the element is not a child.
-Example
+\exception std::invalid_argument may be thrown if the element is not a
+child. Example
 -------
 \snippet examples.cpp removeChild
 */
@@ -2009,9 +2511,9 @@ auto viewManager::Element::removeChild(Element &oldChild) -> Element & {
 \brief removes all children from the document tree associated with the given
 element and free the memory.
 \details The removeChild is a bulk operation function in which all
-child document elements of the referenced element is freed. After the function
-completes, all associated references will not longer be tracked within the
-system.
+child document elements of the referenced element is freed. After the
+function completes, all associated references will not longer be tracked
+within the system.
 
 Example
 -------
@@ -2117,8 +2619,8 @@ size_t getAddress(std::function<T(U...)> f) {
 /**
 \brief adds a new event handler to the element.
 \param eventType - the type of event to associate the handler with.
-\param eventHandler - the std::function to invoke when the event occurs within
-the system.
+\param eventHandler - the std::function to invoke when the event occurs
+within the system.
 
 \details The addListener function provides an method for attaching
 an event handler with a event of the referenced element. The
@@ -2142,8 +2644,8 @@ auto viewManager::Element::addListener(eventType evtType,
 /**
 
 \brief The function is invoked when an event occurrs. Normally this occurs
-from the platform device. However, this may be invoked by the soft generation of
-events.
+from the platform device. However, this may be invoked by the soft
+generation of events.
 
 */
 void viewManager::Element::dispatch(const event &e) {
@@ -2181,6 +2683,49 @@ auto viewManager::Element::removeListener(eventType evtType,
 
 /**
 \internal
+\brief The function provides the calculation of all word break by
+recording the index of spaces. This is used by the layout system
+to determine where to wrap text based upon the font metrics. The
+routine stores the results in an unordered_map indexed by the typeid.
+A vector of std::size_t notes the index position within the string
+where the space is.
+*/
+void viewManager::Element::wordBreaks(void) {
+  stringstream ss;
+  // -- optimizations can be made here
+  // caching the stream
+  // caching the word breaks.
+  for (auto m : m_usageAdaptorMap) {
+    if (m.first == typeid(std::vector<std::string>)) {
+      auto &o = std::any_cast<usageAdaptor<std::string> &>(m.second);
+      ss << o.textData();
+    } else if (m.first == typeid(std::vector<double>)) {
+      auto &o = std::any_cast<usageAdaptor<double> &>(m.second);
+      ss << o.textData();
+    } else if (m.first == typeid(std::vector<float>)) {
+      auto &o = std::any_cast<usageAdaptor<float> &>(m.second);
+      ss << o.textData();
+    } else if (m.first == typeid(std::vector<int>)) {
+      auto &o = std::any_cast<usageAdaptor<int> &>(m.second);
+      ss << o.textData();
+    }
+  }
+  // find all word breaks within the string
+  string sText = ss.str();
+  m_wordBreaks.erase(m_wordBreaks.begin(), m_wordBreaks.end());
+  if (sText.size() == 0)
+    return;
+  vector<std::size_t> positions;
+  std::size_t pos = sText.find_first_of(" \n\t");
+  while (pos != sText.npos) {
+    positions.push_back(pos);
+    pos = sText.find_first_of(" \n\t", pos + 1);
+  }
+  m_wordBreaks = positions;
+}
+
+/**
+\internal
 \brief This is the main function which invokes drawing of the item and
 its children. It is called recursively when painting needs to occur.
 This function is used internally and is not necessary to invoke. That
@@ -2213,18 +2758,19 @@ void viewManager::Element::render(Visualizer::platform &device) {
   string sTextFace;
   int tSize;
   int tColor;
+  textAlignment tAlign = textAlignment(textAlignment::left);
 
   try {
     sTextFace = getAttribute<textFace>().value;
   } catch (const std::exception &e) {
-    sTextFace = "arial";
+    sTextFace = DEFAULT_TEXTFACE;
   }
 
   try {
-    auto [v, opt] = getAttribute<textSize>();
+    auto v = getAttribute<textSize>().toPt();
     tSize = static_cast<int>(v);
   } catch (const std::exception &e) {
-    tSize = 16;
+    tSize = DEFAULT_TEXTSIZE;
   }
 
   try {
@@ -2232,10 +2778,17 @@ void viewManager::Element::render(Visualizer::platform &device) {
     tColor = (static_cast<int>(tc[0]) << 16) | (static_cast<int>(tc[1]) << 8) |
              static_cast<int>(tc[2]);
   } catch (const std::exception &e) {
-    tColor = 0;
+    tColor = DEFAULT_TEXTCOLOR;
+  }
+  try {
+    tAlign = getAttribute<textAlignment>();
+  } catch (const std::exception &e) {
+    tAlign = textAlignment::left;
   }
 
-  device.drawText(sTextFace, tSize, ss.str(), tColor);
+  // draw within the calculated layout rectangle.
+  device.drawText(sTextFace, tSize, ss.str(), tColor, displayList.x1,
+                  displayList.y1, displayList.x2, displayList.y2, tAlign);
 }
 
 /**
@@ -2397,8 +2950,8 @@ Element &viewManager::Element::ingestMarkup(Element &node,
       break;
     }
 
-    // the query flag is on when a item has been tokenized after a signal has
-    // been found.
+    // the query flag is on when a item has been tokenized after a signal
+    // has been found.
     if (pc.bQuery)
       processParseContext(pc);
 
@@ -2420,7 +2973,8 @@ Element &viewManager::Element::ingestMarkup(Element &node,
   // second phase, iterate over the parsed context and develop the elements,
   // color text nodes, and set attributes for the items on the stack. once
   // items are processed, they are removed from the stack using the delete
-  // range operator, For a complete tag to exist, the end tab must also exist.
+  // range operator, For a complete tag to exist, the end tab must also
+  // exist.
   auto item = pc.parsedData.begin();
   while (item != pc.parsedData.end()) {
 
@@ -2499,8 +3053,9 @@ input to lowr case to ensure case insensitive comparisons. The
 pc parserContext structure operates on a stream basis. Therefore
 the logic within this function provides the pass through and control
 break logic to implement the functionality. An intersting effect
-is that at times a token must be completely found before it may be processed.
-For example the ID of a element should be sent within one context.
+is that at times a token must be completely found before it may be
+processed. For example the ID of a element should be sent within one
+context.
 
 */
 void viewManager::Element::processParseContext(
@@ -2595,10 +3150,9 @@ void viewManager::Visualizer::deallocate(const std::size_t &token) {}
   such that each of the operating systems supported is encapsulated within
   preprocessor blocks.
 
-  \param eventHandler evtDispatcher the dispatcher routine which connects the
-  platform to the object model system.
-  \param unsigned short width - window size.
-  \param unsigned short height - window size.
+  \param eventHandler evtDispatcher the dispatcher routine which connects
+  the platform to the object model system. \param unsigned short width -
+  window size. \param unsigned short height - window size.
 */
 viewManager::Visualizer::platform::platform(const eventHandler &evtDispatcher,
                                             const unsigned short width,
@@ -2682,6 +3236,7 @@ viewManager::Visualizer::platform::~platform() {
 
   xcb_destroy_window(m_connection, m_window);
   xcb_disconnect(m_connection);
+  XCloseDisplay(m_xdisplay);
 
 #elif defined(_WIN64)
   CoUninitialize();
@@ -2840,8 +3395,8 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
   LRESULT result = 0;
   bool handled = false;
   /** get the platform objext which is stored within the user data of the
-   window. this is necessary as the wndproc for the windows operating system is
-   called from an external library. The routine needs to be a static
+   window. this is necessary as the wndproc for the windows operating system
+   is called from an external library. The routine needs to be a static
    implementation which is not directly locate within the class.
   */
   LONG_PTR lpUserData = GetWindowLongPtr(hwnd, GWLP_USERDATA);
@@ -2856,18 +3411,20 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
     break;
   case WM_KEYDOWN: {
     UINT scandCode = (lParam >> 8) & 0xFFFFFF00;
-    platformInstance->dispatchEvent(event{eventType::keydown,(unsigned int) wParam});
+    platformInstance->dispatchEvent(
+        event{eventType::keydown, (unsigned int)wParam});
     handled = true;
   } break;
   case WM_KEYUP: {
     UINT scandCode = (lParam >> 8) & 0xFFFFFF00;
-    platformInstance->dispatchEvent(event{eventType::keyup,(unsigned int) wParam});
+    platformInstance->dispatchEvent(
+        event{eventType::keyup, (unsigned int)wParam});
     handled = true;
   } break;
   case WM_CHAR: {
     // filter out some of the control keys that
     // slip through such as the back and tab keys
-    if(wParam>27) {
+    if (wParam > 27) {
       WCHAR tmp[2];
       tmp[0] = wParam;
       tmp[1] = 0x00;
@@ -2993,14 +3550,14 @@ void viewManager::Visualizer::platform::messageLoop(void) {
     case XCB_KEY_PRESS: {
       xcb_key_press_event_t *kp = (xcb_key_press_event_t *)xcbEvent;
       xcb_keysym_t sym = xcb_key_press_lookup_keysym(m_syms, kp, 0);
-      if(sym<0x99) {
+      if (sym < 0x99) {
         XKeyEvent keyEvent;
         keyEvent.display = m_xdisplay;
-        keyEvent.keycode=kp->detail;
-        keyEvent.state=kp->state;
-        std::array<char,16> buf{};
-        if(XLookupString(&keyEvent,buf.data(),buf.size(),nullptr,nullptr))
-          dispatchEvent(event{eventType::keypress,(char)buf[0]});
+        keyEvent.keycode = kp->detail;
+        keyEvent.state = kp->state;
+        std::array<char, 16> buf{};
+        if (XLookupString(&keyEvent, buf.data(), buf.size(), nullptr, nullptr))
+          dispatchEvent(event{eventType::keypress, (char)buf[0]});
       } else {
         dispatchEvent(event{eventType::keydown, sym});
       }
@@ -3051,10 +3608,10 @@ FT_Error viewManager::Visualizer::platform::faceRequestor(
 /**
 \internal
 \brief The function provides the building and location of a textFace name
-The function independently works on linux vs. windows. The linux is much more
-advanced in that it uses the fontconfig api. This api provides for family
-matching as a browser would incorporate. Whereas the windows portion uses the
-registry access and simply compares a string.
+The function independently works on linux vs. windows. The linux is much
+more advanced in that it uses the fontconfig api. This api provides for
+family matching as a browser would incorporate. Whereas the windows portion
+uses the registry access and simply compares a string.
 
 The function comes from the following source:
 https://stackoverflow.com/questions/10542832/how-to-use-fontconfig-to-get-font-list-c-c
@@ -3213,9 +3770,8 @@ https://www.codeguru.com/cpp/cpp/algorithms/general/article.php/c15989/Tip-An-Op
 */
 void viewManager::Visualizer::platform::drawText(
     const std::string &sTextFace, const int pointSize, const std::string &s,
-    const unsigned int foregroundColor) {
-  unsigned int color = 0x00; // computed color
-  int x, y;
+    const unsigned int foregroundColor, int x1, int y1, int x2, int y2,
+    textAlignment tAlign) {
   bool bProcessedOnce = false;
   FT_Error error;
   FTC_ScalerRec scaler;
@@ -3223,25 +3779,8 @@ void viewManager::Visualizer::platform::drawText(
   FT_UInt glyph_index = 0;
   FT_UInt previous_index = 0;
 
-  // get color components of the foreground color used later.
-  unsigned char foregroundR = foregroundColor >> 16;
-  unsigned char foregroundG = foregroundColor >> 8;
-  unsigned char foregroundB = foregroundColor;
-
   // store a cache record for loaded fonts.
-  FTC_FaceID faceID;
-
-  auto it = m_faceCache.find(sTextFace);
-  if (it != m_faceCache.end()) {
-    faceID = static_cast<FTC_FaceID>(&it->second);
-  } else {
-    string sFullFontPath = getFontFilename(sTextFace);
-    faceCacheStruct faceCacheRecord{sFullFontPath,
-                                    static_cast<int>(m_faceCache.size())};
-    m_faceCache[sTextFace] = faceCacheRecord;
-    auto it = m_faceCache.find(sTextFace);
-    faceID = static_cast<FTC_FaceID>(&it->second);
-  }
+  FTC_FaceID faceID = getFaceID(sTextFace);
 
   // having this as a local variable
   scaler.face_id = faceID;
@@ -3254,6 +3793,7 @@ void viewManager::Visualizer::platform::drawText(
 
   // get the face
   error = FTC_Manager_LookupSize(m_cacheManager, &scaler, &sizeFace);
+
   if (error)
     throw std::runtime_error("Could not retrieve font face.");
 
@@ -3265,41 +3805,331 @@ void viewManager::Visualizer::platform::drawText(
 
   // get the height of the font
   int faceHeight = face->size->metrics.height >> 6;
-  m_xpos = 0;
+  int lHeight = faceHeight;
+  int xpos = x1;
+  int ypos = y1;
+
+  // iterate characters in string
+  for (auto &c : s) {
+
+    // exit when rectangle has been filled
+    if (ypos > y2)
+      break;
+
+    // handle special characters
+    // new line
+    if (c == '\n') {
+      xpos = x1;
+      ypos += lHeight;
+      continue;
+      // tab
+    } else if (c == '\t') {
+      xpos += 50;
+      continue;
+    }
+
+    FT_UInt glyph_index = 0;
+
+    // get the index of the glyph
+    glyph_index = FTC_CMapCache_Lookup(m_cmapCache, faceID, 0, c);
+
+    // the kerning of a font depends on the previous character
+    // some proportional fonts provide tighter spacing which improves
+    // rendering characteristics
+    if (FT_HAS_KERNING(face) && bProcessedOnce) {
+      FT_Vector akerning;
+      error = FT_Get_Kerning(face, previous_index, glyph_index,
+                             FT_KERNING_DEFAULT, &akerning);
+      if (!error) {
+        xpos += akerning.x >> 6;
+      }
+    }
+
+    // render the character
+    int xadvance = drawChar(xpos, ypos, x2, y2, c, foregroundColor, glyph_index,
+                            sizeFace, &scaler);
+
+    // move after render
+    xpos += xadvance;
+    // wrap text
+    if (xpos > x2) {
+      xpos = x1;
+      ypos += lHeight;
+    }
+
+    bProcessedOnce = true;
+    previous_index = glyph_index;
+  }
+}
+
+/**
+\internal
+\brief The function provides the rendering of a individual character
+\details
+The routine provides the individual rendering of a character. The function
+is used internally within the drawStrign routine. The parameters are quite
+lengthy yet each are needed for specific purposes. The common ones are self
+explanitory.
+
+
+\param const int xPos is the left coordinate to start rendering
+\param const int yPos is the top coordinate to start rendering
+\param const int xPos2 is the clipping right position
+\param const int yPos2 is the clipping bottom position
+\param const char c is the individual character
+\param const unsigned int foregroundColor is the forgeound color of the
+text.
+\param FT_UInt glyph_index is the index of the character. \param const
+FT_Size sizeFace The face sized projection \param const FTC_Scaler pscaler
+the scaler record
+*/
+int viewManager::Visualizer::platform::drawChar(
+    const int xPos, const int yPos, const int xPos2, const int yPos2,
+    const char c, const unsigned int foregroundColor, FT_UInt glyph_index,
+    const FT_Size sizeFace, const FTC_Scaler pscaler) {
+  FT_Error error;
+  unsigned int color = 0x00; // computed color
+  int x, y;
+
+  // get color components of the foreground color used later.
+  unsigned char foregroundR = foregroundColor >> 16;
+  unsigned char foregroundG = foregroundColor >> 8;
+  unsigned char foregroundB = foregroundColor;
+
+  FT_Face face = sizeFace->face;
+
+  // get the height of the font
+  int faceHeight = face->size->metrics.height >> 6;
+
+  /**
+  \brief use greyscale or color lcd filtering
+\details
+      There are two distinct types of bimap structures that are in use, grey
+      scale or lcd filtered. The buffer format is unique for each, the grey
+  lite one being a value indicating grey luminence while the lcd filter is a
+  rgb one. These values provide the same functionality for the looping and
+      drawing routine. You will notice that within each block of code, after
+      getting the image, these values are set.
+  */
+  int storageSize, pitch, top, left, height, width, xadvance;
+  unsigned char *buffer;
+
+#ifdef USE_GREYSCALE_ANTIALIAS
+  // get the image
+  FTC_SBit bitmap;
+  error = FTC_SBitCache_LookupScaler(m_bitCache, pscaler, FT_LOAD_RENDER,
+                                     glyph_index, &bitmap, nullptr);
+
+  if (error)
+    return 0;
+
+  // set the rendering values used for for grey
+  storageSize = 1;
+  pitch = bitmap->pitch;
+  top = bitmap->top;
+  left = bitmap->left;
+  height = bitmap->height;
+  width = bitmap->width;
+  buffer = bitmap->buffer;
+  xadvance = bitmap->xadvance;
+
+#elif defined USE_LCD_FILTER
+  FT_Glyph aglyph;
+  FT_BitmapGlyph bitmap;
+
+  // get the image, however this is just the outline
+  error = FTC_ImageCache_LookupScaler(m_imageCache, scaler, FT_LOAD_DEFAULT,
+                                      glyph_index, &aglyph, nullptr);
+  if (error)
+    return 0;
+
+  xadvance = (aglyph->advance.x + 0x8000) >> 16;
+
+  // this converts the outline image to a rgb bitmap
+  error = FT_Glyph_To_Bitmap(&aglyph, FT_RENDER_MODE_LCD, 0, 0);
+  bitmap = reinterpret_cast<FT_BitmapGlyph>(aglyph);
+
+  // set the rendering values used for for grey
+  storageSize = 3;
+  pitch = bitmap->bitmap.pitch;
+  top = bitmap->top;
+  left = bitmap->left;
+  height = bitmap->bitmap.rows;
+  width = bitmap->bitmap.width;
+  buffer = bitmap->bitmap.buffer;
+
+#endif
+
+  x = xPos;
+  y = yPos + faceHeight - top;
+
+  // calculate the maximum bounds
+  int xmax = x + width / storageSize + left;
+  int ymax = yPos + faceHeight + height - top;
+
+  // if the maximum bounds are greater than the clipping region, adjust.
+  if (xmax > xPos2)
+    xmax = xPos2;
+  if (ymax > yPos2)
+    ymax = yPos2;
+
+  // loop through the pixels
+  for (int i = x + left, p = 0; i < xmax; i++, p += storageSize) {
+    for (int j = y, q = 0; j < ymax; j++, q++) {
+      int bufferPosition = q * pitch + p;
+
+      /* only plot active pixels, the term
+       luminance is used because it is not actually a color
+       but a brightness of the pixel. Zero being off for the
+       glyph bitmap. */
+      if (buffer[bufferPosition]) {
+
+        unsigned int destinationC = getPixel(i, j);
+
+        unsigned char destinationR = destinationC >> 16;
+        unsigned char destinationG = destinationC >> 8;
+        unsigned char destinationB = destinationC;
+
+#ifdef USE_GREYSCALE_ANTIALIAS
+        // luminance is expressed in greyscal using one byte
+        unsigned char freetypeColor = buffer[bufferPosition];
+        unsigned char freetypeR = freetypeColor;
+        unsigned char freetypeG = freetypeColor;
+        unsigned char freetypeB = freetypeColor;
+
+#elif defined USE_LCD_FILTER
+        // luminance is expressed within the LCD format as three bytes.
+        unsigned char freetypeR = buffer[bufferPosition];
+        unsigned char freetypeG = buffer[bufferPosition + 1];
+        unsigned char freetypeB = buffer[bufferPosition + 2];
+#endif
+
+        unsigned char targetR =
+            ((foregroundR * freetypeR) + (destinationR * (255 - freetypeR))) >>
+            8;
+        unsigned char targetG =
+            ((foregroundG * freetypeG) + (destinationG * (255 - freetypeG))) >>
+            8;
+        unsigned char targetB =
+            ((foregroundB * freetypeB) + (destinationB * (255 - freetypeB))) >>
+            8;
+
+        color = ((targetR) << 16) | ((targetG) << 8) | (targetB);
+
+        // place the computed color into pixel buffer
+        putPixel(i, j, color);
+      }
+    }
+  }
+
+#ifdef USE_LCD_FILTER
+  // delete the bitmap data
+  FT_Done_Glyph((FT_Glyph)bitmap);
+
+#endif
+
+  return xadvance;
+}
+
+/**
+\brief The routine returns that face ID for the cached font. This is a
+pointer to the record within the vector.
+*/
+FTC_FaceID viewManager::Visualizer::platform::getFaceID(string sTextFace) {
+  FTC_FaceID faceID = nullptr;
+
+  auto it = m_faceCache.find(sTextFace);
+  if (it != m_faceCache.end()) {
+    faceID = static_cast<FTC_FaceID>(&it->second);
+  } else {
+    string sFullFontPath = getFontFilename(sTextFace);
+    faceCacheStruct faceCacheRecord{sFullFontPath,
+                                    static_cast<int>(m_faceCache.size())};
+    pair<faceCacheIterator, bool> result =
+        m_faceCache.insert({sTextFace, faceCacheRecord});
+    if (result.second)
+      faceID = static_cast<FTC_FaceID>(&(result.first->second));
+  }
+  return faceID;
+}
+
+/**
+\internal
+\brief The function returns the width of the string according to the font
+size.
+*/
+double viewManager::Visualizer::platform::measureTextWidth(
+    const std::string &sTextFace, const int pointSize, const std::string &s) {
+  bool bProcessedOnce = false;
+  FT_Error error;
+  FTC_ScalerRec scaler;
+  FT_Size sizeFace;
+  FT_UInt glyph_index = 0;
+  FT_UInt previous_index = 0;
+  double ret = 0;
+
+  // store a cache record for loaded fonts.
+  FTC_FaceID faceID = getFaceID(sTextFace);
+
+  // having this as a local variable
+  scaler.face_id = faceID;
+  scaler.pixel = 0;
+  scaler.height = (pointSize + fontScale) * 64;
+  scaler.width = (pointSize + fontScale) * 64;
+
+  scaler.x_res = 96;
+  scaler.y_res = 96;
+
+  // get the face
+  error = FTC_Manager_LookupSize(m_cacheManager, &scaler, &sizeFace);
+
+  if (error)
+    throw std::runtime_error("Could not retrieve font face.");
+
+  error = FT_Activate_Size(sizeFace);
+  if (error)
+    throw std::runtime_error("Could FT_Activate_Size for font.");
+
+  FT_Face face = sizeFace->face;
 
   // iterate characters in string
   for (auto &c : s) {
 
     // handle special characters
-    // new line
-    if (c == '\n') {
-      m_xpos = 0;
-      m_ypos += faceHeight;
-      continue;
-      // tab
-    } else if (c == '\t') {
+    if (c == '\t') {
       m_xpos += 50;
       continue;
     }
 
+    FT_UInt glyph_index = 0;
+
     // get the index of the glyph
     glyph_index = FTC_CMapCache_Lookup(m_cmapCache, faceID, 0, c);
 
-    if (glyph_index == 0)
-      continue;
+    // the kerning of a font depends on the previous character
+    // some proportional fonts provide tighter spacing which improves
+    // rendering characteristics
+    if (FT_HAS_KERNING(face) && bProcessedOnce) {
+      FT_Vector akerning;
+      error = FT_Get_Kerning(face, previous_index, glyph_index,
+                             FT_KERNING_DEFAULT, &akerning);
+      if (!error) {
+        m_xpos += akerning.x >> 6;
+      }
+    }
 
+    // render the character
     /**
     \brief use greyscale or color lcd filtering
-\details
-        There are two distinct types of bimap structures that are in use, grey
-        scale or lcd filtered. The buffer format is unique for each, the grey
-    lite one being a value indicating grey luminence while the lcd filter is a
-    rgb one. These values provide the same functionality for the looping and
-        drawing routine. You will notice that within each block of code, after
-        getting the image, these values are set.
+  \details
+        There are two distinct types of bimap structures that are in use,
+  grey scale or lcd filtered. The buffer format is unique for each, the grey
+    lite one being a value indicating grey luminence while the lcd filter is
+  a rgb one. These values provide the same functionality for the looping and
+        drawing routine. You will notice that within each block of code,
+  after getting the image, these values are set.
     */
-    int storageSize, pitch, top, left, height, width, xadvance;
-    unsigned char *buffer;
+    int xadvance;
 
 #ifdef USE_GREYSCALE_ANTIALIAS
     // get the image
@@ -3310,14 +4140,6 @@ void viewManager::Visualizer::platform::drawText(
     if (error)
       continue;
 
-    // set the rendering values used for for grey
-    storageSize = 1;
-    pitch = bitmap->pitch;
-    top = bitmap->top;
-    left = bitmap->left;
-    height = bitmap->height;
-    width = bitmap->width;
-    buffer = bitmap->buffer;
     xadvance = bitmap->xadvance;
 
 #elif defined USE_LCD_FILTER
@@ -3325,119 +4147,31 @@ void viewManager::Visualizer::platform::drawText(
     FT_BitmapGlyph bitmap;
 
     // get the image, however this is just the outline
-    error = FTC_ImageCache_LookupScaler(m_imageCache, &scaler, FT_LOAD_DEFAULT,
+    error = FTC_ImageCache_LookupScaler(m_imageCache, scaler, FT_LOAD_DEFAULT,
                                         glyph_index, &aglyph, nullptr);
     if (error)
       continue;
 
     xadvance = (aglyph->advance.x + 0x8000) >> 16;
 
-    // this converts the outline image to a rgb bitmap
-    error = FT_Glyph_To_Bitmap(&aglyph, FT_RENDER_MODE_LCD, 0, 0);
-    bitmap = reinterpret_cast<FT_BitmapGlyph>(aglyph);
-
-    // set the rendering values used for for grey
-    storageSize = 3;
-    pitch = bitmap->bitmap.pitch;
-    top = bitmap->top;
-    left = bitmap->left;
-    height = bitmap->bitmap.rows;
-    width = bitmap->bitmap.width;
-    buffer = bitmap->bitmap.buffer;
-
-#endif
-
-    x = m_xpos;
-    y = m_ypos + faceHeight - top;
-
-    // calculate the maximum bounds
-    int xmax = x + width / storageSize + left;
-    int ymax = m_ypos + faceHeight + height - top;
-
-    // the kerning of a font depends on the previous character
-    // some proportional fonts provide tighter spacing which improves
-    // rendering characteristics
-    if (FT_HAS_KERNING(face) && bProcessedOnce) {
-      FT_Vector akerning;
-      error = FT_Get_Kerning(face, previous_index, glyph_index,
-                             FT_KERNING_DEFAULT, &akerning);
-
-      /** provide special spacing for the charcters
-       and adjust the maximum width counter
-       These numbers usually preserve space.*/
-      if (!error) {
-        x += akerning.x >> 6;
-        xmax += akerning.x >> 6;
-      }
-    }
-    // loop through the pixels
-    for (int i = x + left, p = 0; i < xmax; i++, p += storageSize) {
-      for (int j = y, q = 0; j < ymax; j++, q++) {
-        int bufferPosition = q * pitch + p;
-
-        /* only plot active pixels, the term
-         luminance is used because it is not actually a color
-         but a brightness of the pixel. Zero being off for the
-         glyph bitmap. */
-        if (buffer[bufferPosition]) {
-
-          unsigned int destinationC = getPixel(i, j);
-
-          unsigned char destinationR = destinationC >> 16;
-          unsigned char destinationG = destinationC >> 8;
-          unsigned char destinationB = destinationC;
-
-#ifdef USE_GREYSCALE_ANTIALIAS
-          // luminance is expressed in greyscal using one byte
-          unsigned char freetypeColor = buffer[bufferPosition];
-          unsigned char freetypeR = freetypeColor;
-          unsigned char freetypeG = freetypeColor;
-          unsigned char freetypeB = freetypeColor;
-
-#elif defined USE_LCD_FILTER
-          // luminance is expressed within the LCD format as three bytes.
-          unsigned char freetypeR = buffer[bufferPosition];
-          unsigned char freetypeG = buffer[bufferPosition + 1];
-          unsigned char freetypeB = buffer[bufferPosition + 2];
-#endif
-
-          unsigned char targetR = ((foregroundR * freetypeR) +
-                                   (destinationR * (255 - freetypeR))) >>
-                                  8;
-          unsigned char targetG = ((foregroundG * freetypeG) +
-                                   (destinationG * (255 - freetypeG))) >>
-                                  8;
-          unsigned char targetB = ((foregroundB * freetypeB) +
-                                   (destinationB * (255 - freetypeB))) >>
-                                  8;
-
-          color = ((targetR) << 16) | ((targetG) << 8) | (targetB);
-
-          // place the computed color into pixel buffer
-          putPixel(i, j, color);
-        }
-      }
-    }
-
-#ifdef USE_LCD_FILTER
-    // delete the bitmap data
-    FT_Done_Glyph((FT_Glyph)bitmap);
-
 #endif
 
     // move after render
-    m_xpos += xadvance;
+    ret += xadvance;
     bProcessedOnce = true;
     previous_index = glyph_index;
   }
+  return ret;
 }
+
 /**
-\internal
-\brief the function draws the cursor.
-*/
-void viewManager::Visualizer::platform::drawCaret(const int x, const int y, const int h) {
-  for(int j=y;j<y+h;j++)
-    putPixel(x,j,0x00);
+  \internal
+  \brief the function draws the cursor.
+  */
+void viewManager::Visualizer::platform::drawCaret(const int x, const int y,
+                                                  const int h) {
+  for (int j = y; j < y + h; j++)
+    putPixel(x, j, 0x00);
 }
 
 /**
@@ -3477,9 +4211,9 @@ void viewManager::Visualizer::platform::putPixel(const int x, const int y,
 }
 
 /**
-\brief The function returns the color at the pixel space. Coordinate start at
-0,0, upper left. \param x - the left point of the pixel \param y - the top
-point of the pixel \param unsigned int color - the bgra color value
+\brief The function returns the color at the pixel space. Coordinate start
+at 0,0, upper left. \param x - the left point of the pixel \param y - the
+top point of the pixel \param unsigned int color - the bgra color value
 
 */
 unsigned int viewManager::Visualizer::platform::getPixel(const int x,

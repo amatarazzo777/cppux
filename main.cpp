@@ -58,13 +58,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
       textAlignment::left, position::relative, paddingTop{5_pt},
       paddingLeft{5_pt}, paddingBottom{5_pt}, paddingRight{5_pt},
       marginTop{5_pt}, marginLeft{5_pt}, marginBottom{5_pt}, marginRight{5_pt});
-  #if 0
-  test0(vm);
-  test0c(vm);
-  #endif
 
-  test0b(vm);
-  #if 0
+  test0(vm);
+#if 0
+  test0c(vm);
+#endif
+
+  //test0b(vm);
+#if 0
   testUX(vm);
   testUXmarkup(vm);
   test1(vm);
@@ -91,7 +92,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
   test8(vm);
   test8a(vm);
   test10(vm);
-  #endif
+#endif
 
   vm.processEvents();
 }
@@ -120,15 +121,18 @@ void test0(Viewer &vm) {
 //! [test0]
 void test0b(Viewer &vm) {
   testStart(__FUNCTION__);
+  auto o = vm.getAttribute<objectWidth>();
+  auto &e = createElement<DIV>(
+      indexBy{"divTTT"}, textColor { "red" } , "test",
+                               vector<float>{.3f, .6f, .3f, .777f, 10.33f});
 
-  auto &e = createElement<DIV>(indexBy{"divTTT"}, "test",
-                               vector<float>{.3, .6, .3, .777, 10.33});
-
-  auto &appTitle = createElement<H1>(indexBy{"title"}, objectTop{10_px},
-                                     textAlignment::center, "Type XCB");
+  auto &appTitle =
+      createElement<H1>(indexBy{"title"}, objectTop{10_px},
+                        textAlignment::center, textColor{"orange"}, "Type XCB");
 
   e.appendChild(appTitle);
-  e.appendChild<H2>(indexBy{"subTitle"}, textAlignment::center,
+  e.appendChild<H2>(indexBy{"subTitle"}, textColor("midnightblue"),
+                    display::in_line, textAlignment::center,
                     "An application for entering text");
 
   vm.appendChild(e);

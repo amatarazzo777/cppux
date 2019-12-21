@@ -22,6 +22,10 @@ options when compiling the source.
 @{
 */
 
+#define DEFAULT_TEXTFACE "arial"
+#define DEFAULT_TEXTSIZE 12
+#define DEFAULT_TEXTCOLOR 0
+
 /**
 \def USE_INLINE_RENDERER
 \brief The system will be configured to use an inline version of the rendered
@@ -188,6 +192,8 @@ using dataTransformMap =
 contained here as smart pointers and are automatically memory managed.
 */
 extern std::unordered_map<std::size_t, std::unique_ptr<Element>> elements;
+typedef std::unordered_map<std::size_t, std::unique_ptr<Element>>::iterator
+    elementsIterator;
 
 /**
 \internal
@@ -255,7 +261,7 @@ public:
   event(const eventType &et, const unsigned int &vk) {
     evtType = et;
     virtualKey = vk;
-    bVirtualKey=true;
+    bVirtualKey = true;
   }
 
   event(const eventType &et, const short &mx, const short &my,
@@ -326,6 +332,8 @@ public:
   doubleNF(const double &_val, const numericFormat &_nf)
       : value(_val), option(_nf) {}
   doubleNF(const std::string &_str);
+  double toPx(void);
+  double toPt(void);
 };
 
 /**
@@ -508,10 +516,7 @@ enumerated constant
     NAME(std::vector<std::string> _val) : value(std::move(_val)) {}            \
   }
 
-#define _STRUCT_ATTRIBUTE(NAME,NAME2) using NAME = NAME2
-
-
-
+#define _STRUCT_ATTRIBUTE(NAME, NAME2) using NAME = NAME2
 
 /**
   \addtogroup Attributes
@@ -598,7 +603,6 @@ _ENUMERATED_ATTRIBUTE(listStyleType, none, disc, circle, square, decimal, alpha,
 /// viewManagerApp always.
 _STRING_ATTRIBUTE(windowTitle);
 
-
 /// \class documentState holds the document state. The stateStructure applies
 /// the structure which holds the information.
 using documentState = class documentState {
@@ -670,14 +674,22 @@ public:
   void openWindow(const std::string &sWindowTitle);
   void closeWindow(void);
   void messageLoop(void);
-  void drawText(const std::string &sTextFace, const int pointSize, const std::string &s,
-                const unsigned int tC);
+  inline FTC_FaceID getFaceID(std::string sTextFace);
+  void drawText(const std::string &sTextFace, const int pointSize,
+                const std::string &s, const unsigned int foreground, int x1,
+                int y1, int x2, int y2, textAlignment tAlign);
+  inline int drawChar(const int xPos, const int yPos, const int xPos2,
+                      const int yPos2, const char c,
+                      const unsigned int foreground, const FT_UInt glyph_index,
+                      const FT_Size sizeFace, const FTC_Scaler scaler);
+  double measureTextWidth(const std::string &sTextFace, const int pointSize,
+                          const std::string &s);
   void drawCaret(const int x, const int y, const int h);
   inline void putPixel(const int x, const int y, const unsigned int color);
-  inline unsigned int getPixel(const int x,const  int y);
+  inline unsigned int getPixel(const int x, const int y);
 
   void flip(void);
-  void resize(const int w,const int h);
+  void resize(const int w, const int h);
   void clear(void);
   bool filled(void);
   std::string getFontFilename(const std::string &sTextFace);
@@ -751,6 +763,8 @@ private:
 
   FTC_CMapCache m_cmapCache;
   std::unordered_map<std::string, faceCacheStruct> m_faceCache;
+  typedef std::unordered_map<std::string, faceCacheStruct>::iterator
+      faceCacheIterator;
 
   //  std::unordered_map<std::pair<unsigned int, unsigned int>, unsigned int>
   //  m_blend;
@@ -808,6 +822,59 @@ typedef std::unordered_map<std::string, std::pair<bool, attributeLambda>>
 attribute strings, numer of parameters and attribute setting lambda.
 */
 extern const attributeStringMap attributeFactory;
+
+/**
+   \details The class holds the cached results of the layout calculations.
+   the coordinates include the margin and padding values.
+   The boolean values are used when calculations have dependency
+   such that font metrics must be attained first, or the parent's
+   size is based upon percentages.
+   Items that have the display::none property are never included in this list.
+  */
+using displayListItem = class displayListItem {
+public:
+  bool bAutoCalculateTop : 1;
+  bool bAutoCalculateLeft : 1;
+  bool bAutoCalculateRight : 1;
+  bool bAutoCalculateBottom : 1;
+  bool bAutoCalculateWidth : 1;
+  bool bAutoCalculateHeight : 1;
+  bool bCalculatedTop : 1;
+  bool bCalculatedLeft : 1;
+  bool bCalculatedRight : 1;
+  bool bCalculatedBottom : 1;
+  bool bCalculatedWidth : 1;
+  bool bCalculatedHeight : 1;
+
+  double x1;
+  numericFormat x1_nf;
+
+  double y1;
+  numericFormat y1_nf;
+
+  double x2;
+
+  double y2;
+
+  double ow;
+  numericFormat ow_nf;
+
+  double oh;
+  numericFormat oh_nf;
+
+  display::optionEnum disp;
+  position::optionEnum pos;
+  int zIndex;
+
+  Element *ptr;
+
+public:
+  /// \brief notes the bounds have been completely calculated.
+  bool completed(void) {
+    return bCalculatedTop && bCalculatedLeft && bCalculatedRight &&
+           bCalculatedBottom;
+  }
+};
 
 /**
   \class Element
@@ -1142,7 +1209,8 @@ private:
   Element *m_nextSibling;
   Element *m_previousSibling;
   std::size_t m_childCount;
-  // interface access points for the interface
+
+  // interface access points for the tree traversal functions
 public:
 /**
   \internal
@@ -1293,6 +1361,17 @@ private:
   std::size_t surface;
 
 public:
+  /**
+  \internal
+  \brief The member contains a pointer to its display record.
+  Display records are stored within the main Viewer class or _root
+  element.
+  */
+  void wordBreaks(void);
+  std::vector<std::size_t> m_wordBreaks;
+  displayListItem displayList;
+
+public:
   auto appendChild(const std::string &sMarkup) -> Element &;
   auto appendChild(Element &newChild) -> Element &;
   auto appendChild(const ElementList &elementCollection) -> Element &;
@@ -1354,7 +1433,8 @@ public:
   \snippet examples.cpp setAttribute_parampack
 
   */
-  template <typename... TYPES> Element &setAttribute(const TYPES... settings) {
+  template <typename... TYPES>
+  Element &setAttribute(const TYPES &... settings) {
     setAttribute(std::vector<std::any>{settings...});
     return *this;
   }
@@ -1413,7 +1493,7 @@ public:
   auto resize(const double w, const double h) -> Element &;
   auto addListener(eventType evtType, eventHandler evtHandler) -> Element &;
   auto removeListener(eventType evtType, eventHandler evtHandler) -> Element &;
-  void dispatch(const event& e);
+  void dispatch(const event &e);
   virtual void render(Visualizer::platform &device);
   auto insertBefore(Element &newChild, Element &existingElement) -> Element &;
   auto insertBefore(Element &newChild, std::string &sID) -> Element &;
@@ -1435,6 +1515,7 @@ public:
 #endif
 
 private:
+  /// \enum the type of tokenized data
   enum itemType {
     element,
     elementTerminal,
@@ -1445,30 +1526,38 @@ private:
     textData
   };
 
-  /// \typedef the variant holds the payload from the parser
+  /// \typedef the variant holds the payload from the tokenizer
   typedef std::variant<std::string, factoryLambda, attributeLambda, colorNF>
       parserOperator;
 
   /// \typedef the structure that holds the parser context.
   typedef struct {
-    std::vector<std::tuple<itemType, bool, parserOperator>>
-        parsedData; // the elements parsed thus far token
-    std::vector<std::reference_wrapper<Element>>
-        elementStack; // stack holding the tree of elements
-
-    bool bSignal; // true when a < is encountered, Presumed that the
-                  // information will be a markup
+    // the elements parsed thus far token
+    std::vector<std::tuple<itemType, bool, parserOperator>> parsedData;
+    // stack holding the tree of elements
+    std::vector<std::reference_wrapper<Element>> elementStack;
+    // true when a < is encountered, Presumed that the information will be a
+    // markup
+    bool bSignal;
+    // true when a primary token has been captured, ie the first item after the
+    // <
     bool bToken;
+    // skips the character from being captured.
     bool bSkip;
-    bool bTerminal; // true when the / is encountered and a signal has been
-                    // found
+    // true when the / is encountered and a signal has been found
+    bool bTerminal;
+    // true when the attributes are being set.
     bool bAttributeList;
+    // true when an attribute value is expected
     bool bAttributeListValue;
-    bool bQuery; // true when the information should be queried for a token
-    const char *signalStart; // holds the position of the signal start
-    std::string sCapture;    // the capturing of an element or token name
-    std::string
-        sText; // text information that will be added to the elements data
+    // true when the information should be queried for a token
+    bool bQuery;
+    // holds the position of the signal start
+    const char *signalStart;
+    // the capturing of an element or token name
+    std::string sCapture;
+    // text information that will be added to the elements data
+    std::string sText;
 
   } parserContext;
 
@@ -1548,7 +1637,7 @@ using H1 = class H1 : public Element {
 public:
   H1(const std::vector<std::any> &attribs)
       : Element("h1", {display::block, marginTop{.67_em}, marginLeft{.67_em},
-                       marginBottom{0_em}, marginRight{0_em}, textSize{32_pt},
+                       marginBottom{0_em}, marginRight{0_em}, textSize{2_em},
                        textWeight{800}}) {
     setAttribute(attribs);
   }
@@ -1577,7 +1666,7 @@ using H2 = class H2 : public Element {
 public:
   H2(const std::vector<std::any> &attribs)
       : Element("h2", {display::block, marginTop{.83_em}, marginLeft{.83_em},
-                       marginBottom{0_em}, marginRight{0_em}, textSize{24_pt},
+                       marginBottom{0_em}, marginRight{0_em}, textSize{1.5_em},
                        textWeight{800}}) {
     setAttribute(attribs);
   }
@@ -1632,9 +1721,8 @@ Example
 using PARAGRAPH = class PARAGRAPH : public Element {
 public:
   PARAGRAPH(const std::vector<std::any> &attribs)
-      : Element("paragraph",
-                {listStyleType::disc, marginTop{1_em}, marginLeft{1_em},
-                 marginBottom{0_em}, marginRight{0_em}}) {
+      : Element("paragraph", {display::block, marginTop{1_em}, marginLeft{1_em},
+                              marginBottom{0_em}, marginRight{0_em}}) {
     setAttribute(attribs);
   }
 };
@@ -1673,7 +1761,8 @@ Example
 */
 using SPAN = class SPAN : public Element {
 public:
-  SPAN(const std::vector<std::any> &attribs) : Element("span") {
+  SPAN(const std::vector<std::any> &attribs)
+      : Element("span", {display::in_line}) {
     setAttribute(attribs);
   }
 };
@@ -1752,7 +1841,7 @@ Example
 */
 using LI = class LI : public Element {
 public:
-  LI(const std::vector<std::any> &attribs) : Element("li") {
+  LI(const std::vector<std::any> &attribs) : Element("li", {display::block}) {
     setAttribute(attribs);
   }
 };
@@ -1808,7 +1897,8 @@ Example
 */
 using IMAGE = class IMAGE : public Element {
 public:
-  IMAGE(const std::vector<std::any> &attribs) : Element("image") {
+  IMAGE(const std::vector<std::any> &attribs)
+      : Element("image", {display::in_line}) {
     setAttribute(attribs);
   }
 };
@@ -1865,11 +1955,19 @@ using textnode = textNode;
 */
 template <typename TYPE>
 auto &_createElement(const std::vector<std::any> &attrs) {
+  // create object
   std::unique_ptr<TYPE> e = std::make_unique<TYPE>(attrs);
+  // storage key is actually the numeric pointer.
   std::size_t storageKey = (std::size_t)e.get();
-  elements[storageKey] = std::move(e);
-  auto it = elements.find(storageKey);
-  return static_cast<TYPE &>(*(it->second.get()));
+
+  // this version of the insert returns the position of where it was inserted.
+  // this is important as the pointer will be owned by the unordered_map
+  // simply getting the value
+  std::pair<elementsIterator, bool> ret =
+      elements.insert({storageKey, std::move(e)});
+
+  TYPE *typedReturn = static_cast<TYPE *>(ret.first->second.get());
+  return static_cast<TYPE &>(*typedReturn);
 }
 
 /**
@@ -1929,7 +2027,7 @@ template <class T = Element &> auto getElement(const std::string &key) -> T & {
 
   auto it = indexedElements.find(key);
   if (it != indexedElements.end()) {
-    T &ret = it->second.get();
+    T &ret = reinterpret_cast<T &>(it->second.get());
     return ret;
 
   } else {
@@ -1960,6 +2058,12 @@ are added on top of the viewManager base library.
         [](const std::vector <std::any> &attrs)                                \
              -> Element & { return _createElement<OBJECT_TYPE>(attrs); }       \
   }
+
+/**
+\brief The class is the main document viewer. Applications must create this as
+the top node of the tree. All subsequent operations are added or appended to
+this object.
+*/
 class Viewer : public Element {
 public:
   Viewer(const std::vector<std::any> &attribs);
@@ -1968,13 +2072,17 @@ public:
   Viewer &operator=(const Viewer &) {}
   Viewer &operator=(Viewer &&other) noexcept {} // move assignment
   void render();
-  void recursiveRender(Element &e);
   void processEvents(void);
-  // event implementation
+  void recursiveComputeLayout(Element &e);
+  void computeLayout(Element &e);
   void dispatchEvent(const event &e);
 
 private:
   std::unique_ptr<Visualizer::platform> m_device;
+  double m_layoutPenX;
+  double m_layoutPenY;
+
+  std::vector<displayListItem *> m_displayList;
 };
 }; // namespace viewManager
 
