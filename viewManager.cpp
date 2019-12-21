@@ -945,7 +945,7 @@ viewManager::Viewer::~Viewer() {}
   should be calculated.
 
 */
-void viewManager::Viewer::recursiveComputeLayout(Element &e) {
+void viewManager::Viewer::treeOrderComputeLayout(Element &e) {
   doubleNF numeric = doubleNF(0_px);
   // the logic skips the calculation if it has already been
   // performed. Also because of the walking order, object parents
@@ -1032,7 +1032,7 @@ void viewManager::Viewer::recursiveComputeLayout(Element &e) {
         // m_device->measureTextWidth(e.data()[0]);
         listEntry.oh = 50;
         listEntry.oh_nf = numericFormat::px;
-        listEntry.y2 = listEntry.y1 + listEntry.oh + 50;
+        listEntry.y2 = listEntry.y1 + listEntry.oh;
         listEntry.bCalculatedBottom = true;
         listEntry.bAutoCalculateBottom = false;
       } else if (listEntry.oh_nf == numericFormat::percent) {
@@ -1059,7 +1059,7 @@ void viewManager::Viewer::recursiveComputeLayout(Element &e) {
     }
   }
   for (auto &n : e.children())
-    recursiveComputeLayout(n);
+    treeOrderComputeLayout(n);
 }
 
 /**
@@ -1347,7 +1347,7 @@ void viewManager::Viewer::computeLayout(Element &e) {
   eRoot.displayList.y2 = eRoot.getAttribute<objectHeight>().toPx();
 
   // recursively wlak the document and calculate layout.
-  recursiveComputeLayout(eRoot);
+  treeOrderComputeLayout(eRoot);
 
   // sort the displayList by left, top, and zOrder
   sort(m_displayList.begin(), m_displayList.end(),

@@ -58,13 +58,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
       textAlignment::left, position::relative, paddingTop{5_pt},
       paddingLeft{5_pt}, paddingBottom{5_pt}, paddingRight{5_pt},
       marginTop{5_pt}, marginLeft{5_pt}, marginBottom{5_pt}, marginRight{5_pt});
-
-  test0(vm);
 #if 0
+  test0(vm);
   test0c(vm);
 #endif
-
-  //test0b(vm);
+  test0b(vm);
 #if 0
   testUX(vm);
   testUXmarkup(vm);
@@ -79,7 +77,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
   test7a(vm);
   test7b(vm);
   test7c(vm);
-
+#endif
   /*
   test7d(vm);
   test7e(vm);
@@ -92,7 +90,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
   test8(vm);
   test8a(vm);
   test10(vm);
-#endif
 
   vm.processEvents();
 }

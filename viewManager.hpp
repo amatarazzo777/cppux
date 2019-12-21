@@ -2073,9 +2073,11 @@ public:
   Viewer &operator=(Viewer &&other) noexcept {} // move assignment
   void render();
   void processEvents(void);
-  void recursiveComputeLayout(Element &e);
-  void computeLayout(Element &e);
   void dispatchEvent(const event &e);
+
+private:
+  void treeOrderComputeLayout(Element &e);
+  void computeLayout(Element &e);
 
 private:
   std::unique_ptr<Visualizer::platform> m_device;
