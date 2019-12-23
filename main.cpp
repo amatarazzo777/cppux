@@ -6,6 +6,7 @@ using namespace viewManager;
 void test0(Viewer &vm);
 void test0b(Viewer &vm);
 void test0c(Viewer &vm);
+void test0d(Viewer &vm);
 void testUX(Viewer &vm);
 void testUXmarkup(Viewer &vm);
 
@@ -63,6 +64,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
   test0c(vm);
 #endif
   test0b(vm);
+  test0d(vm);
 #if 0
   testUX(vm);
   testUXmarkup(vm);
@@ -87,9 +89,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
   test7i(vm);
   */
 
+#if 0
   test8(vm);
   test8a(vm);
   test10(vm);
+#endif
 
   vm.processEvents();
 }
@@ -119,8 +123,7 @@ void test0(Viewer &vm) {
 void test0b(Viewer &vm) {
   testStart(__FUNCTION__);
   auto o = vm.getAttribute<objectWidth>();
-  auto &e = createElement<DIV>(
-      indexBy{"divTTT"}, textColor { "red" } , "test",
+  auto &e = createElement<DIV>(indexBy{"divTTT"}, textColor{"red"}, "test",
                                vector<float>{.3f, .6f, .3f, .777f, 10.33f});
 
   auto &appTitle =
@@ -169,6 +172,43 @@ void test0c(Viewer &vm) {
   getElement("testAdd") << "This is information that is appended.";
 }
 //! [test0]
+void test0d(Viewer &vm) {
+  vm.ingestStream = true;
+  #if 0
+  vm.appendChild("<h1 color=orange>Layout Manager</h1>");
+  vm.appendChild("<div inline width=250px id=markupSecond>the drive to complete is the sincere "
+                 "satisfaction of a working system. While a solution is a "
+                 "compromise, value is found within the description.</div>");
+  vm << "<p>Does mixing the objects still calculate appropiately. I "
+        "believe the logic would work since they are separate elements."
+        "Yet information is trampled upon. It is like the y pen position"
+        " is not being incremented at the appropiate positions."
+        "Perhaps this is true since the appearance is that way."
+        "Ahh to discover the options, and the breakages."
+        "The other problem with the layout is that the "
+        "resizing to a small tollerance beyond the size of the smallest wrap"
+        " objext causes a freeze.</p>";
+  #endif
+  vm << "<div width=50% inline><h2 color=midnightblue>Quality Description</h2>";
+  vm << "<p>Several bugs still exist and new feature logic will have to be "
+        "added. Such as the calculation of spacing of the left side being greater."
+        "When the left side height is greater than the right, the layout manager "
+        "should move the rendering down to the next layer. This may involve "
+        " searching. However the best way to solve the issue is to remember "
+        " the value. Then when changing between inline to block again, the "
+        "block level element should be set to the greatest y2 value thus "
+        "developed.</p></div>";
+  vm << "<div width=50% inline><h2 color=red>Bugs</h2>";
+  vm << "<ul>"
+        "<li></li>"
+        "<li>The font height is incorrect somehow.</li>"
+        "<li>Adding inline to the paragraph produces incorrect results. Meaning that the height is not gathered. </li>"
+        "<li>Many layout features to debug.</li>"
+        "<li>The dots do not draw yet...</li>"
+        "<li>It locks up when the resizing.</li>"
+        "<li>mixing data nodes and other elements seems quirky.</li></ul></div>";
+  vm.appendChild<ul>().appendChild<li>("one").append<li>("two").append<li>("three");
+}
 
 /************************************************************************
 ************************************************************************/

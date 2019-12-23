@@ -684,6 +684,8 @@ public:
                       const FT_Size sizeFace, const FTC_Scaler scaler);
   double measureTextWidth(const std::string &sTextFace, const int pointSize,
                           const std::string &s);
+  double measureFaceHeight(const std::string &sTextFace, const int pointSize);
+
   void drawCaret(const int x, const int y, const int h);
   inline void putPixel(const int x, const int y, const unsigned int color);
   inline unsigned int getPixel(const int x, const int y);
@@ -837,8 +839,6 @@ public:
   bool bAutoCalculateLeft : 1;
   bool bAutoCalculateRight : 1;
   bool bAutoCalculateBottom : 1;
-  bool bAutoCalculateWidth : 1;
-  bool bAutoCalculateHeight : 1;
   bool bCalculatedTop : 1;
   bool bCalculatedLeft : 1;
   bool bCalculatedRight : 1;
@@ -847,24 +847,19 @@ public:
   bool bCalculatedHeight : 1;
 
   double x1;
-  numericFormat x1_nf;
-
   double y1;
-  numericFormat y1_nf;
-
   double x2;
-
   double y2;
-
   double ow;
-  numericFormat ow_nf;
-
   double oh;
+  numericFormat x1_nf;
+  numericFormat y1_nf;
+  numericFormat ow_nf;
   numericFormat oh_nf;
 
   display::optionEnum disp;
   position::optionEnum pos;
-  int zIndex;
+  double zIndex;
 
   Element *ptr;
 
@@ -960,10 +955,12 @@ private:
       return ss.str();
     }
 
-    std::string textData(void) {
+    std::size_t textDataSize(void) { return _data.size(); }
+
+    std::string textData(int index) {
       std::stringstream ss;
-      for (T n : _data)
-        ss << n << "\n";
+      T n = _data[index];
+      ss << n;
       return ss.str();
     }
 
@@ -1367,8 +1364,20 @@ public:
   Display records are stored within the main Viewer class or _root
   element.
   */
-  void wordBreaks(void);
-  std::vector<std::size_t> m_wordBreaks;
+  void wordMetrics(Visualizer::platform &device);
+  double computeWrappedTextDataHeight(Visualizer::platform &device,
+                                      double dWrappingWidth);
+  double computeWidestTextData(Visualizer::platform &device);
+  typedef struct  {
+    double totalWidth;
+    double wordWidth;
+    size_t spacePosition;
+  } wordMetricType;
+
+  std::map<std::pair<std::size_t, std::size_t>, std::vector<wordMetricType>>
+      indexedWordMetrics;
+  typedef std::map<std::size_t, std::vector<wordMetricType>>::iterator
+      wordMetricsIterator;
   displayListItem displayList;
 
 public:

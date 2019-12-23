@@ -932,6 +932,7 @@ viewManager::Viewer::Viewer(const vector<any> &attrs)
 }
 
 /**
+/**
 \internal
 \brief deconstructor for the view manager object.
 */
@@ -947,15 +948,18 @@ viewManager::Viewer::~Viewer() {}
 */
 void viewManager::Viewer::treeOrderComputeLayout(Element &e) {
   doubleNF numeric = doubleNF(0_px);
-  // the logic skips the calculation if it has already been
-  // performed. Also because of the walking order, object parents
-  // will already be resolved.
+  /* the logic skips the calculation if it has already been
+     performed. Also because of the walking order, object parents
+     will already be resolved. This is a necessity for the process
+     to work.
+  */
   if (!e.displayList.completed()) {
 
     // dereference for ease of syntax
     displayListItem &listEntry = e.displayList;
     Element &eParent = (*e.parent()).get();
 
+    /* left position */
     if (!listEntry.bCalculatedLeft) {
       if (listEntry.bAutoCalculateLeft) {
         listEntry.x1 = m_layoutPenX;
@@ -976,13 +980,14 @@ void viewManager::Viewer::treeOrderComputeLayout(Element &e) {
         listEntry.bAutoCalculateLeft = false;
       }
     }
+
+    /* top position */
     if (!listEntry.bCalculatedTop) {
       if (listEntry.bAutoCalculateTop) {
         listEntry.y1 = m_layoutPenY;
         listEntry.y1_nf = numericFormat::px;
         listEntry.bCalculatedTop = true;
         listEntry.bAutoCalculateTop = false;
-
       } else if (listEntry.y1_nf == numericFormat::percent) {
         listEntry.y1 =
             m_layoutPenY + (eParent.displayList.oh * (listEntry.y1 / 100));
@@ -998,19 +1003,28 @@ void viewManager::Viewer::treeOrderComputeLayout(Element &e) {
       }
     }
 
+    /* right position */
     if (!listEntry.bCalculatedRight) {
       if (listEntry.bAutoCalculateRight) {
         // get with of the text lines, the max size
         // m_device->measureTextWidth(e.data()[0]);
         if (listEntry.disp == display::in_line) {
-          
-          listEntry.x2 = m_layoutPenX + 100;
+          listEntry.ow = eParent.displayList.ow;
+          listEntry.ow_nf = numericFormat::px;
+          listEntry.ow = e.computeWidestTextData(*m_device.get());
+          // clamp to width of parent
+          if (listEntry.ow > eParent.displayList.ow)
+            listEntry.ow = eParent.displayList.ow;
+          listEntry.x2 = m_layoutPenX + listEntry.ow;
 
         } else {
+          listEntry.ow_nf = numericFormat::px;
           listEntry.x2 = eParent.displayList.x2;
+          listEntry.ow = listEntry.x2 - listEntry.x1;
         }
         listEntry.bCalculatedRight = true;
         listEntry.bAutoCalculateRight = false;
+
       } else if (listEntry.ow_nf == numericFormat::percent) {
         listEntry.ow = ((eParent.displayList.ow) * (listEntry.ow / 100));
         listEntry.ow_nf = numericFormat::px;
@@ -1020,17 +1034,19 @@ void viewManager::Viewer::treeOrderComputeLayout(Element &e) {
       } else {
         numeric = doubleNF(listEntry.ow, listEntry.ow_nf);
         listEntry.x2 = numeric.toPx();
+        listEntry.ow = listEntry.x2 - listEntry.x1;
         listEntry.ow_nf = numericFormat::px;
         listEntry.bCalculatedRight = true;
         listEntry.bAutoCalculateRight = false;
       }
     }
 
+    /* bottom position */
     if (!listEntry.bCalculatedBottom) {
       if (listEntry.bAutoCalculateBottom) {
-        // get with of the text lines, the max size
-        // m_device->measureTextWidth(e.data()[0]);
-        listEntry.oh = 50;
+        // get the height of the wrapped text in pixels.
+        listEntry.oh =
+            e.computeWrappedTextDataHeight(*m_device.get(), listEntry.ow);
         listEntry.oh_nf = numericFormat::px;
         listEntry.y2 = listEntry.y1 + listEntry.oh;
         listEntry.bCalculatedBottom = true;
@@ -1058,6 +1074,8 @@ void viewManager::Viewer::treeOrderComputeLayout(Element &e) {
       m_layoutPenY = listEntry.y2;
     }
   }
+
+  // iterate the children recursively.
   for (auto &n : e.children())
     treeOrderComputeLayout(n);
 }
@@ -1079,7 +1097,7 @@ void viewManager::Viewer::computeLayout(Element &e) {
   // knowing where to wrap textual data.
   for (auto &ptr : elements) {
     Element &e = *(ptr.second.get());
-    e.wordBreaks();
+    e.wordMetrics(*m_device.get());
   }
 
   /*
@@ -1108,17 +1126,15 @@ void viewManager::Viewer::computeLayout(Element &e) {
     // initialize base structure with defualts or the information from the
     // class object needed for display
     listEntry.bCalculatedTop = false;
-    listEntry.bCalculatedLeft = false;
     listEntry.bCalculatedBottom = false;
+    listEntry.bCalculatedLeft = false;
     listEntry.bCalculatedRight = false;
     listEntry.bCalculatedWidth = false;
     listEntry.bCalculatedHeight = false;
     listEntry.bAutoCalculateTop = false;
-    listEntry.bAutoCalculateLeft = false;
     listEntry.bAutoCalculateBottom = false;
+    listEntry.bAutoCalculateLeft = false;
     listEntry.bAutoCalculateRight = false;
-    listEntry.bAutoCalculateWidth = false;
-    listEntry.bAutoCalculateHeight = false;
 
     listEntry.x1 = 0;
     listEntry.y1 = 0;
@@ -1159,8 +1175,8 @@ void viewManager::Viewer::computeLayout(Element &e) {
     if (listEntry.pos == position::absolute) {
       try {
         numeric = e.getAttribute<objectLeft>();
-        if (numeric.option != numericFormat::percent ||
-            numeric.option != numericFormat::autoCalculate) {
+        if (numeric.option == numericFormat::percent ||
+            numeric.option == numericFormat::autoCalculate) {
           listEntry.x1 = numeric.value;
           listEntry.x1_nf = numeric.option;
 
@@ -1198,14 +1214,15 @@ void viewManager::Viewer::computeLayout(Element &e) {
     calculate option is turned on within the display list structure.
     */
 
-    /** X1 object left */
+    /** x1 object left */
     if (!listEntry.bCalculatedLeft) {
       try {
         numeric = e.getAttribute<objectLeft>();
-        listEntry.x1_nf = numeric.option;
-        if (numeric.option == numericFormat::autoCalculate)
+        if (numeric.option == numericFormat::autoCalculate) {
           listEntry.bAutoCalculateLeft = true;
-        else if (numeric.option == numericFormat::percent) {
+          listEntry.x1_nf = numeric.option;
+
+        } else if (numeric.option == numericFormat::percent) {
           listEntry.x1 = numeric.value;
           listEntry.x1_nf = numeric.option;
 
@@ -1221,15 +1238,16 @@ void viewManager::Viewer::computeLayout(Element &e) {
       }
     }
 
-    /** Y1 object top */
+    /** y1 object top */
     if (!listEntry.bCalculatedTop) {
       try {
         numeric = e.getAttribute<objectTop>();
-        listEntry.y1_nf = numeric.option;
 
-        if (numeric.option == numericFormat::autoCalculate)
+        if (numeric.option == numericFormat::autoCalculate) {
           listEntry.bAutoCalculateTop = true;
-        if (numeric.option == numericFormat::percent) {
+          listEntry.y1_nf = numeric.option;
+
+        } else if (numeric.option == numericFormat::percent) {
           listEntry.y1 = numeric.value;
           listEntry.y1_nf = numeric.option;
 
@@ -1248,13 +1266,14 @@ void viewManager::Viewer::computeLayout(Element &e) {
     /** object width */
     try {
       numeric = e.getAttribute<objectWidth>();
-      listEntry.ow_nf = numeric.option;
       if (numeric.option == numericFormat::autoCalculate) {
         listEntry.bAutoCalculateRight = true;
-        listEntry.bAutoCalculateWidth = true;
+        listEntry.ow_nf = numeric.option;
+
       } else if (numeric.option == numericFormat::percent) {
         listEntry.ow = numeric.value;
         listEntry.ow_nf = numeric.option;
+
       } else {
         listEntry.ow = numeric.toPx();
         listEntry.ow_nf = numericFormat::px;
@@ -1267,20 +1286,19 @@ void viewManager::Viewer::computeLayout(Element &e) {
     } catch (std::exception e) {
       listEntry.ow_nf = numericFormat::autoCalculate;
       listEntry.bAutoCalculateRight = true;
-      listEntry.bAutoCalculateWidth = true;
     }
 
     /** object height */
     try {
       numeric = e.getAttribute<objectHeight>();
-      listEntry.oh_nf = numeric.option;
       if (numeric.option == numericFormat::autoCalculate) {
         listEntry.bAutoCalculateBottom = true;
-        listEntry.bAutoCalculateHeight = true;
+        listEntry.oh_nf = numeric.option;
 
       } else if (numeric.option == numericFormat::percent) {
         listEntry.oh = numeric.value;
         listEntry.oh_nf = numeric.option;
+
       } else {
         listEntry.oh = numeric.toPx();
         listEntry.oh_nf = numericFormat::px;
@@ -1293,7 +1311,6 @@ void viewManager::Viewer::computeLayout(Element &e) {
     } catch (std::exception e) {
       listEntry.oh_nf = numericFormat::autoCalculate;
       listEntry.bAutoCalculateBottom = true;
-      listEntry.bAutoCalculateHeight = true;
     }
 
     // if the preceeding operations were resolved to find the widths or
@@ -1303,13 +1320,11 @@ void viewManager::Viewer::computeLayout(Element &e) {
       listEntry.x2 = listEntry.x1 + listEntry.ow;
       listEntry.bCalculatedRight = true;
       listEntry.bAutoCalculateRight = false;
-      listEntry.bAutoCalculateWidth = false;
     }
 
     if (listEntry.bCalculatedTop && listEntry.bCalculatedHeight) {
       listEntry.y2 = listEntry.y1 + listEntry.oh;
       listEntry.bCalculatedBottom = true;
-      listEntry.bAutoCalculateHeight = false;
       listEntry.bAutoCalculateBottom = false;
     }
 
@@ -1334,8 +1349,6 @@ void viewManager::Viewer::computeLayout(Element &e) {
   eRoot.displayList.bAutoCalculateLeft = false;
   eRoot.displayList.bAutoCalculateBottom = false;
   eRoot.displayList.bAutoCalculateRight = false;
-  eRoot.displayList.bAutoCalculateWidth = false;
-  eRoot.displayList.bAutoCalculateHeight = false;
 
   eRoot.displayList.bCalculatedLeft = true;
   eRoot.displayList.x1 = 0;
@@ -1343,8 +1356,10 @@ void viewManager::Viewer::computeLayout(Element &e) {
   eRoot.displayList.y1 = 0;
   eRoot.displayList.bCalculatedRight = true;
   eRoot.displayList.x2 = eRoot.getAttribute<objectWidth>().toPx();
+  eRoot.displayList.ow = eRoot.getAttribute<objectWidth>().toPx();
   eRoot.displayList.bCalculatedBottom = true;
   eRoot.displayList.y2 = eRoot.getAttribute<objectHeight>().toPx();
+  eRoot.displayList.oh = eRoot.getAttribute<objectHeight>().toPx();
 
   // recursively wlak the document and calculate layout.
   treeOrderComputeLayout(eRoot);
@@ -1355,7 +1370,6 @@ void viewManager::Viewer::computeLayout(Element &e) {
          return a->x1 < b->x1 && a->y1 < b->y1 && a->zIndex < b->zIndex;
        });
 }
-
 
 /**
 \internal
@@ -2554,6 +2568,7 @@ auto viewManager::Element::removeChildren(void) -> Element & {
 /**
 \brief The function removes all children and data from the
 the element. All memory for each of the elements is freed.
+
 \details The clear method is a bulk operation that removes
 all associated data within the public data members as well as
 all manually document elements. It should be noted that
@@ -2690,38 +2705,263 @@ routine stores the results in an unordered_map indexed by the typeid.
 A vector of std::size_t notes the index position within the string
 where the space is.
 */
-void viewManager::Element::wordBreaks(void) {
-  stringstream ss;
+void viewManager::Element::wordMetrics(Visualizer::platform &device) {
   // -- optimizations can be made here
   // caching the stream
   // caching the word breaks.
+  string stextface;
+  double dsize;
+
+  // get the textface and point size that is used for the element's
+  // data
+  try {
+    stextface = getAttribute<textFace>().value;
+  } catch (exception e) {
+    stextface = DEFAULT_TEXTFACE;
+  }
+
+  try {
+    dsize = getAttribute<textSize>().toPt();
+  } catch (exception e) {
+    dsize = DEFAULT_TEXTSIZE;
+  }
+  size_t storageTypeID;
+  // find all word breaks within the string
+  indexedWordMetrics.erase(indexedWordMetrics.begin(),
+                           indexedWordMetrics.end());
   for (auto m : m_usageAdaptorMap) {
-    if (m.first == typeid(std::vector<std::string>)) {
-      auto &o = std::any_cast<usageAdaptor<std::string> &>(m.second);
-      ss << o.textData();
-    } else if (m.first == typeid(std::vector<double>)) {
-      auto &o = std::any_cast<usageAdaptor<double> &>(m.second);
-      ss << o.textData();
-    } else if (m.first == typeid(std::vector<float>)) {
-      auto &o = std::any_cast<usageAdaptor<float> &>(m.second);
-      ss << o.textData();
-    } else if (m.first == typeid(std::vector<int>)) {
-      auto &o = std::any_cast<usageAdaptor<int> &>(m.second);
-      ss << o.textData();
+    size_t textDataSize = 0;
+
+    // get the number of elements
+    if (m.first == typeid(vector<string>)) {
+      storageTypeID = m.first.hash_code();
+      auto &o = any_cast<usageAdaptor<string> &>(m.second);
+      textDataSize = o.textDataSize();
+
+    } else if (m.first == typeid(vector<double>)) {
+      storageTypeID = m.first.hash_code();
+      auto &o = any_cast<usageAdaptor<double> &>(m.second);
+      textDataSize = o.textDataSize();
+
+    } else if (m.first == typeid(vector<float>)) {
+      storageTypeID = m.first.hash_code();
+      auto &o = any_cast<usageAdaptor<float> &>(m.second);
+      textDataSize = o.textDataSize();
+
+    } else if (m.first == typeid(vector<int>)) {
+      storageTypeID = m.first.hash_code();
+      auto &o = any_cast<usageAdaptor<int> &>(m.second);
+      textDataSize = o.textDataSize();
+    }
+
+    // iterate the data within the element,
+    // get both the size of the rendered field and
+    for (std::size_t idx = 0; idx < textDataSize; idx++) {
+      string s;
+
+      if (m.first == typeid(vector<string>)) {
+        auto &o = any_cast<usageAdaptor<string> &>(m.second);
+        s = o.textData(idx);
+      } else if (m.first == typeid(vector<double>)) {
+        auto &o = any_cast<usageAdaptor<double> &>(m.second);
+        s = o.textData(idx);
+      } else if (m.first == typeid(vector<float>)) {
+        auto &o = any_cast<usageAdaptor<float> &>(m.second);
+        s = o.textData(idx);
+      } else if (m.first == typeid(vector<int>)) {
+        auto &o = any_cast<usageAdaptor<int> &>(m.second);
+        s = o.textData(idx);
+      }
+
+      // build a tuple vector contains the totaling width as the string
+      // progresses including the space, the width of the text without a space,
+      // and the position of the space within the text
+      vector<wordMetricType> positions;
+      size_t pos = s.find_first_of(" \n\t");
+      size_t begin = 0;
+      double dtotal = 0;
+      string text;
+      double width;
+      double dspacesize = device.measureTextWidth(stextface, dsize, " ");
+      while (pos != s.npos) {
+        text = s.substr(begin, pos - begin);
+        width = device.measureTextWidth(stextface, dsize, text);
+        dtotal += width + dspacesize;
+        positions.push_back({dtotal, width, pos});
+        begin = pos + 1;
+        pos = s.find_first_of(" \n\t", begin);
+      }
+
+      // handle last part of string
+      text = s.substr(begin);
+      width = device.measureTextWidth(stextface, dsize, text);
+      dtotal += width + dspacesize;
+      positions.push_back({dtotal, width, pos});
+
+      indexedWordMetrics[{storageTypeID, idx}] = positions;
     }
   }
-  // find all word breaks within the string
-  string sText = ss.str();
-  m_wordBreaks.erase(m_wordBreaks.begin(), m_wordBreaks.end());
-  if (sText.size() == 0)
-    return;
-  vector<std::size_t> positions;
-  std::size_t pos = sText.find_first_of(" \n\t");
-  while (pos != sText.npos) {
-    positions.push_back(pos);
-    pos = sText.find_first_of(" \n\t", pos + 1);
+}
+
+/**
+\internal
+\brief The routine finds the largest string within the group of data elements.
+*/
+double
+viewManager::Element::computeWidestTextData(Visualizer::platform &device) {
+  double dMaxWidth = 0;
+  size_t storageTypeID;
+
+  for (auto m : m_usageAdaptorMap) {
+    size_t textDataSize;
+    // get the size of the amount of data
+    if (m.first == typeid(std::vector<std::string>)) {
+      storageTypeID = m.first.hash_code();
+      auto &o = std::any_cast<usageAdaptor<std::string> &>(m.second);
+      textDataSize = o.textDataSize();
+
+    } else if (m.first == typeid(std::vector<double>)) {
+      storageTypeID = m.first.hash_code();
+      auto &o = std::any_cast<usageAdaptor<double> &>(m.second);
+      textDataSize = o.textDataSize();
+
+    } else if (m.first == typeid(std::vector<float>)) {
+      storageTypeID = m.first.hash_code();
+      auto &o = std::any_cast<usageAdaptor<float> &>(m.second);
+      textDataSize = o.textDataSize();
+
+    } else if (m.first == typeid(std::vector<int>)) {
+      storageTypeID = m.first.hash_code();
+      auto &o = std::any_cast<usageAdaptor<int> &>(m.second);
+      textDataSize = o.textDataSize();
+    }
+
+    // iterate the word Metrics
+    for (size_t idx = 0; idx < textDataSize; idx++) {
+
+      // find the textual layout positions for wrapping
+      vector<wordMetricType> lineWordMetrics;
+      auto it = indexedWordMetrics.find({storageTypeID, idx});
+      if (it != indexedWordMetrics.end()) {
+        lineWordMetrics = it->second;
+      }
+
+      // if the line will fit within the defined rectangle, show it without
+      // searching
+      if (dMaxWidth <= lineWordMetrics.back().totalWidth)
+        dMaxWidth = lineWordMetrics.back().totalWidth;
+    }
   }
-  m_wordBreaks = positions;
+  return dMaxWidth;
+}
+
+/**
+\internal
+\brief The routine performs a virtual wrapping of the textual data based
+upon the contents of the information.
+*/
+double
+viewManager::Element::computeWrappedTextDataHeight(Visualizer::platform &device,
+                                                   double dWrappingWidth) {
+  string sTextFace;
+  int tSize;
+  double dFaceHeight;
+  double dLineHeight;
+  double dTextLineHeight;
+  size_t linesDisplayed = 0;
+
+  try {
+    sTextFace = getAttribute<textFace>().value;
+  } catch (const std::exception &e) {
+    sTextFace = DEFAULT_TEXTFACE;
+  }
+
+  try {
+    auto v = getAttribute<textSize>().toPt();
+    tSize = static_cast<int>(v);
+  } catch (const std::exception &e) {
+    tSize = DEFAULT_TEXTSIZE;
+  }
+
+  // adjust the textline height to pixel values for advancement.
+  // the lineheight is given in a decimal range.
+  dLineHeight = 1.0;
+  try {
+    auto lh = getAttribute<lineHeight>();
+    if (lh.option == lineHeight::normal)
+      dLineHeight = lh.value;
+  } catch (std::exception e) {
+  }
+  dFaceHeight = device.measureFaceHeight(sTextFace, tSize);
+  dTextLineHeight = dFaceHeight * dLineHeight;
+  size_t storageTypeID;
+  for (auto m : m_usageAdaptorMap) {
+    size_t textDataSize;
+    // get the size of the amount of data
+    if (m.first == typeid(std::vector<std::string>)) {
+      storageTypeID = m.first.hash_code();
+      auto &o = std::any_cast<usageAdaptor<std::string> &>(m.second);
+      textDataSize = o.textDataSize();
+
+    } else if (m.first == typeid(std::vector<double>)) {
+      storageTypeID = m.first.hash_code();
+      auto &o = std::any_cast<usageAdaptor<double> &>(m.second);
+      textDataSize = o.textDataSize();
+
+    } else if (m.first == typeid(std::vector<float>)) {
+      storageTypeID = m.first.hash_code();
+      auto &o = std::any_cast<usageAdaptor<float> &>(m.second);
+      textDataSize = o.textDataSize();
+
+    } else if (m.first == typeid(std::vector<int>)) {
+      storageTypeID = m.first.hash_code();
+      auto &o = std::any_cast<usageAdaptor<int> &>(m.second);
+      textDataSize = o.textDataSize();
+    }
+
+    // iterate the strings within the data
+    for (size_t idx = 0; idx < textDataSize; idx++) {
+
+      // find the textual layout positions for wrapping
+      vector<wordMetricType> lineWordMetrics;
+      auto it = indexedWordMetrics.find({storageTypeID, idx});
+      if (it != indexedWordMetrics.end()) {
+        lineWordMetrics = it->second;
+      }
+
+      // if the line will fit within the defined rectangle, show it without
+      // searching
+      if (dWrappingWidth >= lineWordMetrics.back().totalWidth) {
+        linesDisplayed++;
+      } else {
+        // find the width that can be drawn within the given rectangle of text.
+        // and break apart the text into line wrapping.
+        double dConsumedSpace = 0;
+        double dTotalConsumedSpace = 0;
+        for (auto &n : lineWordMetrics) {
+          if (n.totalWidth - dTotalConsumedSpace > dWrappingWidth) {
+
+            // accumulate the total amount of horizontal space within the
+            // string that has been rendered.
+            dTotalConsumedSpace = dTotalConsumedSpace + dConsumedSpace;
+            dConsumedSpace = 0;
+            linesDisplayed++;
+
+            // display last part of unbroken contigious string, last time
+            // processing
+            if (lineWordMetrics.back().totalWidth - dTotalConsumedSpace <=
+                displayList.ow) {
+              linesDisplayed++;
+              break;
+            }
+          }
+
+          dConsumedSpace = n.totalWidth - dTotalConsumedSpace;
+        }
+      }
+    }
+  }
+  return linesDisplayed * dTextLineHeight;
 }
 
 /**
@@ -2733,32 +2973,13 @@ is, system already invokes this as part of the processing stack. The
 work performed by this routine is accomplished using the surface image.
 */
 void viewManager::Element::render(Visualizer::platform &device) {
-  stringstream ss;
-
-  for (auto m : m_usageAdaptorMap) {
-    if (m.first == typeid(std::vector<std::string>)) {
-      auto &o = std::any_cast<usageAdaptor<std::string> &>(m.second);
-      ss << o.textData();
-    } else if (m.first == typeid(std::vector<double>)) {
-      auto &o = std::any_cast<usageAdaptor<double> &>(m.second);
-      ss << o.textData();
-    } else if (m.first == typeid(std::vector<float>)) {
-      auto &o = std::any_cast<usageAdaptor<float> &>(m.second);
-      ss << o.textData();
-    } else if (m.first == typeid(std::vector<int>)) {
-      auto &o = std::any_cast<usageAdaptor<int> &>(m.second);
-      ss << o.textData();
-    }
-  }
-
-  // skip blank lines
-  if (ss.str().size() == 0)
-    return;
-
   string sTextFace;
   int tSize;
   int tColor;
   textAlignment tAlign = textAlignment(textAlignment::left);
+  double dFaceHeight;
+  double dLineHeight;
+  double dTextLineHeight;
 
   try {
     sTextFace = getAttribute<textFace>().value;
@@ -2780,15 +3001,137 @@ void viewManager::Element::render(Visualizer::platform &device) {
   } catch (const std::exception &e) {
     tColor = DEFAULT_TEXTCOLOR;
   }
+
   try {
     tAlign = getAttribute<textAlignment>();
   } catch (const std::exception &e) {
     tAlign = textAlignment::left;
   }
 
-  // draw within the calculated layout rectangle.
-  device.drawText(sTextFace, tSize, ss.str(), tColor, displayList.x1,
-                  displayList.y1, displayList.x2, displayList.y2, tAlign);
+  // adjust the textline height to pixel values for advancement.
+  // the lineheight is given in a decimal range.
+  dLineHeight = 1.0;
+  try {
+    auto lh = getAttribute<lineHeight>();
+    if (lh.option == lineHeight::normal)
+      dLineHeight = lh.value;
+  } catch (std::exception e) {
+  }
+  dFaceHeight = device.measureFaceHeight(sTextFace, tSize);
+  dTextLineHeight = dFaceHeight * dLineHeight;
+  size_t storageTypeID;
+
+  for (auto m : m_usageAdaptorMap) {
+    size_t textDataSize;
+    // get the size of the amount of data
+    if (m.first == typeid(std::vector<std::string>)) {
+      storageTypeID = m.first.hash_code();
+      auto &o = std::any_cast<usageAdaptor<std::string> &>(m.second);
+      textDataSize = o.textDataSize();
+
+    } else if (m.first == typeid(std::vector<double>)) {
+      storageTypeID = m.first.hash_code();
+      auto &o = std::any_cast<usageAdaptor<double> &>(m.second);
+      textDataSize = o.textDataSize();
+
+    } else if (m.first == typeid(std::vector<float>)) {
+      storageTypeID = m.first.hash_code();
+      auto &o = std::any_cast<usageAdaptor<float> &>(m.second);
+      textDataSize = o.textDataSize();
+
+    } else if (m.first == typeid(std::vector<int>)) {
+      storageTypeID = m.first.hash_code();
+      auto &o = std::any_cast<usageAdaptor<int> &>(m.second);
+      textDataSize = o.textDataSize();
+    }
+
+    // iterate the strings within the data
+    size_t linesDisplayed = 0;
+    for (size_t idx = 0; idx < textDataSize; idx++) {
+      string s;
+
+      if (m.first == typeid(std::vector<std::string>)) {
+        auto &o = std::any_cast<usageAdaptor<std::string> &>(m.second);
+        s = o.textData(idx);
+      } else if (m.first == typeid(std::vector<double>)) {
+        auto &o = std::any_cast<usageAdaptor<double> &>(m.second);
+        s = o.textData(idx);
+      } else if (m.first == typeid(std::vector<float>)) {
+        auto &o = std::any_cast<usageAdaptor<float> &>(m.second);
+        s = o.textData(idx);
+      } else if (m.first == typeid(std::vector<int>)) {
+        auto &o = std::any_cast<usageAdaptor<int> &>(m.second);
+        s = o.textData(idx);
+      }
+
+      // find the textual layout positions for wrapping
+      vector<wordMetricType> lineWordMetrics;
+      auto it = indexedWordMetrics.find({storageTypeID, idx});
+      if (it != indexedWordMetrics.end()) {
+        lineWordMetrics = it->second;
+      }
+
+      // if the line will fit within the defined rectangle, show it without
+      // searching
+      if (displayList.ow >= lineWordMetrics.back().totalWidth) {
+        // draw within the calculated layout rectangle.
+        device.drawText(sTextFace, tSize, s, tColor, displayList.x1,
+                        displayList.y1 + idx * dTextLineHeight, displayList.x2,
+                        displayList.y2, tAlign);
+      } else {
+        // find the width that can be drawn within the given rectangle of text.
+        // and break apart the text into line wrapping.
+        bool bDone = false;
+        double dyPos = displayList.y1;
+        wordMetricType lastMetric=lineWordMetrics[0];
+        size_t lastCharacterRendered = 0;
+        string sText;
+        double dConsumedSpace = 0;
+        double dTotalConsumedSpace = 0;
+        for (auto &n : lineWordMetrics) {
+          if (n.totalWidth - dTotalConsumedSpace > displayList.ow) {
+            // get the piece of text that is calculate to fit within the
+            // bounds.
+            sText = s.substr(lastCharacterRendered,
+                             lastMetric.spacePosition - lastCharacterRendered);
+
+            // draw within the calculated layout rectangle.
+            device.drawText(sTextFace, tSize, sText, tColor, displayList.x1,
+                            displayList.y1 + linesDisplayed * dTextLineHeight,
+                            displayList.x2, displayList.y2, tAlign);
+
+            // accumulate the total amount of horizontal space within the
+            // string that has been rendered.
+            dTotalConsumedSpace = dTotalConsumedSpace + dConsumedSpace;
+            dConsumedSpace = 0;
+            lastCharacterRendered = lastMetric.spacePosition + 1;
+            linesDisplayed++;
+
+            // display last part of unbroken contigious string, last time
+            // processing
+            if (lineWordMetrics.back().totalWidth - dTotalConsumedSpace <=
+                displayList.ow) {
+              sText =
+                  s.substr(lastCharacterRendered,
+                           lastMetric.spacePosition - lastCharacterRendered);
+
+              // draw within the calculated layout rectangle.
+              device.drawText(sTextFace, tSize, sText, tColor, displayList.x1,
+                              displayList.y1 + linesDisplayed * dTextLineHeight,
+                              displayList.x2, displayList.y2, tAlign);
+              linesDisplayed++;
+
+              lastMetric = lineWordMetrics.back();
+              break;
+            }
+          }
+
+          dConsumedSpace = n.totalWidth - dTotalConsumedSpace;
+          lastMetric = n;
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -2919,6 +3262,8 @@ Element &viewManager::Element::ingestMarkup(Element &node,
         pc.parsedData.emplace_back(textData, false, pc.sText);
         pc.sText = "";
       }
+      pc.bAttributeList=false;
+      pc.bAttributeListValue=false;
       pc.bSignal = true;
       pc.bSkip = true;
       break;
@@ -3011,6 +3356,12 @@ Element &viewManager::Element::ingestMarkup(Element &node,
 
     } break;
 
+    case attributeSimple: {
+      get<attributeLambda>(get<2>(*item))(pc.elementStack.back(), "");
+      // mark as processed
+      get<1>(*item) = true;
+    } break;
+
     case color: {
       auto &e = pc.elementStack.back().get().appendChild<textNode>(
           textColor{get<colorNF>(get<2>(*item))});
@@ -3065,7 +3416,7 @@ void viewManager::Element::processParseContext(
   std::transform(sKey.begin(), sKey.end(), sKey.begin(),
                  [](unsigned char c) { return std::tolower(c); });
 
-  if (pc.bToken && !pc.bAttributeListValue) {
+  if (pc.bAttributeList && !pc.bAttributeListValue) {
 
     // store iterator to the function
     auto it = attributeFactory.find(sKey);
@@ -3082,6 +3433,8 @@ void viewManager::Element::processParseContext(
       }
     pc.sCapture = "";
     pc.bQuery = false;
+    if (!pc.bSignal)
+      pc.bToken = false;
 
   } else if (pc.bAttributeList && pc.bAttributeListValue) {
     pc.parsedData.emplace_back(attributeValue, false, pc.sCapture);
@@ -3509,9 +3862,9 @@ LRESULT CALLBACK viewManager::Visualizer::platform::WndProc(HWND hwnd,
 #endif
 
 /**
-  \internal
-  \brief the routine handles the message processing for the specific
-  operating system. The function is called from processEvents.
+\internal
+\brief the routine handles the message processing for the specific
+operating system. The function is called from processEvents.
 
 */
 void viewManager::Visualizer::platform::messageLoop(void) {
@@ -3879,9 +4232,9 @@ explanitory.
 \param const char c is the individual character
 \param const unsigned int foregroundColor is the forgeound color of the
 text.
-\param FT_UInt glyph_index is the index of the character. \param const
-FT_Size sizeFace The face sized projection \param const FTC_Scaler pscaler
-the scaler record
+\param FT_UInt glyph_index is the index of the character.
+\param const FT_Size sizeFace The face sized projection
+\param const FTC_Scaler pscaler the scaler record
 */
 int viewManager::Visualizer::platform::drawChar(
     const int xPos, const int yPos, const int xPos2, const int yPos2,
@@ -4047,6 +4400,8 @@ FTC_FaceID viewManager::Visualizer::platform::getFaceID(string sTextFace) {
                                     static_cast<int>(m_faceCache.size())};
     pair<faceCacheIterator, bool> result =
         m_faceCache.insert({sTextFace, faceCacheRecord});
+    // A potential bug may exist when items are added while the faceID is
+    // waiting to be used.
     if (result.second)
       faceID = static_cast<FTC_FaceID>(&(result.first->second));
   }
@@ -4162,6 +4517,48 @@ double viewManager::Visualizer::platform::measureTextWidth(
     previous_index = glyph_index;
   }
   return ret;
+}
+
+/**
+\internal
+\brief the function measures the height of the textFace
+\param const std::string &sTextFace the face name
+\param const int pointSize the size in point of the font
+
+*/
+double viewManager::Visualizer::platform::measureFaceHeight(
+    const std::string &sTextFace, const int pointSize) {
+  FT_Error error;
+  FTC_ScalerRec scaler;
+  FT_Size sizeFace;
+
+  // store a cache record for loaded fonts.
+  FTC_FaceID faceID = getFaceID(sTextFace);
+
+  // having this as a local variable
+  scaler.face_id = faceID;
+  scaler.pixel = 0;
+  scaler.height = (pointSize + fontScale) * 64;
+  scaler.width = (pointSize + fontScale) * 64;
+
+  scaler.x_res = 96;
+  scaler.y_res = 96;
+
+  // get the face
+  error = FTC_Manager_LookupSize(m_cacheManager, &scaler, &sizeFace);
+
+  if (error)
+    throw std::runtime_error("Could not retrieve font face.");
+
+  error = FT_Activate_Size(sizeFace);
+  if (error)
+    throw std::runtime_error("Could FT_Activate_Size for font.");
+
+  FT_Face face = sizeFace->face;
+
+  // get the height of the font
+  int faceHeight = face->size->metrics.height >> 6;
+  return static_cast<double>(faceHeight);
 }
 
 /**
