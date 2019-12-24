@@ -63,7 +63,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE /* hPrevInstance */,
   test0(vm);
   test0c(vm);
 #endif
-  test0b(vm);
+  //test0(vm);
+  //test0c(vm);
+  //test0b(vm);
   test0d(vm);
 #if 0
   testUX(vm);
@@ -156,8 +158,8 @@ void test0b(Viewer &vm) {
 void test0c(Viewer &vm) {
   testStart(__FUNCTION__);
 
-  vm.appendChild("<div id=testAdd>test information inside</div>");
-  vm.appendChild("<div id=markupSecond>the drive to complete is the sincere "
+  vm.appendChild("<div id=testAdd>Test information inside</div>");
+  vm.appendChild("<div id=markupSecond>The drive to complete is the sincere "
                  "satisfaction of a working system. While a solution is a "
                  "compromise, value is found within the description.</div>");
 
@@ -174,11 +176,14 @@ void test0c(Viewer &vm) {
 //! [test0]
 void test0d(Viewer &vm) {
   vm.ingestStream = true;
-  #if 0
+
   vm.appendChild("<h1 color=orange>Layout Manager</h1>");
-  vm.appendChild("<div inline width=250px id=markupSecond>the drive to complete is the sincere "
+  
+  vm.appendChild("<div inline width=250px id=markupSecond>The drive to complete is the sincere "
                  "satisfaction of a working system. While a solution is a "
                  "compromise, value is found within the description.</div>");
+
+
   vm << "<p>Does mixing the objects still calculate appropiately. I "
         "believe the logic would work since they are separate elements."
         "Yet information is trampled upon. It is like the y pen position"
@@ -187,10 +192,12 @@ void test0d(Viewer &vm) {
         "Ahh to discover the options, and the breakages."
         "The other problem with the layout is that the "
         "resizing to a small tollerance beyond the size of the smallest wrap"
-        " objext causes a freeze.</p>";
-  #endif
-  vm << "<div width=50% inline><h2 color=midnightblue>Quality Description</h2>";
-  vm << "<p>Several bugs still exist and new feature logic will have to be "
+        " object causes a freeze. The previous problem described has been fixed.</p>";
+  vm << "<p>Second block of information might appear where?</p>";
+  #if 0
+  vm << "<div width=50%><h2 color=midnightblue>Quality Description</h2>";
+  vm << "<p textsize=16pt color=darkgreen>Several bugs still exist and new feature "
+        "logic will have to be "
         "added. Such as the calculation of spacing of the left side being greater."
         "When the left side height is greater than the right, the layout manager "
         "should move the rendering down to the next layer. This may involve "
@@ -201,13 +208,15 @@ void test0d(Viewer &vm) {
   vm << "<div width=50% inline><h2 color=red>Bugs</h2>";
   vm << "<ul>"
         "<li></li>"
-        "<li>The font height is incorrect somehow.</li>"
+        "<li>The font height is incorrect somehow. FIXED</li>"
         "<li>Adding inline to the paragraph produces incorrect results. Meaning that the height is not gathered. </li>"
         "<li>Many layout features to debug.</li>"
         "<li>The dots do not draw yet...</li>"
-        "<li>It locks up when the resizing.</li>"
+        "<li>It locks up when the resizing. FIXED</li>"
         "<li>mixing data nodes and other elements seems quirky.</li></ul></div>";
   vm.appendChild<ul>().appendChild<li>("one").append<li>("two").append<li>("three");
+  #endif
+
 }
 
 /************************************************************************

@@ -946,7 +946,7 @@ viewManager::Viewer::~Viewer() {}
   should be calculated.
 
 */
-void viewManager::Viewer::treeOrderComputeLayout(Element &e) {
+void viewManager::Viewer::treeOrderComputeLayout(double &dpenX, double &dpenY,Element &e) {
   doubleNF numeric = doubleNF(0_px);
   /* the logic skips the calculation if it has already been
      performed. Also because of the walking order, object parents
@@ -954,7 +954,7 @@ void viewManager::Viewer::treeOrderComputeLayout(Element &e) {
      to work.
   */
   if (!e.displayList.completed()) {
-
+    
     // dereference for ease of syntax
     displayListItem &listEntry = e.displayList;
     Element &eParent = (*e.parent()).get();
@@ -962,13 +962,13 @@ void viewManager::Viewer::treeOrderComputeLayout(Element &e) {
     /* left position */
     if (!listEntry.bCalculatedLeft) {
       if (listEntry.bAutoCalculateLeft) {
-        listEntry.x1 = m_layoutPenX;
+        listEntry.x1 = dpenX;
         listEntry.x1_nf = numericFormat::px;
         listEntry.bCalculatedLeft = true;
         listEntry.bAutoCalculateLeft = false;
       } else if (listEntry.x1_nf == numericFormat::percent) {
         listEntry.x1 =
-            m_layoutPenX + (eParent.displayList.oh * (listEntry.x1 / 100));
+            dpenX + (eParent.displayList.oh * (listEntry.x1 / 100));
         listEntry.x1_nf = numericFormat::px;
         listEntry.bCalculatedLeft = true;
         listEntry.bAutoCalculateLeft = false;
@@ -984,13 +984,13 @@ void viewManager::Viewer::treeOrderComputeLayout(Element &e) {
     /* top position */
     if (!listEntry.bCalculatedTop) {
       if (listEntry.bAutoCalculateTop) {
-        listEntry.y1 = m_layoutPenY;
+        listEntry.y1 = dpenY;
         listEntry.y1_nf = numericFormat::px;
         listEntry.bCalculatedTop = true;
         listEntry.bAutoCalculateTop = false;
       } else if (listEntry.y1_nf == numericFormat::percent) {
         listEntry.y1 =
-            m_layoutPenY + (eParent.displayList.oh * (listEntry.y1 / 100));
+            dpenY + (eParent.displayList.oh * (listEntry.y1 / 100));
         listEntry.y1_nf = numericFormat::px;
         listEntry.bCalculatedTop = true;
         listEntry.bAutoCalculateTop = false;
@@ -1007,7 +1007,6 @@ void viewManager::Viewer::treeOrderComputeLayout(Element &e) {
     if (!listEntry.bCalculatedRight) {
       if (listEntry.bAutoCalculateRight) {
         // get with of the text lines, the max size
-        // m_device->measureTextWidth(e.data()[0]);
         if (listEntry.disp == display::in_line) {
           listEntry.ow = eParent.displayList.ow;
           listEntry.ow_nf = numericFormat::px;
@@ -1015,7 +1014,7 @@ void viewManager::Viewer::treeOrderComputeLayout(Element &e) {
           // clamp to width of parent
           if (listEntry.ow > eParent.displayList.ow)
             listEntry.ow = eParent.displayList.ow;
-          listEntry.x2 = m_layoutPenX + listEntry.ow;
+          listEntry.x2 = dpenX + listEntry.ow;
 
         } else {
           listEntry.ow_nf = numericFormat::px;
@@ -1028,7 +1027,7 @@ void viewManager::Viewer::treeOrderComputeLayout(Element &e) {
       } else if (listEntry.ow_nf == numericFormat::percent) {
         listEntry.ow = ((eParent.displayList.ow) * (listEntry.ow / 100));
         listEntry.ow_nf = numericFormat::px;
-        listEntry.x2 = m_layoutPenX + listEntry.ow;
+        listEntry.x2 = dpenX + listEntry.ow;
         listEntry.bCalculatedRight = true;
         listEntry.bAutoCalculateRight = false;
       } else {
@@ -1054,7 +1053,7 @@ void viewManager::Viewer::treeOrderComputeLayout(Element &e) {
       } else if (listEntry.oh_nf == numericFormat::percent) {
         listEntry.oh = (eParent.displayList.oh * (listEntry.y2 / 100));
         listEntry.oh_nf = numericFormat::px;
-        listEntry.y2 = m_layoutPenY + listEntry.oh;
+        listEntry.y2 = dpenY + listEntry.oh;
         listEntry.bCalculatedBottom = true;
         listEntry.bAutoCalculateBottom = false;
       } else {
@@ -1065,55 +1064,78 @@ void viewManager::Viewer::treeOrderComputeLayout(Element &e) {
       }
     }
 
+    if(dpenX>maxX)
+      maxX=dpenX;
+    if(dpenY>maxY)
+      maxY=dpenY;
+    if(listEntry.y2 > eParent.maxY)
+      eParent.maxY=listEntry.y2;
+
     // advance the pen based upon the display mode
     if (listEntry.disp == display::in_line) {
-      m_layoutPenX = listEntry.x2;
-      m_layoutPenY = listEntry.y1;
+      dpenX = listEntry.x2;
+      dpenY = listEntry.y1;
     } else if (listEntry.disp == display::block) {
-      m_layoutPenX = eParent.displayList.x1;
-      m_layoutPenY = listEntry.y2;
+      dpenX = eParent.displayList.x1;
+      dpenY = eParent.maxY;
+      //listEntry.y2;
     }
+
+    if(dpenX>=eParent.displayList.ow)
+      e.penX=e.displayList.x1;
+    //if(e.penY>=e.displayList.oh)
+    //  break;
   }
+  e.penX=dpenX;
+  e.penY=dpenY;
 
   // iterate the children recursively.
-  for (auto &n : e.children())
-    treeOrderComputeLayout(n);
+  for (auto &n : e.children()) {
+    treeOrderComputeLayout(e.penX, e.penY, n);
+  }
 }
 
 /**
-\brief The routine processes the list of element such that the layout
+\brief The routine processes the list of elements such that the layout
 and units are all expressed within the model as pixel units. After this
 function is ran, each element will have a rectangle attached that expresses
-it pixel size on the viewing device.
+it's pixel size on the viewing device.
 */
 void viewManager::Viewer::computeLayout(Element &e) {
-  m_layoutPenX = 0;
-  m_layoutPenY = 0;
+  penX = 0;
+  penY = 0;
 
   // clear the display list.
   m_displayList.erase(m_displayList.begin(), m_displayList.end());
 
-  // ensure word break indexing are performed for
-  // knowing where to wrap textual data.
+  // ensure word break and font metrics indexing are performed. 
+  // This is used to know where to wrap textual data, calculations 
+  // of widths and heights of fields.
   for (auto &ptr : elements) {
     Element &e = *(ptr.second.get());
     e.wordMetrics(*m_device.get());
+    e.penX=0;
+    e.penY=0;
+    e.maxX=0;
+    e.maxY=0;
   }
 
   /*
    This loop establishes all items that will be involved within the
-   display of elements. The first process resolves all
-   calculations without dependencies than can be found.
+   display of elements. As well, the loop initalizes the displayList
+   class. Breaking the process into two parts simplifies the second
+   logic in that exception handling will not be used. The loop process 
+   also resolves all calculations without dependencies than can be 
+   found such as absolute positions
 
-   A particually area of interest is exception handling that occurrs.
-   As the resuolt, items and options are set to default, however preserving
+   A particular area of interest is exception handling that occurrs.
+   As the result, items and options are set to default, however preserving
    the unstored state within the attribute list. The display list has the
-   defaults set.
+   defaults set within its cachce.
   */
   for (auto &ptr : elements) {
     // store local reference for ease of syntax
     Element &e = *(ptr.second.get());
-
     displayListItem &listEntry = e.displayList;
 
     // items that are not displayed are not included in the list
@@ -1166,11 +1188,12 @@ void viewManager::Viewer::computeLayout(Element &e) {
 
     /* if items are absolute, they can be calculated
      absolute position items must have the coordinates expressed
-     in numerical values, not percentages.
-     resoluve on measurements that can be converted or calculated.
+     in numerical values, not percentages. When percentages are used,
+     they are resolved after their depencency is calculated.
+     So basically this first phase resolves all measurements 
+     that can be converted or calculated.
      At times the developer using the library may choose to have absolute
-     positioning however let the system calculate the defaults or the terms
-     might be expressed in a percentage.
+     positioning. Or let the system calculate the defaults for the terms.
     */
     if (listEntry.pos == position::absolute) {
       try {
@@ -1209,12 +1232,12 @@ void viewManager::Viewer::computeLayout(Element &e) {
 
     /*
     These series of tests performs the logic of calculation when the value
-    can be determine without other dependency. If the item is not found
+    can be determined without other dependency. If the item is not found
     within the structure or if its option is set to auto calculate, the auto
     calculate option is turned on within the display list structure.
     */
 
-    /** x1 object left */
+    /**************************************************** x1 object left */
     if (!listEntry.bCalculatedLeft) {
       try {
         numeric = e.getAttribute<objectLeft>();
@@ -1238,7 +1261,7 @@ void viewManager::Viewer::computeLayout(Element &e) {
       }
     }
 
-    /** y1 object top */
+    /**************************************************** y1 object top */
     if (!listEntry.bCalculatedTop) {
       try {
         numeric = e.getAttribute<objectTop>();
@@ -1263,7 +1286,7 @@ void viewManager::Viewer::computeLayout(Element &e) {
       }
     }
 
-    /** object width */
+    /**************************************************** object width */
     try {
       numeric = e.getAttribute<objectWidth>();
       if (numeric.option == numericFormat::autoCalculate) {
@@ -1288,7 +1311,7 @@ void viewManager::Viewer::computeLayout(Element &e) {
       listEntry.bAutoCalculateRight = true;
     }
 
-    /** object height */
+    /**************************************************** object height */
     try {
       numeric = e.getAttribute<objectHeight>();
       if (numeric.option == numericFormat::autoCalculate) {
@@ -1316,12 +1339,14 @@ void viewManager::Viewer::computeLayout(Element &e) {
     // if the preceeding operations were resolved to find the widths or
     // heights and the top or left coordinates are also known, the bottom
     // may be found as well.
+    /**************************************************** object bottom */
     if (listEntry.bCalculatedLeft && listEntry.bCalculatedWidth) {
       listEntry.x2 = listEntry.x1 + listEntry.ow;
       listEntry.bCalculatedRight = true;
       listEntry.bAutoCalculateRight = false;
     }
 
+    /**************************************************** object top */
     if (listEntry.bCalculatedTop && listEntry.bCalculatedHeight) {
       listEntry.y2 = listEntry.y1 + listEntry.oh;
       listEntry.bCalculatedBottom = true;
@@ -1361,8 +1386,8 @@ void viewManager::Viewer::computeLayout(Element &e) {
   eRoot.displayList.y2 = eRoot.getAttribute<objectHeight>().toPx();
   eRoot.displayList.oh = eRoot.getAttribute<objectHeight>().toPx();
 
-  // recursively wlak the document and calculate layout.
-  treeOrderComputeLayout(eRoot);
+  // recursively walk the document and calculate layout.
+  treeOrderComputeLayout(eRoot.penX, eRoot.penY, eRoot);
 
   // sort the displayList by left, top, and zOrder
   sort(m_displayList.begin(), m_displayList.end(),
@@ -2700,7 +2725,9 @@ auto viewManager::Element::removeListener(eventType evtType,
 \internal
 \brief The function provides the calculation of all word break by
 recording the index of spaces. This is used by the layout system
-to determine where to wrap text based upon the font metrics. The
+to determine where to wrap text based upon the font metrics. The function
+also provides measurement in pixels of textual data based upon the font.
+The routine measureTextWidth within the devie object is used for this. The
 routine stores the results in an unordered_map indexed by the typeid.
 A vector of std::size_t notes the index position within the string
 where the space is.
@@ -4253,6 +4280,7 @@ int viewManager::Visualizer::platform::drawChar(
 
   // get the height of the font
   int faceHeight = face->size->metrics.height >> 6;
+  int baseline=face->size->metrics.ascender>>6;
 
   /**
   \brief use greyscale or color lcd filtering
@@ -4291,7 +4319,7 @@ int viewManager::Visualizer::platform::drawChar(
   FT_BitmapGlyph bitmap;
 
   // get the image, however this is just the outline
-  error = FTC_ImageCache_LookupScaler(m_imageCache, scaler, FT_LOAD_DEFAULT,
+  error = FTC_ImageCache_LookupScaler(m_imageCache, pscaler, FT_LOAD_DEFAULT,
                                       glyph_index, &aglyph, nullptr);
   if (error)
     return 0;
@@ -4314,11 +4342,11 @@ int viewManager::Visualizer::platform::drawChar(
 #endif
 
   x = xPos;
-  y = yPos + faceHeight - top;
+  y = yPos +  baseline - top;
 
   // calculate the maximum bounds
   int xmax = x + width / storageSize + left;
-  int ymax = yPos + faceHeight + height - top;
+  int ymax = yPos + (baseline-top) + height;
 
   // if the maximum bounds are greater than the clipping region, adjust.
   if (xmax > xPos2)
@@ -4502,7 +4530,7 @@ double viewManager::Visualizer::platform::measureTextWidth(
     FT_BitmapGlyph bitmap;
 
     // get the image, however this is just the outline
-    error = FTC_ImageCache_LookupScaler(m_imageCache, scaler, FT_LOAD_DEFAULT,
+    error = FTC_ImageCache_LookupScaler(m_imageCache, &scaler, FT_LOAD_DEFAULT,
                                         glyph_index, &aglyph, nullptr);
     if (error)
       continue;

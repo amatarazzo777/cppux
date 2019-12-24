@@ -48,12 +48,6 @@ against the USE_GREYSCALE_ANTIALIAS option. One one should be defined.
 //#define USE_LCD_FILTER
 
 /**
-\def USE_INLINE_RENDERER
-\brief The system will be configured to use the CEF framework
-*/
-#define USE_CHROMIUM_EMBEDDED_FRAMEWORK
-
-/**
 \def USE_CHROMIUM_EMBEDDED_FRAMEWORK
 \brief The system will be configured to use the CEF system.
 */
@@ -879,11 +873,15 @@ public:
 class Element {
 public:
   std::string_view softName;
+  double penX;
+  double penY;
+  double maxX;
+  double maxY;
 
 public:
   Element(const std::string_view &_softName,
           const std::vector<std::any> &attribs = {})
-      : softName(_softName), m_self(this), m_parent(nullptr),
+      : softName(_softName), penX(0), penY(0), maxX(0),maxY(0), m_self(this), m_parent(nullptr),
         m_firstChild(nullptr), m_lastChild(nullptr), m_nextChild(nullptr),
         m_previousChild(nullptr), m_nextSibling(nullptr),
         m_previousSibling(nullptr), m_childCount(0), ingestStream(false) {
@@ -1368,7 +1366,7 @@ public:
   double computeWrappedTextDataHeight(Visualizer::platform &device,
                                       double dWrappingWidth);
   double computeWidestTextData(Visualizer::platform &device);
-  typedef struct  {
+  typedef struct {
     double totalWidth;
     double wordWidth;
     size_t spacePosition;
@@ -2085,13 +2083,11 @@ public:
   void dispatchEvent(const event &e);
 
 private:
-  void treeOrderComputeLayout(Element &e);
+  void treeOrderComputeLayout(double &penx, double &penY, Element &e);
   void computeLayout(Element &e);
 
 private:
   std::unique_ptr<Visualizer::platform> m_device;
-  double m_layoutPenX;
-  double m_layoutPenY;
 
   std::vector<displayListItem *> m_displayList;
 };
