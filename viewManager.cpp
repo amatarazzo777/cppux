@@ -3540,6 +3540,7 @@ viewManager::Visualizer::platform::platform(const eventHandler &evtDispatcher,
   dispatchEvent = evtDispatcher;
   _w = width;
   _h = height;
+  fontScale = 0;
 
 // initialize private members
 #if defined(__linux__)
@@ -3552,7 +3553,6 @@ viewManager::Visualizer::platform::platform(const eventHandler &evtDispatcher,
 #elif defined(_WIN64)
 
   m_hwnd = 0x00;
-  fontScale = 0;
   CoInitialize(NULL);
 
 #endif
